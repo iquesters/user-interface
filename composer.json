@@ -18,5 +18,12 @@
             "email": "pritam02b@gmail.com"
         }
     ],
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "extra": {
+        "laravel": {
+        "providers": [
+            "Iquesters\\UserInterface\\UserInterfaceServiceProvider"
+        ]
+        }
+    }
 }
