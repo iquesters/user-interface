@@ -16,6 +16,9 @@ Route::prefix('form')->name('form')->group(function () {
     Route::get('/{id}/update', [FormController::class, 'update'])->name('.update');
     Route::post('/{id}/update', [FormController::class, 'update'])->name('.update.schema');
     Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
+
+
+    Route::get('/formCreate/{id}', [FormController::class, 'formCreate'])->name('.formCreate');
 });
 
 Route::prefix('table')->name('table')->group(function () {

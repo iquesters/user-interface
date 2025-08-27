@@ -151,4 +151,29 @@ class FormController extends Controller
     }
 
     public function delete() {}
+
+
+
+
+    public function formCreate($id)
+    {
+        $parent_id = $id;
+
+        $data = (object) [
+            'parent_id' => $parent_id
+        ];
+
+        $schema = null;
+
+        if ($parent_id > 0) {
+            $parent = FormSchema::where('id', $parent_id)->first();
+            $data->parent = $parent;
+
+            // assuming schema column holds your JSON
+            $schema = $parent->schema ? json_decode($parent->schema, true) : null;
+        }
+
+        return view('userinterface::form-schemas.dynamic-form', compact('data', 'schema'));
+}
+
 }
