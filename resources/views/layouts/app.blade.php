@@ -39,6 +39,10 @@
 
     <!-- JSON Editor -->
     <script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js"></script>
+
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/form.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/containers.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/form-validation.js') }}"></script>
     @stack('scripts')
 </body>
 </html>

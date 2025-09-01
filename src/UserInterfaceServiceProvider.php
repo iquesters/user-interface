@@ -8,6 +8,13 @@ use Illuminate\Support\Facades\Route;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
+
+    public function register()
+    {
+        $this->mergeConfigFrom(__DIR__ . '/../config/userinterface.php', 'userinterface');
+    }
+
+
     public function boot()
     {
         Log::info("✅ UserInterface package loaded from src/");
@@ -17,10 +24,20 @@ class UserInterfaceServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'userinterface');
         // allow config publish
         $this->mergeConfigFrom(__DIR__.'/../config/userinterface.php', 'userinterface');
+
+
+        $this->publishes([
+            __DIR__ . '/../public' => public_path('vendor/userinterface'),
+        ], 'user-userinterface-assets');
     }
 
-    public function register()
+    /**
+     * Get the JS URL for the package
+     */
+    public static function getJsUrl(string $file = 'js/app.js'): string
     {
-        //
+        return route('userinterface.asset', ['path' => $file]);
     }
+
+    
 }

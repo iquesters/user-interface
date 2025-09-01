@@ -19,6 +19,7 @@ Route::prefix('form')->name('form')->group(function () {
 
 
     Route::get('/formCreate/{id}', [FormController::class, 'formCreate'])->name('.formCreate');
+    Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
 });
 
 Route::prefix('table')->name('table')->group(function () {
@@ -30,3 +31,14 @@ Route::prefix('table')->name('table')->group(function () {
     Route::post('/{id}/update', [TableSchemaController::class, 'update'])->name('.update.schema');
     Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
 });
+
+
+Route::get('userinterface/assets/{path}', function ($path) {
+    $file = __DIR__ . '/../public/' . $path;
+
+    if (!File::exists($file)) {
+        abort(404);
+    }
+
+    return response()->file($file);
+})->where('path', '.*')->name('userinterface.asset');

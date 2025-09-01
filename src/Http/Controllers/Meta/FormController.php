@@ -174,6 +174,22 @@ class FormController extends Controller
         }
 
         return view('userinterface::form-schemas.dynamic-form', compact('data', 'schema'));
-}
+    }
+
+
+    public function formCreation($id = 0){
+        $parent_id = $id;
+
+        $data = (object)array(
+            'parent_id' => $parent_id
+        );
+
+        if ($parent_id > 0) {
+            $parent = FormSchema::where('id', $parent_id)->first();
+            $data->parent = $parent;
+        }
+
+        return view('userinterface::form-schemas.formcreation', compact('data'));
+    }
 
 }
