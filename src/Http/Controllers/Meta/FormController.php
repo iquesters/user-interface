@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Iquesters\UserInterface\Helpers\SchemaValidator;
 
 class FormController extends Controller
 {
@@ -191,5 +192,68 @@ class FormController extends Controller
 
         return view('userinterface::form-schemas.formcreation', compact('data'));
     }
+
+
+
+
+
+
+
+
+
+
+
+
+    // Handle form submission
+    public function formsubmit(Request $request)
+    {
+        try {
+            // 1️⃣ Get the submitted form schema JSON from the request
+            $schemaJson = $request->input('form_schema');
+
+            if (!$schemaJson) {
+                return back()->withErrors(['form_schema' => 'Form schema is missing.']);
+            }
+
+            // 2️⃣ Decode the JSON schema
+            $schema = json_decode($schemaJson, true);
+            if (!$schema) {
+                return back()->withErrors(['form_schema' => 'Invalid form schema JSON.']);
+            }
+
+            // 3️⃣ Build rules and messages dynamically
+            $rules = SchemaValidator::buildRules($schema);
+            $messages = SchemaValidator::buildMessages($schema);
+            dd($rules, $messages);
+            // 4️⃣ Validate the request
+            $validatedData = $request->validate($rules, $messages);
+
+            // 5️⃣ Process form data (example: store in DB, handle files, checkboxes, etc.)
+            foreach ($schema['fields'] as $field) {
+                $fieldId = $field['id'];
+                $value = $validatedData[$fieldId] ?? null;
+
+                // Handle file upload
+                if ($field['type'] === 'file' && $request->hasFile($fieldId)) {
+                    $file = $request->file($fieldId);
+                    $path = $file->store('uploads'); // store in storage/app/uploads
+                    $value = $path;
+                }
+
+                // TODO: Save $fieldId => $value in DB or perform other processing
+            }
+
+            // 6️⃣ Return success response
+            return back()->with('success', 'Form submitted successfully!');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Catch validation errors separately to return proper messages
+            return back()->withErrors($e->errors())->withInput();
+        } catch (\Exception $e) {
+            // Catch any other unexpected errors
+            return back()->withErrors(['error' => 'An unexpected error occurred: ' . $e->getMessage()]);
+        }
+    }
+
 
 }

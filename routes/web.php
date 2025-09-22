@@ -20,6 +20,7 @@ Route::prefix('form')->name('form')->group(function () {
 
     Route::get('/formCreate/{id}', [FormController::class, 'formCreate'])->name('.formCreate');
     Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
+    Route::post('/formsubmit', [FormController::class, 'formsubmit'])->name('.formsubmit');
 });
 
 Route::prefix('table')->name('table')->group(function () {

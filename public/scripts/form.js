@@ -70,6 +70,33 @@ async function setupForm(formElement) {
         }
     }
 
+
+
+
+    formElement.addEventListener("submit", function (e) {
+        e.preventDefault();
+        console.log("form submit event called...",formElement);
+        // console.log("Submitting form with schema:", formElement.querySelector('input[name="form_schema"]').value);
+        const formData = new FormData(formElement);
+        console.log(formData.get('form_schema'));
+
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+        })
+        .then(res => res.json())
+        .then(data => {
+            console.log('Form submitted:', data);
+            // handle success, show message, etc.
+        })
+        .catch(err => console.error('Form submit error:', err));
+
+
+
+
+    })
+
     // run prepare hook func if present
     if (formMeta?.prepareHookFunc) {
         window[formMeta?.prepareHookFunc](formElement?.id);
@@ -182,7 +209,9 @@ function setupFormFooter(cardFooter, formMeta) {
     if (formMeta.actions) {
         formMeta.actions.forEach(action => {
             action.form = formMeta.id
-            addAction(action, fragment);
+            // addAction(action, fragment);
+            const form = document.getElementById(formMeta.id);
+            addAction(action, form);
         })
     }
 
@@ -231,8 +260,33 @@ function addAction(action, addTo) {
             (action.element.variant && SUPPORTED_ACTION_ELEMENT_VARIANTS.includes(action.element.variant)) ?
                 action.element.variant : DEFAULT_ACTION_ELEMENT_VARIANT
 
+
+
+
+        let actionElement;
+
+        // ✅ CHANGE HERE: If action.type is "submit", create input instead of button
+        if (action.element.type === "button" && action.type === "submit") {
+            actionElement = document.createElement("input");
+            actionElement.type = "submit"; // native submit
+            actionElement.value = action.text ?? "Submit"; // text goes into value
+
+
+            // actionElement.addEventListener("click", (e) => {
+            //     console.log("Submit button clicked for form:");
+            // });
+
+
+        } else {
+            actionElement = document.createElement(action.element.type);
+        }
+        
+
+
+
+
         // creating action element
-        const actionElement = document.createElement(action.element.type)
+        // const actionElement = document.createElement(action.element.type)
         actionElement.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
         actionElement.classList.add('btn')
         actionElement.classList.add('btn-' + action.element.size);
@@ -377,25 +431,23 @@ function setupFormBlock(formCol, formMeta) {
             console.log(field);
             addField(field, form);
         })
+
+
+
+
+
+
+        const schemaInput = document.createElement('input');
+        schemaInput.type = 'hidden';
+        schemaInput.name = 'form_schema';
+        schemaInput.value = JSON.stringify(formMeta); // include entire schema
+        form.appendChild(schemaInput);
     }
 }
 
-function addField(field, addTo) {
-    if (field.type && !field.label) {
-        const input = document.createElement("input");
-        input.type = field.type;
-        if (field.type === 'file' && field?.accept) {
-            input.accept = field?.accept;
-        }
-        input.id = field.id;
-        input.name = field.id;
-        input.value = field.value || "";
-        input.classList.add("form-control");
-        input.setAttribute("placeholder", field.label);
-        addTo.appendChild(input);
-    } 
 
-    else if (field.type === 'radio') {
+function addField(field, addTo) {
+    if (field.type === 'radio') {
         const fragment = document.createElement("div");
         fragment.classList.add("col-12", "form-check-group");
         addTo.appendChild(fragment);
@@ -422,20 +474,24 @@ function addField(field, addTo) {
                     input.checked = true;
                 }
 
+                // Apply validation to each radio input
+                applyFieldValidation(field, input);
+
                 const label = document.createElement("label");
                 label.classList.add("form-check-label");
                 label.setAttribute("for", input.id);
-                label.textContent = opt.text;
+                label.textContent = opt.label;
 
                 div.appendChild(input);
                 div.appendChild(label);
                 fragment.appendChild(div);
             });
+            
         }
     }
     
     
-    else if (field.type === 'select') {
+    else if (field.type === 'select' || field.element === 'select') {
         const fragment = document.createElement("div");
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
@@ -453,7 +509,7 @@ function addField(field, addTo) {
             field.options.forEach(opt => {
                 const option = document.createElement("option");
                 option.value = opt.value;
-                option.textContent = opt.text;
+                option.textContent = opt.label;
                 if (field.value && field.value === opt.value) {
                     option.selected = true;
                 }
@@ -466,7 +522,10 @@ function addField(field, addTo) {
         label.setAttribute("for", field.id);
         label.textContent = field.label;
         formFloating.appendChild(label);
+
+        applySelectValidation(field, select);
     }
+    
     
     else if (field.type === 'checkbox') {
         const fragment = document.createElement("div");
@@ -496,6 +555,10 @@ function addField(field, addTo) {
                     input.checked = true;
                 }
 
+
+                // Apply validation to each checkbox input
+                applyFieldValidation(field, input);
+
                 const label = document.createElement("label");
                 label.classList.add("form-check-label");
                 label.setAttribute("for", input.id);
@@ -520,6 +583,9 @@ function addField(field, addTo) {
                 input.checked = true;
             }
 
+            // Apply validation to each checkbox input
+            applyFieldValidation(field, input);
+
             const label = document.createElement("label");
             label.classList.add("form-check-label");
             label.setAttribute("for", input.id);
@@ -531,7 +597,178 @@ function addField(field, addTo) {
         }
     }
 
-    
+
+    else if (field.type === "textarea") {
+        const fragment = document.createElement("div");
+        fragment.id = addTo.id + "-field";
+        addFieldSize(field, fragment);
+        addTo.appendChild(fragment);
+
+        const formFloating = document.createElement("div");
+        formFloating.id = field.id + "-container";
+        formFloating.classList.add("form-floating");
+        fragment.appendChild(formFloating);
+
+        const textarea = document.createElement("textarea");
+        textarea.id = field.id;
+        textarea.name = field.id;
+        textarea.rows = field.rows || 4; // default to 4 rows if not provided
+        textarea.value = field.value || "";
+        textarea.classList.add("form-control");
+        textarea.setAttribute("placeholder", field.label);
+
+        // Apply textarea validation
+        applyTextareaValidation(field, textarea);
+
+        formFloating.appendChild(textarea);
+
+        const label = document.createElement("label");
+        label.id = field.id + "-label";
+        label.setAttribute("for", field.id);
+        label.textContent = field.label;
+        formFloating.appendChild(label);
+
+        if (field.info) {
+            addFieldHelpInfo(field, formFloating);
+        }
+
+        if (field.feedback) {
+            addFieldFeedback(field.feedback, formFloating);
+        }
+    }
+
+
+
+
+
+    else if (field.type === "datalist") {
+        const fragment = document.createElement("div");
+        fragment.id = addTo.id + "-field";
+        addFieldSize(field, fragment);
+        addTo.appendChild(fragment);
+
+        const formFloating = document.createElement("div");
+        formFloating.id = field.id + "-container";
+        formFloating.classList.add("form-floating");
+        fragment.appendChild(formFloating);
+
+        // Create input with list attribute
+        const input = document.createElement("input");
+        input.id = field.id;
+        input.name = field.id;
+        input.type = "text";
+        input.classList.add("form-control");
+        input.setAttribute("placeholder", field.label);
+        input.setAttribute("list", field.id + "-list"); // link to datalist
+
+        formFloating.appendChild(input);
+
+        // ✅ Create datalist element
+        const datalist = document.createElement("datalist");
+        datalist.id = field.id + "-list";
+
+        if (field.options && Array.isArray(field.options)) {
+            field.options.forEach(opt => {
+                const option = document.createElement("option");
+                option.value = opt;
+                datalist.appendChild(option);
+            });
+        }
+
+        formFloating.appendChild(datalist);
+
+        // ✅ Apply datalist validation here (AFTER datalist is created)
+        if (typeof applyDatalistValidation === "function") {
+            applyDatalistValidation(field, input, datalist);
+        }
+
+        const label = document.createElement("label");
+        label.id = field.id + "-label";
+        label.setAttribute("for", field.id);
+        label.textContent = field.label;
+        formFloating.appendChild(label);
+
+        if (field.info) {
+            addFieldHelpInfo(field, formFloating);
+        }
+
+        if (field.feedback) {
+            addFieldFeedback(field.feedback, formFloating);
+        }
+    }
+
+
+
+    // Input type text with dropdown options (not a select)
+    else if (field.type === "text" && field.options && Array.isArray(field.options)) {
+        const fragment = document.createElement("div");
+        fragment.id = addTo.id + "-field";
+        addFieldSize(field, fragment);
+        addTo.appendChild(fragment);
+
+        // Dropdown container
+        const container = document.createElement("div");
+        fragment.appendChild(container);
+
+        // Dropdown button
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = field.label + " ▼";
+        button.id = field.id + "-button";
+        container.appendChild(button);
+
+        // Dropdown menu (hidden by default)
+        const menu = document.createElement("div");
+        menu.id = field.id + "-menu";
+        menu.style.display = "none";
+        container.appendChild(menu);
+
+        // Search input inside dropdown
+        const search = document.createElement("input");
+        search.type = "text";
+        search.placeholder = field.placeholder || "Search...";
+        menu.appendChild(search);
+
+        // Populate items
+        field.options.forEach(opt => {
+            const item = document.createElement("div");
+            item.textContent = opt.label;
+            item.addEventListener("click", () => {
+                button.textContent = opt.label + " ▼"; // show selection
+                menu.style.display = "none";
+            });
+            menu.appendChild(item);
+        });
+
+        // Toggle dropdown on button click
+        button.addEventListener("click", () => {
+            menu.style.display = menu.style.display === "none" ? "block" : "none";
+            search.value = ""; // reset search
+            filterItems("");
+            search.focus();
+        });
+
+        // Filter function
+        function filterItems(filter) {
+            Array.from(menu.querySelectorAll("div")).forEach(div => {
+                if (div !== search) {
+                    div.style.display = div.textContent.toLowerCase().includes(filter) ? "" : "none";
+                }
+            });
+        }
+
+        // Filter on input
+        search.addEventListener("input", () => filterItems(search.value.toLowerCase()));
+
+        // Close when clicking outside
+        document.addEventListener("click", (e) => {
+            if (!container.contains(e.target)) {
+                menu.style.display = "none";
+            }
+        });
+    }
+
+    // Simple input types: text, email, password, number, date, datetime-local, time, file
     else if (field.type && field.label) {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
@@ -556,6 +793,13 @@ function addField(field, addTo) {
         input.value = field.value || "";
         input.classList.add("form-control");
         input.setAttribute("placeholder", field.label);
+
+
+        // HTML form validation
+        applyFieldValidation(field, input);
+
+
+
         formFloating.appendChild(input);
 
         const label = document.createElement("label");
@@ -818,6 +1062,7 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
         if (document.readyState === "complete") {
             // Fetch all the forms marked as shoz-form
             const forms = document.querySelectorAll('.shoz-form')
+            console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {
                 setupForm(form)
@@ -864,3 +1109,4 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
         }, false)
     })
 })();
+

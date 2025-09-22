@@ -40,9 +40,15 @@
     <!-- JSON Editor -->
     <script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js"></script>
 
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/form-constant.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/customValidationMessage.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/input-field-validation.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/textarea-validation.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/select-validation.js') }}"></script>
+    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('formValidation/datalist-validation.js') }}"></script>
     <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/form.js') }}"></script>
     <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/containers.js') }}"></script>
-    <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('scripts/form-validation.js') }}"></script>
+    
     @stack('scripts')
 </body>
 </html>
