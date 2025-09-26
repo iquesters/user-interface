@@ -16,6 +16,18 @@
     <div class="container-fluid" style="min-height: calc(100vh - 65px);">
         <!-- Main Content -->
         <main class="main-content squeeze" id="mainContent">
+
+           @if ($errors->any())
+            <div class="text-danger p-3 rounded mb-4">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+
+            
             @if (session('status'))
             <div class="alert alert-info m-0 mt-3 p-2" role="alert">
                 {{ session('status') }}

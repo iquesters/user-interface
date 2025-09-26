@@ -3,14 +3,18 @@
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
 @section('content')
-<form id="mdm-create" class="shoz-form" data-form-data="{{json_encode($data)}}"></form>
-<!-- <form id="mdm-create" class="shoz-form" 
-      action="{{ route('form.formsubmit') }}" 
+<!-- <form id="mdm-create" class="shoz-form" data-form-data="{{json_encode($data)}}"></form> -->
+<form id="mdm-create" class="shoz-form" 
+      action="{{ route('form.formsubmit', ['uid' => $data->parent->uid ?? '']) }}" 
       method="POST" 
       enctype="multipart/form-data"
       data-form-data="{{ json_encode($data) }}">
     @csrf
-</form> -->
+
+   
+    
+    
+</form>
 
 @endsection
 

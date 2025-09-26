@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Iquesters\UserInterface\Helpers\SchemaValidator;
+use Iquesters\UserInterface\Http\Requests\DynamicFormRequest;
+use Iquesters\UserInterface\Support\DynamicFormSchema;
 
 class FormController extends Controller
 {
@@ -189,69 +190,49 @@ class FormController extends Controller
             $parent = FormSchema::where('id', $parent_id)->first();
             $data->parent = $parent;
         }
-
+        Log::info('Form data: ' . json_encode($data));
         return view('userinterface::form-schemas.formcreation', compact('data'));
     }
 
 
 
-
-
-
-
-
-
-
-
-
-    // Handle form submission
-    public function formsubmit(Request $request)
+    public function formsubmit(Request $request,$uid)
     {
         try {
-            // 1️⃣ Get the submitted form schema JSON from the request
-            $schemaJson = $request->input('form_schema');
-
-            if (!$schemaJson) {
-                return back()->withErrors(['form_schema' => 'Form schema is missing.']);
+            // Fetch schema record
+            $schemaRecord = FormSchema::where('uid', $uid)->first();
+            if (!$schemaRecord) {
+                return back()->withErrors(['uid' => 'Invalid form UID']);
             }
 
-            // 2️⃣ Decode the JSON schema
-            $schema = json_decode($schemaJson, true);
-            if (!$schema) {
-                return back()->withErrors(['form_schema' => 'Invalid form schema JSON.']);
+            // Decode JSON schema
+            $schema = json_decode($schemaRecord->schema, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Invalid JSON schema: ' . json_last_error_msg());
             }
 
-            // 3️⃣ Build rules and messages dynamically
-            $rules = SchemaValidator::buildRules($schema);
-            $messages = SchemaValidator::buildMessages($schema);
-            dd($rules, $messages);
-            // 4️⃣ Validate the request
-            $validatedData = $request->validate($rules, $messages);
+            // Generate rules and messages dynamically
+            $rules = DynamicFormSchema::toRules($schema);
+            $messages = DynamicFormSchema::toMessages($schema);
 
-            // 5️⃣ Process form data (example: store in DB, handle files, checkboxes, etc.)
-            foreach ($schema['fields'] as $field) {
-                $fieldId = $field['id'];
-                $value = $validatedData[$fieldId] ?? null;
+            // Validate input
+            $validator = Validator::make($request->all(), $rules, $messages);
+            
 
-                // Handle file upload
-                if ($field['type'] === 'file' && $request->hasFile($fieldId)) {
-                    $file = $request->file($fieldId);
-                    $path = $file->store('uploads'); // store in storage/app/uploads
-                    $value = $path;
-                }
-
-                // TODO: Save $fieldId => $value in DB or perform other processing
+            if ($validator->fails()) {
+                return back()
+                    ->withErrors($validator)
+                    ->withInput();
             }
 
-            // 6️⃣ Return success response
-            return back()->with('success', 'Form submitted successfully!');
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            // Catch validation errors separately to return proper messages
-            return back()->withErrors($e->errors())->withInput();
+            $validatedData = $validator->validated();
+
+            return back()->with('success', 'Form submitted successfully');
+
         } catch (\Exception $e) {
-            // Catch any other unexpected errors
-            return back()->withErrors(['error' => 'An unexpected error occurred: ' . $e->getMessage()]);
+            Log::error('Form submission error: ' . $e->getMessage());
+            return back()->withErrors(['form_error' => 'An error occurred: ' . $e->getMessage()])->withInput();
         }
     }
 

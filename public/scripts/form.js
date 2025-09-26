@@ -73,29 +73,26 @@ async function setupForm(formElement) {
 
 
 
-    formElement.addEventListener("submit", function (e) {
-        e.preventDefault();
-        console.log("form submit event called...",formElement);
-        // console.log("Submitting form with schema:", formElement.querySelector('input[name="form_schema"]').value);
-        const formData = new FormData(formElement);
-        console.log(formData.get('form_schema'));
+    // formElement.addEventListener("submit", function (e) {
+    //     e.preventDefault();
+    //     console.log("form submit event called...",formElement);
+    //     // console.log("Submitting form with schema:", formElement.querySelector('input[name="form_schema"]').value);
+    //     // const formData = new FormData(formElement);
+    //     // console.log(formData.get('form_schema'));
 
 
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-        })
-        .then(res => res.json())
-        .then(data => {
-            console.log('Form submitted:', data);
-            // handle success, show message, etc.
-        })
-        .catch(err => console.error('Form submit error:', err));
+    //     // fetch(form.action, {
+    //     //     method: 'POST',
+    //     //     body: formData,
+    //     // })
+    //     // .then(res => res.json())
+    //     // .then(data => {
+    //     //     console.log('Form submitted:', data);
+    //     //     // handle success, show message, etc.
+    //     // })
+    //     // .catch(err => console.error('Form submit error:', err));
 
-
-
-
-    })
+    // })
 
     // run prepare hook func if present
     if (formMeta?.prepareHookFunc) {
@@ -410,7 +407,7 @@ function setupFormBlock(formCol, formMeta) {
         form.appendChild(formIdInput)
 
         form.setAttribute('method', formMeta.method)
-        form.setAttribute('action', formMeta.action)
+        // form.setAttribute('action', formMeta.action)
         form.setAttribute('enctype', formMeta.enctype)
         // form.classList.add(...['row', 'row-cols-1', 'row-cols-md-4', 'g-2', 'needs-validation'])
         form.classList.add(...['row', 'row-cols-1', 'g-2', 'needs-validation'])
@@ -431,19 +428,10 @@ function setupFormBlock(formCol, formMeta) {
             console.log(field);
             addField(field, form);
         })
-
-
-
-
-
-
-        const schemaInput = document.createElement('input');
-        schemaInput.type = 'hidden';
-        schemaInput.name = 'form_schema';
-        schemaInput.value = JSON.stringify(formMeta); // include entire schema
-        form.appendChild(schemaInput);
     }
 }
+
+
 
 
 function addField(field, addTo) {
@@ -700,73 +688,226 @@ function addField(field, addTo) {
 
 
     // Input type text with dropdown options (not a select)
+    // else if (field.type === "text" && field.options && Array.isArray(field.options)) {
+    //     const fragment = document.createElement("div");
+    //     fragment.id = addTo.id + "-field";
+    //     addFieldSize(field, fragment);
+    //     addTo.appendChild(fragment);
+
+    //     // Dropdown container
+    //     const container = document.createElement("div");
+    //     fragment.appendChild(container);
+
+    //     // Dropdown button
+    //     const button = document.createElement("button");
+    //     button.type = "button";
+    //     button.textContent = field.label + " ▼";
+    //     button.id = field.id + "-button";
+    //     container.appendChild(button);
+
+    //     // Dropdown menu (hidden by default)
+    //     const menu = document.createElement("div");
+    //     menu.id = field.id + "-menu";
+    //     menu.style.display = "none";
+    //     container.appendChild(menu);
+
+    //     // Search input inside dropdown
+    //     const search = document.createElement("input");
+    //     search.type = "text";
+    //     search.placeholder = field.placeholder || "Search...";
+    //     menu.appendChild(search);
+
+    //     // Populate items
+    //     field.options.forEach(opt => {
+    //         const item = document.createElement("div");
+    //         item.textContent = opt.label;
+    //         item.addEventListener("click", () => {
+    //             button.textContent = opt.label + " ▼"; // show selection
+    //             menu.style.display = "none";
+    //         });
+    //         menu.appendChild(item);
+    //     });
+
+    //     // Toggle dropdown on button click
+    //     button.addEventListener("click", () => {
+    //         menu.style.display = menu.style.display === "none" ? "block" : "none";
+    //         search.value = ""; // reset search
+    //         filterItems("");
+    //         search.focus();
+    //     });
+
+    //     // Filter function
+    //     function filterItems(filter) {
+    //         Array.from(menu.querySelectorAll("div")).forEach(div => {
+    //             if (div !== search) {
+    //                 div.style.display = div.textContent.toLowerCase().includes(filter) ? "" : "none";
+    //             }
+    //         });
+    //     }
+
+    //     // Filter on input
+    //     search.addEventListener("input", () => filterItems(search.value.toLowerCase()));
+
+    //     // Close when clicking outside
+    //     document.addEventListener("click", (e) => {
+    //         if (!container.contains(e.target)) {
+    //             menu.style.display = "none";
+    //         }
+    //     });
+    // }
+
+    // else if (field.type === "text" && field.options && Array.isArray(field.options)) {
+    //     const fragment = document.createElement("div");
+    //     fragment.id = addTo.id + "-field";
+    //     addFieldSize(field, fragment);
+    //     addTo.appendChild(fragment);
+
+    //     // Input to show selected value
+    //     const input = document.createElement("input");
+    //     input.type = "text";
+    //     input.name = field.id;       // will be sent in form
+    //     input.value = field.value || "";
+    //     input.placeholder = field.placeholder || field.label;
+    //     input.classList.add("form-control");
+    //     fragment.appendChild(input);
+
+    //     // HTML form validation
+    //     applyFieldValidation(field, input);
+
+    //     // Dropdown menu (hidden by default)
+    //     const menu = document.createElement("div");
+    //     menu.style.display = "none";
+    //     menu.classList.add("dropdown-menu", "w-100", "p-2", "position-absolute");
+    //     fragment.appendChild(menu);
+
+    //     // Populate items
+    //     field.options.forEach(opt => {
+    //         const item = document.createElement("div");
+    //         item.classList.add("dropdown-item");
+    //         item.textContent = opt.label;
+    //         item.addEventListener("click", () => {
+    //             input.value = opt.label;      // show selected value
+    //             input.dataset.value = opt.value; // store real value if needed
+    //             menu.style.display = "none";
+    //             input.reportValidity();
+    //         });
+    //         menu.appendChild(item);
+    //     });
+
+    //     // Show dropdown when input is focused
+    //     input.addEventListener("focus", () => {
+    //         menu.style.display = "block";
+    //     });
+
+    //     // Filter items as user types
+    //     input.addEventListener("input", () => {
+    //         const filter = input.value.toLowerCase();
+    //         Array.from(menu.children).forEach(item => {
+    //             if (item !== input) {
+    //                 item.style.display = item.textContent.toLowerCase().includes(filter) ? "" : "none";
+    //             }
+    //         });
+    //     });
+
+    //     // Close when clicking outside
+    //     document.addEventListener("click", (e) => {
+    //         if (!fragment.contains(e.target)) {
+    //             menu.style.display = "none";
+    //         }
+    //     });
+    // }
+
+
     else if (field.type === "text" && field.options && Array.isArray(field.options)) {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
+        fragment.style.position = "relative"; // keep dropdown aligned
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        // Dropdown container
-        const container = document.createElement("div");
-        fragment.appendChild(container);
+        // Input
+        const input = document.createElement("input");
+        input.type = "text";
+        input.name = field.id;
+        input.value = field.value || "";
+        input.placeholder = field.placeholder || field.label;
+        input.classList.add("form-control");
+        fragment.appendChild(input);
 
-        // Dropdown button
-        const button = document.createElement("button");
-        button.type = "button";
-        button.textContent = field.label + " ▼";
-        button.id = field.id + "-button";
-        container.appendChild(button);
+        // Validation
+        applyFieldValidation(field, input);
 
-        // Dropdown menu (hidden by default)
+        // Dropdown menu
         const menu = document.createElement("div");
-        menu.id = field.id + "-menu";
-        menu.style.display = "none";
-        container.appendChild(menu);
+        menu.style.display = "block";
+        menu.style.position = "absolute";
+        menu.style.top = "100%";
+        menu.style.left = "0";
+        menu.style.width = "100%";
+        menu.style.maxHeight = "0";
+        menu.style.overflow = "hidden";
+        menu.style.opacity = "0";
+        menu.style.transition = "all 0.2s ease"; // ✅ smooth transition
+        menu.style.background = "#fff";
+        menu.style.border = "1px solid #ccc";
+        menu.style.zIndex = "1000";
+        fragment.appendChild(menu);
 
-        // Search input inside dropdown
-        const search = document.createElement("input");
-        search.type = "text";
-        search.placeholder = field.placeholder || "Search...";
-        menu.appendChild(search);
-
-        // Populate items
+        // Populate
         field.options.forEach(opt => {
             const item = document.createElement("div");
             item.textContent = opt.label;
+            item.style.padding = "6px 10px";
+            item.style.cursor = "pointer";
+            item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
+            item.addEventListener("mouseout", () => item.style.background = "#fff");
             item.addEventListener("click", () => {
-                button.textContent = opt.label + " ▼"; // show selection
-                menu.style.display = "none";
+                input.value = opt.label;
+                input.dataset.value = opt.value;
+                closeMenu();
+                input.reportValidity();
             });
             menu.appendChild(item);
         });
 
-        // Toggle dropdown on button click
-        button.addEventListener("click", () => {
-            menu.style.display = menu.style.display === "none" ? "block" : "none";
-            search.value = ""; // reset search
-            filterItems("");
-            search.focus();
-        });
-
-        // Filter function
-        function filterItems(filter) {
-            Array.from(menu.querySelectorAll("div")).forEach(div => {
-                if (div !== search) {
-                    div.style.display = div.textContent.toLowerCase().includes(filter) ? "" : "none";
-                }
-            });
+        // Open/close functions
+        function openMenu() {
+            menu.style.maxHeight = "500px"; // expands smoothly
+            menu.style.opacity = "1";
         }
 
-        // Filter on input
-        search.addEventListener("input", () => filterItems(search.value.toLowerCase()));
+        function closeMenu() {
+            menu.style.maxHeight = "0";
+            menu.style.opacity = "0";
+        }
+
+        // Toggle on input click
+        input.addEventListener("click", () => {
+            if (menu.style.maxHeight === "0px" || menu.style.opacity === "0") {
+                openMenu();
+            } else {
+                closeMenu();
+            }
+        });
+
+        // Filter items
+        input.addEventListener("input", () => {
+            const filter = input.value.toLowerCase();
+            Array.from(menu.children).forEach(item => {
+                item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
+            });
+            openMenu();
+        });
 
         // Close when clicking outside
         document.addEventListener("click", (e) => {
-            if (!container.contains(e.target)) {
-                menu.style.display = "none";
+            if (!fragment.contains(e.target)) {
+                closeMenu();
             }
         });
     }
+
+
 
     // Simple input types: text, email, password, number, date, datetime-local, time, file
     else if (field.type && field.label) {
@@ -796,7 +937,7 @@ function addField(field, addTo) {
 
 
         // HTML form validation
-        applyFieldValidation(field, input);
+        // applyFieldValidation(field, input);
 
 
 
