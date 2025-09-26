@@ -937,7 +937,7 @@ function addField(field, addTo) {
 
 
         // HTML form validation
-        // applyFieldValidation(field, input);
+        applyFieldValidation(field, input);
 
 
 
