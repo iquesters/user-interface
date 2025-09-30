@@ -36,15 +36,15 @@ Route::middleware(['web'])->group(function () {
     });
 
 
-    Route::get('userinterface/assets/{path}', function ($path) {
-        $file = __DIR__ . '/../public/' . $path;
+    // Route::get('userinterface/assets/{path}', function ($path) {
+    //     $file = __DIR__ . '/../public/' . $path;
 
-        if (!File::exists($file)) {
-            abort(404);
-        }
+    //     if (!File::exists($file)) {
+    //         abort(404);
+    //     }
 
-        return response()->file($file);
-    })->where('path', '.*')->name('userinterface.asset');
+    //     return response()->file($file);
+    // })->where('path', '.*')->name('userinterface.asset');
 
     });
 });
