@@ -1,0 +1,7 @@
+@media (min-width: 576px) {
+
+    /* Styling for screen width test */
+    .screen-width-test {
+        background-color: #00f;
+    }
+}

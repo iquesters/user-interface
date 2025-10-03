@@ -27,27 +27,6 @@
     }
 }
 
-/* Desktop behavior - sidebar visible by default */
-@media (min-width: 992px) {
-    .sidebar {
-        transform: translateX(0); /* Visible by default */
-    }
-
-    .sidebar.hidden {  /* ✅ FIXED: Use .hidden class */
-        transform: translateX(-250px); /* Hide when has hidden class */
-    }
-
-    /* Main content squeezed by default on desktop */
-    #mainContent {
-        margin-left: 250px;
-        transition: margin-left 0.3s ease;
-    }
-
-    #mainContent.no-squeeze {
-        margin-left: 0;
-    }
-}
-
 .profile-dropdown {
     width: 300px;
     right: 3px !important;

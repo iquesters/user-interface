@@ -1,0 +1,25 @@
+@media (min-width: 992px) {
+
+    /* Styling for screen width test */
+    .screen-width-test {
+        background-color: #0f0;
+    }
+
+    .sidebar {
+        transform: translateX(0); /* Visible by default */
+    }
+
+    .sidebar.hidden {  /* ✅ FIXED: Use .hidden class */
+        transform: translateX(-250px); /* Hide when has hidden class */
+    }
+
+    /* Main content squeezed by default on desktop */
+    #mainContent {
+        margin-left: 250px;
+        transition: margin-left 0.3s ease;
+    }
+
+    #mainContent.no-squeeze {
+        margin-left: 0;
+    }
+}

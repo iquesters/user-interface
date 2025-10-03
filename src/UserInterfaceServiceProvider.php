@@ -5,6 +5,11 @@ namespace Iquesters\UserInterface;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Console\Command;
+use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Schema;
+use Iquesters\Foundation\Models\Module;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
@@ -12,6 +17,8 @@ class UserInterfaceServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/userinterface.php', 'userinterface');
+
+        $this->registerSeedCommand();
     }
 
 
@@ -26,10 +33,52 @@ class UserInterfaceServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/userinterface.php', 'userinterface');
         $this->registerAssetRoute();
 
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                'command.user-interface.seed'
+            ]);
+        }
+
+        // 👇 Share installed modules globally
+        $this->shareInstalledModules();
+
         $this->publishes([
             __DIR__ . '/../public' => public_path('vendor/userinterface'),
         ], 'user-userinterface-assets');
     }
+
+    /**
+     * Share installed modules with all views.
+     */
+    protected function shareInstalledModules(): void
+    {
+        $modules = Schema::hasTable('modules')
+            ? Module::with('metas')->get()
+            : collect();
+
+        View::share('installedModules', $modules);
+    }
+    
+    protected function registerSeedCommand(): void
+    {
+        $this->app->singleton('command.user-interface.seed', function ($app) {
+            return new class extends Command {
+                protected $signature = 'user-interface:seed';
+                protected $description = 'Seed User Interface module data';
+
+                public function handle()
+                {
+                    $this->info('Running User Interface Seeder...');
+                    $seeder = new UserInterfaceSeeder();
+                    $seeder->setCommand($this);
+                    $seeder->run();
+                    $this->info('User Interface seeding completed!');
+                    return 0;
+                }
+            };
+        });
+    }
+    
     protected function registerAssetRoute(): void
     {
         Route::get('/vendor/userinterface/{path}', function ($path) {

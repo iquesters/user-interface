@@ -1,59 +1,60 @@
-<!-- Sidebar -->
 <aside class="sidebar bg-light text-dark p-1" id="appSidebar">
     <div class="sidebar-body">
-        <div class="list-group list-group-flush">
-            @if (class_exists(\Iquesters\UserManagement\UserManagementServiceProvider::class))
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="{{ route('dashboard') }}">
-                    <span><i class="fas fa-fw fa-tachometer-alt me-2"></i>Dashboard</span>
-                </a>
-                {{-- @if (Auth::user()->hasRole('super-admin')) --}}
-                {{-- @can('manage-users') --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="{{ route('users.index') }}">
-                    <span><i class="fas fa-fw fa-users me-2"></i>Users</span>
-                </a>
-            @endif
-            @if (class_exists(\Iquesters\Organisation\OrganisationServiceProvider::class))
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="{{ route('organisations.index') }}">
-                    <span><i class="fas fa-fw fa-building me-2"></i>Organisation</span>
-                </a>
-            @endif
-            @if (class_exists(\Iquesters\UserManagement\UserManagementServiceProvider::class))
-                {{-- @endcan --}}
-                {{-- @can('manage-roles') --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="{{ route('roles.index') }}">
-                    <span><i class="fas fa-fw fa-user-shield me-2"></i>Roles</span>
-                </a>
-                {{-- @endcan --}}
-                
-                {{-- @can('manage-permissions') --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="{{ route('permissions.index') }}">
-                    <span><i class="fas fa-fw fa-shield-alt me-2"></i>Permissions</span>
-                </a>
-                {{-- @endcan --}}
-                
-                {{-- @can('view-master_data') --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="#">
-                    <span><i class="fas fa-fw fa-database me-2"></i>Master Data</span>
-                </a>
-                {{-- @endcan --}}
-                
-                {{-- @can('view-qr_codes') --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="#">
-                    <span><i class="fas fa-fw fa-qrcode me-2"></i>QR Codes</span>
-                </a>
-                {{-- @endcan --}}
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="#">
-                    <span><i class="fas fa-fw fa-user-friends me-2"></i>Persons</span>
-                </a>
-                <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center" href="#">
-                    <span><i class="fas fa-fw fa-plug me-2"></i>Modules</span>
-                </a>
-            @endif
-                {{-- <a class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center"
-                href="{{ route('organisations.integration.index', ['organisationUid' => $organisation->uid ?? 'default']) }}">
-                    <span><i class="fas fa-fw fa-plug me-2"></i>Integrations</span>
-                </a> --}}
-            {{-- @endif --}}
+        <div class="list-group list-group-flush" id="sidebarMenu">
+            <div class="text-muted px-2 py-1">Loading menu...</div>
         </div>
     </div>
 </aside>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebarMenu');
+    const tabs = document.querySelectorAll('.module-tab');
+
+    // Render sidebar
+    function renderSidebar(menu, name) {
+        sidebar.innerHTML = '';
+        if (!menu || menu.length === 0) {
+            sidebar.innerHTML = `<div class="text-muted px-2 py-1">No menu available for ${name}</div>`;
+            return;
+        }
+
+        menu.forEach(item => {
+            const link = document.createElement('a');
+            link.className = 'list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center';
+            link.href = item.url || '#';
+            link.innerHTML = `<span><i class="${item.icon} me-2"></i>${item.label}</span>`;
+            sidebar.appendChild(link);
+        });
+    }
+
+    // Set active tab
+    function setActive(tab) {
+        tabs.forEach(t => t.classList.remove('active-module'));
+        tab.classList.add('active-module');
+        localStorage.setItem('activeModuleIndex', tab.dataset.index);
+    }
+
+    // Load saved module or default first
+    let savedIndex = localStorage.getItem('activeModuleIndex');
+    let defaultTab = tabs[0];
+
+    if (savedIndex) {
+        const tab = Array.from(tabs).find(t => t.dataset.index === savedIndex);
+        if (tab) defaultTab = tab;
+    }
+
+    renderSidebar(JSON.parse(defaultTab.dataset.menu || '[]'), defaultTab.dataset.name);
+    setActive(defaultTab);
+
+    // Attach click events
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            renderSidebar(JSON.parse(tab.dataset.menu || '[]'), tab.dataset.name);
+            setActive(tab);
+        });
+    });
+});
+</script>
+@endpush

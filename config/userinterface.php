@@ -17,5 +17,13 @@ return [
     |
     */
     'logo' => env('USER_MANAGEMENT_LOGO', 'img/logo.png'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Module Tabs
+    |--------------------------------------------------------------------------
+    | Control how many modules are shown before moving the rest into dropdown
+    */
+    'max_visible_modules' => env('USERINTERFACE_MAX_VISIBLE_MODULES', 7),
 ];
 ?>
