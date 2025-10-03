@@ -12,6 +12,7 @@
 
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl() }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/custom-element.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/production-performance.js') }}"></script>
 
 <!-- Dynamic JavaScript inclusion ENDS -->
 @stack('scripts')
