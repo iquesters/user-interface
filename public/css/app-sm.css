@@ -4,4 +4,41 @@
     .screen-width-test {
         background-color: #00f;
     }
+
+    .shoz-minibar {
+        flex-direction: column;
+
+        height: 100vh;
+        max-height: 100vh;
+        min-height: 100vh;
+
+        width: 70px;
+        max-width: 70px;
+        min-width: 70px;
+
+        position: sticky;
+        top: 0;
+    }
+
+    .shoz-minibar-nav {
+        flex-direction: column;
+        justify-content: unset;
+    }
+
+    .shoz-minibar-nav>div,
+    .shoz-minibar-nav>ul {
+        display: flex !important;
+    }
+
+    .shoz-minibar-header {
+        flex-direction: column;
+        justify-content: center;
+        min-height: 62px;
+    }
+
+    .shoz-minibar-body {
+        flex-direction: column;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
 }

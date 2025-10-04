@@ -4,14 +4,11 @@
     $tabsPerScroll = 7;
 @endphp
 
+<div class="overflow-x-auto">
 <div class="d-flex align-items-center border-start border-white position-relative" style="max-width: calc(100vw - 550px); background-color: #e6e3e3">
-    {{-- Left arrow --}}
-    <button class="btn btn-sm position-absolute start-0 top-50 translate-middle-y arrow-btn d-none bg-secondary border text-info" id="leftArrow">
-        &#8592;
-    </button>
 
     {{-- Scrollable tabs container --}}
-    <div class="d-flex overflow-hidden flex-grow-1" id="modulesContainer">
+    <div class="d-flex flex-grow-1" id="modulesContainer">
         {{-- First N modules --}}
         @foreach($installedModules->take($maxVisible) as $index => $module)
             @php
@@ -87,78 +84,5 @@
             </ul>
         </div>
     @endif
-
-    {{-- Right arrow --}}
-    <button class="btn btn-sm position-absolute end-0 top-50 translate-middle-y arrow-btn d-none bg-secondary border text-info" id="rightArrow">
-        &#8594;
-    </button>
 </div>
-
-{{-- CSS --}}
-<style>
-    #modulesContainer {
-        scroll-behavior: smooth;
-    }
-    .arrow-btn {
-        z-index: 10;
-    }
-</style>
-
-{{-- JS --}}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const container = document.getElementById('modulesContainer');
-    const leftArrow = document.getElementById('leftArrow');
-    const rightArrow = document.getElementById('rightArrow');
-
-    const tabs = Array.from(container.children);
-    let currentPage = 0;
-
-    function getTabsPerPage() {
-        // How many tabs fit fully in the visible container
-        const containerWidth = container.clientWidth;
-        let totalWidth = 0;
-        let count = 0;
-        for (let tab of tabs) {
-            totalWidth += tab.offsetWidth;
-            if (totalWidth <= containerWidth) count++;
-            else break;
-        }
-        return count || 1; // at least 1
-    }
-
-    function scrollToPage(page) {
-        const tabsPerPage = getTabsPerPage();
-        currentPage = Math.max(0, page);
-
-        const firstTabIndex = currentPage * tabsPerPage;
-        if (firstTabIndex >= tabs.length) {
-            currentPage = Math.floor((tabs.length - 1) / tabsPerPage);
-        }
-
-        const scrollLeft = tabs[firstTabIndex].offsetLeft;
-        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-        updateArrows();
-    }
-
-    function updateArrows() {
-        const maxScroll = container.scrollWidth - container.clientWidth;
-        leftArrow.classList.toggle('d-none', container.scrollLeft <= 0);
-        rightArrow.classList.toggle('d-none', container.scrollLeft >= maxScroll - 1);
-    }
-
-    rightArrow.addEventListener('click', () => {
-        scrollToPage(currentPage + 1);
-    });
-
-    leftArrow.addEventListener('click', () => {
-        scrollToPage(currentPage - 1);
-    });
-
-    container.addEventListener('scroll', updateArrows);
-    window.addEventListener('resize', () => scrollToPage(currentPage));
-
-    updateArrows();
-});
-
-</script>
+</div>

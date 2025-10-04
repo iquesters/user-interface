@@ -25,7 +25,8 @@
     {{-- @include('utils.backdrop-loader') --}}
     <div class="ui-wrapper">
         {{-- @auth --}}
-        @include('userinterface::layouts.common.mobile-navbar')
+        {{-- @include('userinterface::layouts.common.mobile-navbar') --}}
+        @include('userinterface::layouts.common.minibar')
         {{-- @endif --}}
         <div class="ui-main">
             @include('userinterface::layouts.header')

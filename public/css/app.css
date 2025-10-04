@@ -3,7 +3,7 @@
     height: calc(100vh - 56px);
     position: fixed;
     top: 56px;
-    left: 0;
+    left: 70px;
     z-index: 1000;
     background-color: #f8f9fa;
     border-right: 1px solid #dee2e6;
@@ -75,4 +75,47 @@
     overflow-y: auto;
     transition: all 0.35s ease-in-out;
     width: 100%;
+}
+
+.shoz-minibar {
+    background-color: #beb;
+    display: flex;
+    transition: all .25s ease-in-out;
+    z-index: 1000;
+}
+
+.shoz-minibar {
+    flex-direction: row;
+
+    height: 62px;
+    max-height: 62px;
+    min-height: 62px;
+
+    width: 100vw;
+    max-width: 100vw;
+    min-width: 100vw;
+
+    overflow: hidden;
+    position: fixed;
+    bottom: 0;
+}
+
+.shoz-minibar-nav {
+    display: flex;
+    justify-content: space-between;
+    height: 100%;
+    width: 100%;
+}
+
+.shoz-minibar-nav>div,
+.shoz-minibar-nav>ul {
+    align-items: center;
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.shoz-minibar-header {
+    display: none !important;
 }
