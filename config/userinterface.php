@@ -25,5 +25,19 @@ return [
     | Control how many modules are shown before moving the rest into dropdown
     */
     'max_visible_modules' => env('USERINTERFACE_MAX_VISIBLE_MODULES', 7),
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Mobile Bottom Navigation
+    |--------------------------------------------------------------------------
+    | Configure mobile bottom tab bar settings
+    */
+   'mobile_bottom_tabs' => env('USERINTERFACE_MOBILE_BOTTOM_TABS', 4), // Max tabs to show (4 tabs + 1 dropdown)
+    
+    // Set to null to disable featured tab, or set any module name
+    'mobile_featured_tab' => env('USERINTERFACE_MOBILE_FEATURED_TAB', null), // null = no featured tab, or 'product', 'user-management', etc.
+    
+    // Position of featured tab: 'center' (default), 'left', 'right', or null
+    'mobile_featured_position' => env('USERINTERFACE_MOBILE_FEATURED_POSITION', 'center'),
 ];
 ?>

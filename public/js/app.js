@@ -92,3 +92,20 @@ document.addEventListener('DOMContentLoaded', function () {
         initializeSidebar();
     });
 });
+
+function initializeTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+        new bootstrap.Tooltip(tooltipTriggerEl, {
+            template: `
+                <div class="tooltip custom-tooltip fully-opaque" role="tooltip">
+                    <div class="tooltip-arrow"></div>
+                    <div class="tooltip-inner"></div>
+                </div>`,
+            animation: true,
+            html: true
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initializeTooltips);
