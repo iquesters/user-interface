@@ -3,9 +3,11 @@
         <div class="shoz-minibar-nav">
             <ul class="shoz-minibar-header">
                 <li class="h-100 w-100 d-flex justify-content-center align-items-center">
-                    <button class="btn btn-light border-0 rounded-circle nav-link h-100 shoz-minibar-nav-toggler" type="button" id="sidebarToggle"  style="height: 40px !important; width: 40px;">
-                        <i class="fas fa-fw fa-bars"></i>
-                    </button>
+                    @if(config('userinterface.nav_style') === 'minibar')
+                        <button class="btn btn-light border-0 rounded-circle nav-link h-100 shoz-minibar-nav-toggler" type="button" id="sidebarToggle"  style="height: 40px !important; width: 40px;">
+                            <i class="fas fa-fw fa-bars"></i>
+                        </button>
+                    @endif
                 </li>
             </ul>
 

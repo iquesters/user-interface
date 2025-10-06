@@ -3,12 +3,19 @@
     height: calc(100vh - 56px);
     position: fixed;
     top: 56px;
-    left: 70px;
     z-index: 1000;
     background-color: #f8f9fa;
     border-right: 1px solid #dee2e6;
     overflow-y: auto;
     transition: all 0.3s ease;
+}
+
+.sidebar.has-minibar {
+    left: 70px;
+}
+
+.sidebar.no-minibar {
+    left: 0;
 }
 
 /* Mobile behavior - sidebar off by default */
