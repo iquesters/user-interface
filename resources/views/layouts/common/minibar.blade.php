@@ -1,113 +1,19 @@
-<div class="shoz-minibar">
-    <div class="shoz-minibar-nav">
-        <ul class="shoz-minibar-header shoz-minibar-">
-            <!-- commenting the bars/hamburger for now -->
-            <li class="h-100 w-100">
-                <a class="btn nav-link h-100 shoz-minibar-nav-toggler">
-                    <i class="fas fa-fw fa-bars"></i>
-                </a>
-            </li>
-        </ul>
-        @php
-            $maxVisible = config('userinterface.max_visible_modules');
-            $total = count($installedModules);
-            $tabsPerScroll = 7;
-        @endphp
-        <ul class="shoz-minibar-body">
-        <div class="d-flex flex-column align-items-center border-start border-white position-relative" style="background-color: #e6e3e3">
-
-            {{-- Scrollable tabs container --}}
-            <div class="d-flex flex-column overflow-hidden flex-grow-1" id="modulesContainer">
-                {{-- First N modules --}}
-                @foreach($installedModules->take($maxVisible) as $index => $module)
-                    @php
-                        $menu = collect(json_decode($module->getMeta("module_sidebar_menu"), true))
-                            ->map(function($item) {
-                                return [
-                                    "icon" => $item["icon"],
-                                    "label" => $item["label"],
-                                    "url" => \Illuminate\Support\Facades\Route::has($item["route"])
-                                        ? route($item["route"], ["organisationUid" => request()->route("organisationUid")])
-                                        : "#",
-                                ];
-                            });
-                    @endphp
-
-                    <div class="d-flex flex-column align-items-center justify-content-center p-2 text-center module-tab text-truncate border-end border-white"
-                        style="width: 80px; flex-shrink: 0;"
-                        data-menu='@json($menu)'
-                        data-name="{{ ucfirst($module->name) }}"
-                        data-index="{{ $index }}"
-                        data-bs-toggle="tooltip"
-                        data-bs-placement="bottom"
-                        title="{{ ucfirst($module->name) }}">
-                        <i class="{{ $module->getMeta('module_icon') }}"></i>
-                        <small class="mb-0 text-truncate" style="max-width: 100%;">
-                            <small>{{ ucfirst($module->name) }}</small>
-                        </small>
-                    </div>
-                @endforeach
-            </div>
-
-            {{-- Dropdown for remaining modules outside scroll container --}}
-            @if($total > $maxVisible)
-                <div class="dropdown border-end border-start border-white">
-                    <button class="btn btn-sm text-primary dropdown-toggle p-1 py-3 small fw-semibold"
-                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        +{{ $total - $maxVisible }}
+<div class="d-none d-lg-flex">
+    <div class="shoz-minibar">
+        <div class="shoz-minibar-nav">
+            <ul class="shoz-minibar-header">
+                <li class="h-100 w-100 d-flex justify-content-center align-items-center">
+                    <button class="btn btn-light border-0 rounded-circle nav-link h-100 shoz-minibar-nav-toggler" type="button" id="sidebarToggle"  style="height: 40px !important; width: 40px;">
+                        <i class="fas fa-fw fa-bars"></i>
                     </button>
-                    <ul class="dropdown-menu">
-                        @foreach($installedModules->skip($maxVisible) as $index => $module)
-                            @php
-                                $menu = collect(json_decode($module->getMeta("module_sidebar_menu"), true))
-                                    ->map(function ($item) {
-                                        $params = $item['params'] ?? [];
-                                        foreach ($params as $key => $value) {
-                                            if ($value === null) {
-                                                $params[$key] = request()->route($key);
-                                            }
-                                        }
-                                        return [
-                                            "icon"  => $item["icon"],
-                                            "label" => $item["label"],
-                                            "url"   => \Illuminate\Support\Facades\Route::has($item["route"])
-                                                ? route($item["route"], $params)
-                                                : "#",
-                                        ];
-                                    });
-                            @endphp
+                </li>
+            </ul>
 
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center text-truncate"
-                                href="javascript:void(0);"
-                                data-menu='@json($menu)'
-                                data-name="{{ ucfirst($module->name) }}"
-                                data-index="{{ $maxVisible + $index }}">
-                                    <i class="{{ $module->getMeta('module_icon') }} me-2"></i>
-                                    <span class="text-truncate" style="max-width: calc(100% - 20px);">
-                                        {{ ucfirst($module->name) }}
-                                    </span>
-                                </a>
-                            </li>
-                        @endforeach
-                    </ul>
+            <ul class="shoz-minibar-body">
+                <div class="d-flex flex-column align-items-center border-start border-white position-relative" style="background-color: #e6e3e3">
+                    @include('userinterface::components.module-tabs', ['installedModules' => $installedModules, 'orientation' => 'vertical'])
                 </div>
-            @endif
+            </ul>
         </div>
-        </ul>
-        {{-- <ul class="shoz-minibar-footer">
-            <!-- <li title="Account" data-bs-title="Account" data-bs-toggle="tooltip" data-bs-placement="right">
-                <a href="{{ route('user.profile') }}" class="btn nav-link d-flex flex-column">
-                    <i class="far fa-fw fa-user"></i>
-                    <span>Account</span>
-                </a>
-            </li> -->
-            <!-- <li title="Settings" data-bs-title="Settings" data-bs-toggle="tooltip" data-bs-placement="right">
-                <a href="{{ route('user.settings') }}" class="btn nav-link d-flex flex-column">
-                    <i class="fas fa-fw fa-gear"></i>
-                    <span>Settings</span>
-                </a>
-            </li> -->
-        </ul> --}}
     </div>
 </div>

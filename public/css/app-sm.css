@@ -33,7 +33,7 @@
     .shoz-minibar-header {
         flex-direction: column;
         justify-content: center;
-        min-height: 62px;
+        min-height: 56px;
     }
 
     .shoz-minibar-body {

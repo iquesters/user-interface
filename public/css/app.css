@@ -14,7 +14,7 @@
 /* Mobile behavior - sidebar off by default */
 @media (max-width: 991.98px) {
     .sidebar {
-        transform: translateX(-250px);
+        transform: translateX(-310px);
     }
 
     .sidebar.active {
@@ -81,7 +81,7 @@
     background-color: #beb;
     display: flex;
     transition: all .25s ease-in-out;
-    z-index: 1000;
+    z-index: 1001;
 }
 
 .shoz-minibar {

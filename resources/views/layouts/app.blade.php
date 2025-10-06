@@ -36,7 +36,7 @@
                         @include('userinterface::layouts.sidebar')
                     </div>
                 </div>
-                <div id="" class="ui-content animate-all bg-white">
+                <div class="ui-content animate-all bg-white" id="mainContent">
                     @include('userinterface::layouts.common.alert')
                     {{-- @auth --}}
                     <div class="row row-cols-1 p-2 g-2">
@@ -62,7 +62,7 @@
                 <i class="far fa-fw fa-comment"></i>
             </a>
         </div> -->
-
+        @include('userinterface::layouts.common.mobile-navbar')
     </div>
     @include('userinterface::layouts.common.js')
 </body>

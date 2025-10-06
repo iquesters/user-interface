@@ -11,6 +11,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('sidebarMenu');
     const tabs = document.querySelectorAll('.module-tab');
+    const dropdownItems = document.querySelectorAll('.dropdown-item[data-menu]');
 
     // Render sidebar
     function renderSidebar(menu, name) {
@@ -30,29 +31,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Set active tab
-    function setActive(tab) {
+    function setActive(element) {
+        // Remove active from all tabs
         tabs.forEach(t => t.classList.remove('active-module'));
-        tab.classList.add('active-module');
-        localStorage.setItem('activeModuleIndex', tab.dataset.index);
+        dropdownItems.forEach(d => d.classList.remove('active'));
+        
+        // Add active to current element
+        element.classList.add(element.classList.contains('module-tab') ? 'active-module' : 'active');
+        localStorage.setItem('activeModuleIndex', element.dataset.index);
     }
 
     // Load saved module or default first
     let savedIndex = localStorage.getItem('activeModuleIndex');
-    let defaultTab = tabs[0];
+    let defaultElement = tabs[0];
 
     if (savedIndex) {
-        const tab = Array.from(tabs).find(t => t.dataset.index === savedIndex);
-        if (tab) defaultTab = tab;
+        // Check in tabs first
+        let element = Array.from(tabs).find(t => t.dataset.index === savedIndex);
+        
+        // If not found in tabs, check dropdown items
+        if (!element) {
+            element = Array.from(dropdownItems).find(d => d.dataset.index === savedIndex);
+        }
+        
+        if (element) defaultElement = element;
     }
 
-    renderSidebar(JSON.parse(defaultTab.dataset.menu || '[]'), defaultTab.dataset.name);
-    setActive(defaultTab);
+    renderSidebar(JSON.parse(defaultElement.dataset.menu || '[]'), defaultElement.dataset.name);
+    setActive(defaultElement);
 
-    // Attach click events
+    // Attach click events to tabs
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             renderSidebar(JSON.parse(tab.dataset.menu || '[]'), tab.dataset.name);
             setActive(tab);
+        });
+    });
+
+    // Attach click events to dropdown items
+    dropdownItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            renderSidebar(JSON.parse(item.dataset.menu || '[]'), item.dataset.name);
+            setActive(item);
+            
+            // Close the dropdown after selection
+            const dropdownBtn = document.querySelector('[data-bs-toggle="dropdown"]');
+            if (dropdownBtn) {
+                const dropdown = bootstrap.Dropdown.getInstance(dropdownBtn);
+                if (dropdown) dropdown.hide();
+            }
         });
     });
 });

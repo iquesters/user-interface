@@ -99,7 +99,7 @@
     </div>
 </header> --}}
 
-<header class="sticky-top bg-white shadow-sm" style="max-height: 65px;">        
+<header class="sticky-top bg-white shadow-sm" style="max-height: 56px;">        
     <div class="d-flex justify-content-between px-2 align-items-center">
         <div class="d-flex justify-content-between align-items-center">
             <div class="d-flex gap-2 align-items-center py-2" style="min-width: 242px">

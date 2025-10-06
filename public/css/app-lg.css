@@ -10,7 +10,7 @@
     }
 
     .sidebar.hidden {  /* ✅ FIXED: Use .hidden class */
-        transform: translateX(-250px); /* Hide when has hidden class */
+        transform: translateX(-320px); /* Hide when has hidden class */
     }
 
     /* Main content squeezed by default on desktop */
