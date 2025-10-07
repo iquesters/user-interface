@@ -24,7 +24,7 @@ return [
     |--------------------------------------------------------------------------
     | Control how many modules are shown before moving the rest into dropdown
     */
-    'max_visible_modules' => env('USERINTERFACE_MAX_VISIBLE_MODULES', 7),
+    'module_tabs' => env('USERINTERFACE_MODULE_TABS', 7),
     
     /*
     |--------------------------------------------------------------------------

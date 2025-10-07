@@ -1,4 +1,4 @@
-@php
+{{-- @php
     $mobileMaxVisible = config('userinterface.mobile_bottom_tabs', 4);
     $featuredTabName = config('userinterface.mobile_featured_tab'); // Can be null for no featured tab
     $featuredPosition = config('userinterface.mobile_featured_position', 'center'); // 'center' or null
@@ -128,4 +128,9 @@
         @endif
 
     </div>
-</div>
+</div> --}}
+
+@include('userinterface::components.module-tabs', [
+    'installedModules' => $installedModules, 
+    'viewMode' => 'mobile'
+])
