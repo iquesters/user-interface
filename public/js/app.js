@@ -1,96 +1,91 @@
 document.addEventListener('DOMContentLoaded', function () {
     const sidebar = document.getElementById('appSidebar');
     const mainContent = document.getElementById('mainContent');
-    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarToggles = document.querySelectorAll('.sidebar-toggle');
     const body = document.body;
     const isMobile = () => window.innerWidth < 992;
 
-    // Check if elements exist
-    if (!sidebar || !mainContent || !sidebarToggle) {
-        console.error('Required elements not found');
+    // Ensure sidebar exists
+    if (!sidebar || !sidebarToggles.length) {
+        console.error('Sidebar or toggle buttons not found');
         return;
     }
 
     // Initialize sidebar state
     function initializeSidebar() {
-        // Disable transitions temporarily
         sidebar.style.transition = 'none';
         
         if (isMobile()) {
-            // Mobile: hidden by default
-            sidebar.classList.remove('active', 'hidden');
-            mainContent.classList.remove('no-squeeze');
+            // Always hidden by default on mobile
+            sidebar.classList.remove('hidden');
+            sidebar.classList.remove('active');
+            body.classList.remove('sidebar-active');
         } else {
-            // Desktop: check saved state
+            // Desktop state saved in localStorage
             const savedState = localStorage.getItem('sidebarState');
             if (savedState === 'closed') {
                 sidebar.classList.add('hidden');
-                sidebar.classList.remove('active');
-                mainContent.classList.add('no-squeeze');
+                mainContent?.classList.add('no-squeeze');
             } else {
-                // Default for desktop - sidebar visible
-                sidebar.classList.remove('hidden', 'active');
-                mainContent.classList.remove('no-squeeze');
+                sidebar.classList.remove('hidden');
+                mainContent?.classList.remove('no-squeeze');
             }
         }
-        
-        // Re-enable transitions
+
         setTimeout(() => {
             sidebar.style.transition = 'all 0.3s ease';
         }, 50);
     }
 
-    // Toggle sidebar function
+    // Toggle sidebar visibility
     function toggleSidebar() {
         if (isMobile()) {
-            // Mobile behavior - use 'active' class
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
         } else {
-            // Desktop behavior - use 'hidden' class
             sidebar.classList.toggle('hidden');
-            mainContent.classList.toggle('no-squeeze');
-            
-            // Save state
-            const isHidden = sidebar.classList.contains('hidden');
-            localStorage.setItem('sidebarState', isHidden ? 'closed' : 'open');
+            mainContent?.classList.toggle('no-squeeze');
+            localStorage.setItem(
+                'sidebarState',
+                sidebar.classList.contains('hidden') ? 'closed' : 'open'
+            );
         }
     }
 
-    // Initialize on load
+    // Initialize state
     initializeSidebar();
 
-    // Apply toggle event
-    sidebarToggle.addEventListener('click', function(e) {
-        e.preventDefault();
-        toggleSidebar();
+    // Bind toggle events (for both buttons)
+    sidebarToggles.forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.preventDefault();
+            toggleSidebar();
+        });
     });
 
     // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', function(event) {
-        if (isMobile() && 
-            sidebar.classList.contains('active') && 
-            !sidebar.contains(event.target) && 
-            !sidebarToggle.contains(event.target)) {
+    document.addEventListener('click', e => {
+        if (
+            isMobile() &&
+            sidebar.classList.contains('active') &&
+            !sidebar.contains(e.target) &&
+            !e.target.closest('.sidebar-toggle')
+        ) {
             toggleSidebar();
         }
     });
 
-    // Handle sidebar link clicks
-    const navLinks = document.querySelectorAll('.sidebar .list-group-item');
-    navLinks.forEach(link => {
-        link.addEventListener('click', function() {
-            // Only close the sidebar on mobile
+    // Close sidebar when clicking a link (mobile only)
+    sidebar.querySelectorAll('.list-group-item').forEach(link => {
+        link.addEventListener('click', () => {
             if (isMobile() && sidebar.classList.contains('active')) {
                 toggleSidebar();
             }
         });
     });
 
-    // Handle resize events
-    window.addEventListener('resize', function() {
-        initializeSidebar();
-    });
+    // Handle window resize
+    window.addEventListener('resize', initializeSidebar);
 });
 
 function initializeTooltips() {

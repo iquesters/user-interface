@@ -1,4 +1,4 @@
-<aside class="sidebar bg-light text-dark p-1" id="appSidebar">
+<aside class="sidebar bg-light text-dark p-1 {{ config('userinterface.nav_style') === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
     <div class="sidebar-body">
         <div class="list-group list-group-flush" id="sidebarMenu">
             <div class="text-muted px-2 py-1">Loading menu...</div>

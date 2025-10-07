@@ -26,7 +26,11 @@
     <div class="ui-wrapper">
         {{-- @auth --}}
         {{-- @include('userinterface::layouts.common.mobile-navbar') --}}
-        @include('userinterface::layouts.common.minibar')
+
+        <!-- Display minibar nav bar based of configuration -->
+        @if(config('userinterface.nav_style') === 'minibar')
+            @include('userinterface::layouts.common.minibar')
+        @endif
         {{-- @endif --}}
         <div class="ui-main">
             @include('userinterface::layouts.header')

@@ -24,7 +24,7 @@ return [
     |--------------------------------------------------------------------------
     | Control how many modules are shown before moving the rest into dropdown
     */
-    'max_visible_modules' => env('USERINTERFACE_MAX_VISIBLE_MODULES', 7),
+    'module_tabs' => env('USERINTERFACE_MODULE_TABS', 7),
     
     /*
     |--------------------------------------------------------------------------
@@ -32,12 +32,24 @@ return [
     |--------------------------------------------------------------------------
     | Configure mobile bottom tab bar settings
     */
-   'mobile_bottom_tabs' => env('USERINTERFACE_MOBILE_BOTTOM_TABS', 4), // Max tabs to show (4 tabs + 1 dropdown)
+   'mobile_bottom_tabs' => env('USERINTERFACE_MOBILE_BOTTOM_TABS', 4),
     
     // Set to null to disable featured tab, or set any module name
     'mobile_featured_tab' => env('USERINTERFACE_MOBILE_FEATURED_TAB', null), // null = no featured tab, or 'product', 'user-management', etc.
     
     // Position of featured tab: 'center' (default), 'left', 'right', or null
     'mobile_featured_position' => env('USERINTERFACE_MOBILE_FEATURED_POSITION', 'center'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigation Style
+    |--------------------------------------------------------------------------
+    |
+    | Choose which navigation style to use:
+    | - 'minibar'  : shows the left minibar navigation
+    | - 'header'   : shows module tabs in the header
+    |
+    */
+    'nav_style' => env('USERINTERFACE_NAV_STYLE', 'header'),
 ];
 ?>
