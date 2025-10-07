@@ -12,7 +12,7 @@ window.applyTextareaValidation = function (field, textarea) {
   textarea.addEventListener("invalid", () => {
     textarea.setCustomValidity(""); // reset any previous message
     const messages = field.messages;
-    applyValidationMessage("textarea", field, "", messages);
+    applyValidationMessage("textarea", field, textarea, messages);
   });
 
   // ✅ Clear custom message on input
