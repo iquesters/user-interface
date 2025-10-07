@@ -50,6 +50,6 @@ return [
     | - 'header'   : shows module tabs in the header
     |
     */
-    'nav_style' => env('USERINTERFACE_NAV_STYLE', 'header'),
+    'nav_style' => env('USERINTERFACE_NAV_STYLE', 'minibar'),
 ];
 ?>
