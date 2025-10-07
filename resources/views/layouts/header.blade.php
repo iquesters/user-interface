@@ -4,15 +4,15 @@
             <div class="d-flex gap-2 align-items-center py-2" style="min-width: 242px">
 
                 <div class="d-lg-none">
-                    <button class="sidebar-toggle btn-light app-left-sidebar-toggler border-0 rounded-circle text-muted d-flex align-items-center justify-content-center" type="button" style="height: 40px; width: 40px;">
-                        <i class="fa-solid fa-bars"></i>
-                    </button>
+                    @include('userinterface::components.hamburger', [
+                        'classes' => 'app-left-sidebar-toggler text-muted'
+                    ])
                 </div>
 
                 @if(config('userinterface.nav_style') === 'header')
-                    <button class="sidebar-toggle btn-light app-left-sidebar-toggler border-0 rounded-circle text-muted d-flex align-items-center justify-content-center d-none d-lg-flex" type="button" style="height: 40px; width: 40px;">
-                        <i class="fa-solid fa-bars"></i>
-                    </button>
+                    @include('userinterface.includes.hamburger', [
+                        'classes' => 'app-left-sidebar-toggler text-muted d-none d-lg-flex'
+                    ])
                 @endif
 
                 <a href="{{ url('/') }}">
