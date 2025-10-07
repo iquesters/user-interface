@@ -4,42 +4,4 @@
     .screen-width-test {
         background-color: #f0f;
     }
-
-    /* Common Tab Styles */
-    .module-tab-desktop,
-    .module-tab-vertical {
-        width: 80px;
-        flex-shrink: 0;
-        padding: 0.5rem;
-        color: inherit;
-        transition: all 0.2s;
-    }
-
-    .module-tab-desktop {
-        border-right: 1px solid white;
-    }
-
-    .module-tab-vertical {
-        border-bottom: 1px solid white;
-    }
-
-    .module-tab-desktop .module-tab-icon-wrapper,
-    .module-tab-vertical .module-tab-icon-wrapper {
-        display: contents;
-    }
-
-    .module-tab-desktop .module-tab-icon,
-    .module-tab-vertical .module-tab-icon {
-        font-size: 1rem;
-    }
-
-    .module-tab-desktop .module-tab-label,
-    .module-tab-vertical .module-tab-label {
-        font-size: 0.75rem;
-        margin-top: 0;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
 }
