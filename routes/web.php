@@ -32,8 +32,6 @@ Route::middleware(['web'])->group(function () {
         Route::get('/{id}/update', [TableSchemaController::class, 'update'])->name('.update');
         Route::post('/{id}/update', [TableSchemaController::class, 'update'])->name('.update.schema');
         Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
-
-        Route::get('/tableCreation/{id}', [TableSchemaController::class, 'tableCreation'])->name('.tableCreation');
     });
 
 
