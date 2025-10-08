@@ -163,7 +163,7 @@ class FormController extends Controller
         );
 
         if ($parent_id > 0) {
-            $parent = FormSchema::where('id', $parent_id)->first();
+            $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
         Log::info('Form data: ' . json_encode($data));
