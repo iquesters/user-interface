@@ -20,7 +20,6 @@ Route::middleware(['web'])->group(function () {
         Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
 
 
-        Route::get('/formCreate/{id}', [FormController::class, 'formCreate'])->name('.formCreate');
         Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
         Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
     });
@@ -33,6 +32,8 @@ Route::middleware(['web'])->group(function () {
         Route::get('/{id}/update', [TableSchemaController::class, 'update'])->name('.update');
         Route::post('/{id}/update', [TableSchemaController::class, 'update'])->name('.update.schema');
         Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
+
+        Route::get('/tableCreation/{id}', [TableSchemaController::class, 'tableCreation'])->name('.tableCreation');
     });
 
 

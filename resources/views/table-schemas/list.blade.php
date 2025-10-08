@@ -55,10 +55,13 @@ Table Schemas
                     <td class="">{{ $table->extra_info }}</td>
                     <td class="">
                         <div class="d-flex justify-content-center gap-2">
-                            <a type="button" class="nav-link d-flex align-items-center" title="Overview of {{ $table->name }} form" href="{{route('table.overview',$table->id)}}">
+                            <a type="button" class="nav-link d-flex align-items-center text-primary" title="Table creation of {{ $table->name }} form" href="{{route('table.tableCreation',$table->uid)}}">
                                 <i class="fa-fw far fa-eye"></i>
                             </a>
-                            <a type="button" class="nav-link d-flex align-items-center" title="Delete {{ $table->name }} form" href="{{route('table.delete',$table->id)}}">
+                            <a type="button" class="nav-link d-flex align-items-center text-success" title="Overview of {{ $table->name }} form" href="{{route('table.overview',$table->id)}}">
+                                <i class="fa-fw far fa-edit"></i>
+                            </a>
+                            <a type="button" class="nav-link d-flex align-items-center text-danger" title="Delete {{ $table->name }} form" href="{{route('table.delete',$table->id)}}">
                                 <i class="fa-fw far fa-trash-can"></i>
                             </a>
                         </div>

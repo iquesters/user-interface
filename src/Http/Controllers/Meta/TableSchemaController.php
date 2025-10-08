@@ -152,4 +152,20 @@ class TableSchemaController extends Controller
     }
 
     public function delete() {}
+
+
+    public function tableCreation($id = 0){
+        $parent_id = $id;
+
+        $data = (object)array(
+            'parent_id' => $parent_id
+        );
+
+        if ($parent_id > 0) {
+            $parent = TableSchema::where('uid', $parent_id)->first();
+            $data->parent = $parent;
+        }
+        Log::info('table data: ' . json_encode($data));
+        return view('userinterface::table-schemas.tablecreation', compact('data'));
+    }
 }
