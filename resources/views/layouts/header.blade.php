@@ -1,25 +1,27 @@
 <header class="sticky-top bg-white shadow-sm" style="height: 56px;">        
-    <div class="d-flex justify-content-between px-2 align-items-center h-100">
+    <div class="d-flex justify-content-between pe-2 align-items-center h-100">
         <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex gap-2 align-items-center py-2" style="min-width: 242px">
+            <div class="d-flex align-items-center py-2" style="min-width: 250px">
 
-                <div class="d-lg-none">
+                <div class="d-lg-none d-flex align-items-center justify-content-center" style="width: 70px">
                     @include('userinterface::components.hamburger', [
-                        'classes' => 'app-left-sidebar-toggler text-muted'
+                        'classes' => 'text-muted'
                     ])
                 </div>
 
-                @if(config('userinterface.nav_style') === 'header')
-                    @include('userinterface.includes.hamburger', [
-                        'classes' => 'app-left-sidebar-toggler text-muted d-none d-lg-flex'
-                    ])
-                @endif
+                <div class="d-lg-flex d-none align-items-center justify-content-center" style="width: 70px">
+                    @if(config('userinterface.nav_style') === 'header')
+                        @include('userinterface::components.hamburger', [
+                            'classes' => 'text-muted'
+                        ])
+                    @endif
+                </div>
 
                 <a href="{{ url('/') }}">
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" alt="Logo" class="brand-logo-sm" style="height: 25px;">
                 </a>            
                 @if(config('app.debug'))
-                    <div class="text-bg-danger fw-bold px-2 py-1 rounded">{{ \Illuminate\Support\Str::upper(config('app.env')) }}</div>
+                    <div class="text-bg-danger ms-2 fw-bold px-2 py-1 rounded">{{ \Illuminate\Support\Str::upper(config('app.env')) }}</div>
                 @endif
             </div>
 

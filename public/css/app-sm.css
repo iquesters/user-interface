@@ -1,44 +1,43 @@
 @media (min-width: 576px) {
+  /* Styling for screen width test */
+  .screen-width-test {
+    background-color: #00f;
+  }
 
-    /* Styling for screen width test */
-    .screen-width-test {
-        background-color: #00f;
-    }
+  .minibar {
+    flex-direction: column;
 
-    .shoz-minibar {
-        flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    min-height: 100vh;
 
-        height: 100vh;
-        max-height: 100vh;
-        min-height: 100vh;
+    width: 70px;
+    max-width: 70px;
+    min-width: 70px;
 
-        width: 70px;
-        max-width: 70px;
-        min-width: 70px;
+    position: sticky;
+    top: 0;
+  }
 
-        position: sticky;
-        top: 0;
-    }
+  .minibar-nav {
+    flex-direction: column;
+    justify-content: unset;
+  }
 
-    .shoz-minibar-nav {
-        flex-direction: column;
-        justify-content: unset;
-    }
+  .minibar-nav > div,
+  .minibar-nav > ul {
+    display: flex !important;
+  }
 
-    .shoz-minibar-nav>div,
-    .shoz-minibar-nav>ul {
-        display: flex !important;
-    }
+  .minibar-header {
+    flex-direction: column;
+    justify-content: center;
+    min-height: 56px;
+  }
 
-    .shoz-minibar-header {
-        flex-direction: column;
-        justify-content: center;
-        min-height: 56px;
-    }
-
-    .shoz-minibar-body {
-        flex-direction: column;
-        overflow-x: hidden;
-        overflow-y: auto;
-    }
+  .minibar-body {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 }
