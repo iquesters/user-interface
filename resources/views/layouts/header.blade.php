@@ -9,13 +9,13 @@
                     ])
                 </div>
 
-                <div class="d-lg-flex d-none align-items-center justify-content-center" style="width: 70px">
-                    @if(config('userinterface.nav_style') === 'header')
+                @if(config('userinterface.nav_style') === 'header')
+                    <div class="d-lg-flex d-none align-items-center justify-content-center" style="width: 70px">
                         @include('userinterface::components.hamburger', [
                             'classes' => 'text-muted'
                         ])
-                    @endif
-                </div>
+                    </div>
+                @endif
 
                 <a href="{{ url('/') }}">
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" alt="Logo" class="brand-logo-sm" style="height: 25px;">
