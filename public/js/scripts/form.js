@@ -27,8 +27,8 @@ const DTP_VIEW_MODE_TIME = "time"
 let dtpOption
 
 async function setupForm(formElement) {
-    console.log("setuping shoz-form...")
-    console.log("formId = " + formElement.id)
+    // console.log("setuping shoz-form...")
+    // console.log("formId = " + formElement.id)
 
     // let formMeta = formElement.dataset.formMeta
 
@@ -44,7 +44,7 @@ async function setupForm(formElement) {
         formMeta = await getFormSchema(formElement.id)
     }
 
-    console.log("formMeta = " + formMeta)
+    // console.log("formMeta = " + formMeta)
     if (!formMeta) {
         // break the code
         return;
@@ -420,12 +420,12 @@ function setupFormBlock(formCol, formMeta) {
         } else {
             console.log("data-form-data is not provided")
         }
-        console.log("formData = " + formData)
+        // console.log("formData = " + formData)
 
         formMeta.fields.forEach(field => {
-            console.log(field);
+            // console.log(field);
             field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
-            console.log(field);
+            // console.log(field);
             addField(field, form);
         })
     }
@@ -462,7 +462,7 @@ function addField(field, addTo) {
                     input.checked = true;
                 }
 
-                // Apply validation to each radio input
+                // Apply Frontend validation to each radio input
                 applyFieldValidation(field, input);
 
                 const label = document.createElement("label");
@@ -475,6 +475,21 @@ function addField(field, addTo) {
                 fragment.appendChild(div);
             });
             
+        }
+
+
+        // ✅ Laravel backend validation error for the radio group
+        if (window.formErrors && window.formErrors[field.id]) {
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback", "d-block"); // d-block so it shows for group
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            fragment.appendChild(errorDiv);
+
+            // Optionally mark all radio inputs as invalid
+            fragment.querySelectorAll(`input[name="${field.id}"]`).forEach(radio => {
+                radio.classList.add('is-invalid');
+            });
         }
     }
     
@@ -511,7 +526,18 @@ function addField(field, addTo) {
         label.textContent = field.label;
         formFloating.appendChild(label);
 
+        // Apply select Frontend validation
         applySelectValidation(field, select);
+
+        // ✅ Laravel backend validation error
+        if (window.formErrors && window.formErrors[field.id]) {
+            select.classList.add('is-invalid'); // Bootstrap red border
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            formFloating.appendChild(errorDiv);
+        }
     }
     
     
@@ -544,7 +570,7 @@ function addField(field, addTo) {
                 }
 
 
-                // Apply validation to each checkbox input
+                // Apply Frontend validation to each checkbox input
                 applyFieldValidation(field, input);
 
                 const label = document.createElement("label");
@@ -571,7 +597,7 @@ function addField(field, addTo) {
                 input.checked = true;
             }
 
-            // Apply validation to each checkbox input
+            // Apply Frontend validation to each checkbox input
             applyFieldValidation(field, input);
 
             const label = document.createElement("label");
@@ -605,7 +631,7 @@ function addField(field, addTo) {
         textarea.classList.add("form-control");
         textarea.setAttribute("placeholder", field.label);
 
-        // Apply textarea validation
+        // Apply textarea Frontend validation
         applyTextareaValidation(field, textarea);
 
         formFloating.appendChild(textarea);
@@ -615,6 +641,18 @@ function addField(field, addTo) {
         label.setAttribute("for", field.id);
         label.textContent = field.label;
         formFloating.appendChild(label);
+
+
+
+        // ✅ Add Laravel backend validation error if exists
+        if (window.formErrors && window.formErrors[field.id]) {
+            textarea.classList.add('is-invalid'); // Bootstrap red border
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            formFloating.appendChild(errorDiv);
+        }
 
         if (field.info) {
             addFieldHelpInfo(field, formFloating);
@@ -665,7 +703,7 @@ function addField(field, addTo) {
 
         formFloating.appendChild(datalist);
 
-        // ✅ Apply datalist validation here (AFTER datalist is created)
+        // ✅ Apply datalist Frontend validation here (AFTER datalist is created)
         if (typeof applyDatalistValidation === "function") {
             applyDatalistValidation(field, input, datalist);
         }
@@ -675,6 +713,17 @@ function addField(field, addTo) {
         label.setAttribute("for", field.id);
         label.textContent = field.label;
         formFloating.appendChild(label);
+
+
+        // ✅ Add Laravel backend validation error if exists
+        if (window.formErrors && window.formErrors[field.id]) {
+            input.classList.add('is-invalid'); // Bootstrap red border
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            formFloating.appendChild(errorDiv);
+        }
 
         if (field.info) {
             addFieldHelpInfo(field, formFloating);
@@ -702,8 +751,20 @@ function addField(field, addTo) {
         input.classList.add("form-control");
         fragment.appendChild(input);
 
-        // Validation
+        //Frontend Validation
         applyFieldValidation(field, input);
+
+
+
+        // ✅ Laravel backend validation error
+        if (window.formErrors && window.formErrors[field.id]) {
+            input.classList.add('is-invalid');
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            fragment.appendChild(errorDiv);
+        }
 
         // Dropdown menu
         const menu = document.createElement("div");
@@ -804,7 +865,7 @@ function addField(field, addTo) {
         input.setAttribute("placeholder", field.label);
 
 
-        // HTML form validation
+        // Frontend validation
         applyFieldValidation(field, input);
 
 
@@ -816,6 +877,21 @@ function addField(field, addTo) {
         label.setAttribute("for", field.id);
         label.textContent = field.label;
         formFloating.appendChild(label);
+
+
+
+
+
+        // ✅ ADD ERROR MESSAGE ELEMENT HERE
+        if (window.formErrors && window.formErrors[field.id]) {
+            input.classList.add('is-invalid');
+
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // First error message
+            formFloating.appendChild(errorDiv);
+        }
 
         if (field.info) {
             addFieldHelpInfo(field, formFloating);
@@ -836,7 +912,7 @@ function addFieldSize(field, elementToSize) {
             }
         } else if (field.size.constructor.name === 'Object') {
             Object.keys(field.size).forEach((sizeKey) => {
-                console.log(sizeKey);
+                // console.log(sizeKey);
                 if ('xs' === sizeKey) {
                     sizeClasses.push("col-" + field.size[sizeKey])
                 } else if ('sm' === sizeKey || 'md' === sizeKey || 'lg' === sizeKey || 'xl' === sizeKey || 'xxl' === sizeKey) {
@@ -1071,7 +1147,7 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
         if (document.readyState === "complete") {
             // Fetch all the forms marked as shoz-form
             const forms = document.querySelectorAll('.shoz-form')
-            console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
+            // console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {
                 setupForm(form)

@@ -23,5 +23,6 @@
     function prepare_MDMForm(formID) {
         // do something here
     }
+    window.formErrors = @json($errors->toArray());
 </script>
 @endpushonce
