@@ -14,14 +14,15 @@
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/custom-element.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/production-performance.js') }}"></script>
 
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/containers.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/data-providers.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form-constant.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/input-field-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/select-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/datalist-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/textarea-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/customValidationMessage.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/scripts/containers.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/scripts/data-providers.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/scripts/form.js') }}"></script>
+
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/form-constant.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/input-field-validation.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/select-validation.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/datalist-validation.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/textarea-validation.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/customValidationMessage.js') }}"></script>
 <!-- Dynamic JavaScript inclusion ENDS -->
 @stack('scripts')

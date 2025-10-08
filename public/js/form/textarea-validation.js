@@ -21,18 +21,3 @@ window.applyTextareaValidation = function (field, textarea) {
   // ✅ Optional: check validity on blur for better UX
   textarea.addEventListener("blur", () => textarea.reportValidity());
 };
-
-// ✅ Attach validation to forms
-// document.addEventListener("DOMContentLoaded", () => {
-//   const forms = document.querySelectorAll("form");
-//   forms.forEach(form => {
-//     form.addEventListener("submit", (event) => {
-//       console.log("📝 Checking textarea validation in form:", form.id);
-//       if (!form.checkValidity()) {
-//         event.preventDefault();
-//         event.stopPropagation();
-//         form.reportValidity(); // display validation messages
-//       }
-//     });
-//   });
-// });

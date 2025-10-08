@@ -31,17 +31,3 @@ window.applySelectValidation = function (field, select) {
   select.addEventListener("blur", () => select.reportValidity());
 };
 
-// ✅ Attach validation to all forms
-// document.addEventListener("DOMContentLoaded", () => {
-//   const forms = document.querySelectorAll("form");
-//   forms.forEach(form => {
-//     form.addEventListener("submit", (event) => {
-//       console.log("📑 Checking select validation in form:", form.id);
-//       if (!form.checkValidity()) {
-//         event.preventDefault();
-//         event.stopPropagation();
-//         form.reportValidity();
-//       }
-//     });
-//   });
-// });
