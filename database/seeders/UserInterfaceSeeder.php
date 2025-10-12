@@ -2,9 +2,9 @@
 
 namespace Iquesters\UserInterface\Database\Seeders;
 
-use Iquesters\Foundation\Database\Seeders\BaseModuleSeeder;
+use Iquesters\Foundation\Database\Seeders\BaseSeeder;
 
-class UserInterfaceSeeder extends BaseModuleSeeder
+class UserInterfaceSeeder extends BaseSeeder
 {
     protected string $moduleName = 'user-interface';
     protected string $description = 'user-interface module';
@@ -28,4 +28,13 @@ class UserInterfaceSeeder extends BaseModuleSeeder
             ]
         ]
     ];
+    
+    /**
+     * Implement abstract method from BaseSeeder
+     */
+    protected function seedCustom(): void
+    {
+        // Add custom seeding logic here if needed
+        // Leave empty if none
+    }
 }
