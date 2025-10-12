@@ -20,6 +20,11 @@ class UserInterfaceSeeder extends BaseModuleSeeder
                 "icon" => "fas fa-table",
                 "label" => "All Tables",
                 "route" => "table.list",
+            ],
+            [
+                "icon" => "fas fa-database",
+                "label" => "All Entities",
+                "route" => "entities.index",
             ]
         ]
     ];
