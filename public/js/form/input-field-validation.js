@@ -31,6 +31,6 @@ window.applyFieldValidation = function (field, input) {
   input.addEventListener("input", () => input.setCustomValidity(""));
 
   // ✅ Live validation: check on blur (optional but useful)
-  input.addEventListener("blur", () => input.reportValidity());
+  // input.addEventListener("blur", () => input.reportValidity());
 };
 

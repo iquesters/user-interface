@@ -20,8 +20,8 @@ window.applyDatalistValidation = function (field, input, datalist) {
     input.setCustomValidity(""); // reset
   });
 
-  input.addEventListener("blur", () => {
-    input.reportValidity();
-  });
+  // input.addEventListener("blur", () => {
+  //   input.reportValidity();
+  // });
 
 };

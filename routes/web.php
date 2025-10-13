@@ -22,6 +22,8 @@ Route::middleware(['web'])->group(function () {
 
         Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
         Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
+
+        Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
     });
 
     Route::prefix('table')->name('table')->group(function () {

@@ -28,6 +28,6 @@ window.applySelectValidation = function (field, select) {
   select.addEventListener("change", () => select.setCustomValidity(""));
 
   // ✅ Optional: validate immediately on blur
-  select.addEventListener("blur", () => select.reportValidity());
+  // select.addEventListener("blur", () => select.reportValidity());
 };
 

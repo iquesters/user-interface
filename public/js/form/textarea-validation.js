@@ -19,5 +19,5 @@ window.applyTextareaValidation = function (field, textarea) {
   textarea.addEventListener("input", () => textarea.setCustomValidity(""));
 
   // ✅ Optional: check validity on blur for better UX
-  textarea.addEventListener("blur", () => textarea.reportValidity());
+  // textarea.addEventListener("blur", () => textarea.reportValidity());
 };

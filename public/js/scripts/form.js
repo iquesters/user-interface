@@ -34,7 +34,7 @@ async function setupForm(formElement) {
 
     let form = document.getElementById("mdm-create");
     let formData = JSON.parse(form.dataset.formData);
-    // console.log("formData>>>>>",formData);
+    console.log("formData>>>>>",formData);
 
     let formMeta = formData.parent.schema;
     if (formMeta) {
@@ -426,7 +426,7 @@ function setupFormBlock(formCol, formMeta) {
             // console.log(field);
             field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
             // console.log(field);
-            addField(field, form);
+            addField(field, form,formMeta);
         })
     }
 }
@@ -434,7 +434,7 @@ function setupFormBlock(formCol, formMeta) {
 
 
 
-function addField(field, addTo) {
+function addField(field, addTo,formMeta) {
     if (field.type === 'radio') {
         const fragment = document.createElement("div");
         fragment.classList.add("col-12", "form-check-group");
@@ -475,6 +475,16 @@ function addField(field, addTo) {
                 fragment.appendChild(div);
             });
             
+        }
+
+
+        // ✅ Add helper text below the group
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            fragment.appendChild(helper);
         }
 
 
@@ -537,6 +547,15 @@ function addField(field, addTo) {
             errorDiv.id = `${field.id}-error`;
             errorDiv.textContent = window.formErrors[field.id][0]; // first error message
             formFloating.appendChild(errorDiv);
+        }
+
+        // ✅ Add helper text below select (outside form-floating)
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            fragment.appendChild(helper);
         }
     }
     
@@ -609,8 +628,79 @@ function addField(field, addTo) {
             div.appendChild(label);
             fragment.appendChild(div);
         }
+
+        // ✅ Add helper text below checkbox or group
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            fragment.appendChild(helper);
+        }
+        
     }
 
+
+    // else if (field.type === "textarea") {
+    //     const fragment = document.createElement("div");
+    //     fragment.id = addTo.id + "-field";
+    //     addFieldSize(field, fragment);
+    //     addTo.appendChild(fragment);
+
+    //     const formFloating = document.createElement("div");
+    //     formFloating.id = field.id + "-container";
+    //     formFloating.classList.add("form-floating");
+    //     fragment.appendChild(formFloating);
+
+    //     const textarea = document.createElement("textarea");
+    //     textarea.id = field.id;
+    //     textarea.name = field.id;
+    //     textarea.rows = field.rows || 4; // default to 4 rows if not provided
+    //     textarea.value = field.value || "";
+    //     textarea.classList.add("form-control");
+    //     textarea.setAttribute("placeholder", field.label);
+
+    //     // Apply textarea Frontend validation
+    //     applyTextareaValidation(field, textarea);
+
+    //     formFloating.appendChild(textarea);
+
+    //     const label = document.createElement("label");
+    //     label.id = field.id + "-label";
+    //     label.setAttribute("for", field.id);
+    //     label.textContent = field.label;
+    //     formFloating.appendChild(label);
+
+
+
+    //     // ✅ Add Laravel backend validation error if exists
+    //     if (window.formErrors && window.formErrors[field.id]) {
+    //         textarea.classList.add('is-invalid'); // Bootstrap red border
+    //         const errorDiv = document.createElement("div");
+    //         errorDiv.classList.add("invalid-feedback");
+    //         errorDiv.id = `${field.id}-error`;
+    //         errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+    //         formFloating.appendChild(errorDiv);
+    //     }
+
+
+    //     // ✅ Add helper text below textarea (outside form-floating)
+    //     if (field.helpertext) {
+    //         const helper = document.createElement("div");
+    //         helper.classList.add("form-text");
+    //         helper.id = `${field.id}-help`;
+    //         helper.textContent = field.helpertext;
+    //         fragment.appendChild(helper);
+    //     }
+
+    //     if (field.info) {
+    //         addFieldHelpInfo(field, formFloating);
+    //     }
+
+    //     if (field.feedback) {
+    //         addFieldFeedback(field.feedback, formFloating);
+    //     }
+    // }
 
     else if (field.type === "textarea") {
         const fragment = document.createElement("div");
@@ -618,48 +708,106 @@ function addField(field, addTo) {
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add("form-floating");
-        fragment.appendChild(formFloating);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel = formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
+        // ✅ CONDITIONAL: Label placement for normal structure
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ TEXTAREA: Create textarea element
         const textarea = document.createElement("textarea");
         textarea.id = field.id;
         textarea.name = field.id;
-        textarea.rows = field.rows || 4; // default to 4 rows if not provided
         textarea.value = field.value || "";
         textarea.classList.add("form-control");
-        textarea.setAttribute("placeholder", field.label);
+        
+        // ✅ HEIGHT: Handle rows vs CSS height properly
+        if (useFloatingLabel) {
+            // For floating labels, use CSS height instead of rows attribute
+            if (field.rows) {
+                const heightInPx = (field.rows * 24) + 16; // Approximate line height
+                textarea.style.height = heightInPx + "px";
+            } else {
+                textarea.style.height = "100px"; // Default height for floating
+            }
+            // Floating labels require placeholder for CSS to work
+            textarea.setAttribute("placeholder", field.placeholder || field.label);
+        } else {
+            // For normal labels, rows attribute works fine
+            textarea.rows = field.rows || 4; // default to 4 rows if not provided
+            if (field.placeholder) {
+                textarea.setAttribute("placeholder", field.placeholder);
+            }
+        }
 
         // Apply textarea Frontend validation
         applyTextareaValidation(field, textarea);
+        formContainer.appendChild(textarea);
 
-        formFloating.appendChild(textarea);
+        // ✅ CONDITIONAL: Label placement for floating structure
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER textarea
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
-
-
-
-        // ✅ Add Laravel backend validation error if exists
+        // ✅ ERROR HANDLING: Same for both structures
         if (window.formErrors && window.formErrors[field.id]) {
-            textarea.classList.add('is-invalid'); // Bootstrap red border
+            textarea.classList.add('is-invalid');
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
             errorDiv.id = `${field.id}-error`;
-            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-            formFloating.appendChild(errorDiv);
+            errorDiv.textContent = window.formErrors[field.id][0];
+            formContainer.appendChild(errorDiv);
+        }
+
+        // ✅ HELPER TEXT: Conditional placement
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            
+            if (useFloatingLabel) {
+                // For floating labels, helper text goes outside container
+                fragment.appendChild(helper);
+            } else {
+                // For normal labels, helper text stays in container
+                formContainer.appendChild(helper);
+            }
         }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
 
@@ -667,29 +815,138 @@ function addField(field, addTo) {
 
 
 
+
+    // else if (field.type === "datalist") {
+    //     const fragment = document.createElement("div");
+    //     fragment.id = addTo.id + "-field";
+    //     addFieldSize(field, fragment);
+    //     addTo.appendChild(fragment);
+
+    //     const formFloating = document.createElement("div");
+    //     formFloating.id = field.id + "-container";
+    //     formFloating.classList.add("form-floating");
+    //     fragment.appendChild(formFloating);
+
+    //     // Create input with list attribute
+    //     const input = document.createElement("input");
+    //     input.id = field.id;
+    //     input.name = field.id;
+    //     input.type = "text";
+    //     input.classList.add("form-control");
+    //     input.setAttribute("placeholder", field.label);
+    //     input.setAttribute("list", field.id + "-list"); // link to datalist
+
+    //     formFloating.appendChild(input);
+
+    //     // ✅ Create datalist element
+    //     const datalist = document.createElement("datalist");
+    //     datalist.id = field.id + "-list";
+
+    //     if (field.options && Array.isArray(field.options)) {
+    //         field.options.forEach(opt => {
+    //             const option = document.createElement("option");
+    //             option.value = opt;
+    //             datalist.appendChild(option);
+    //         });
+    //     }
+
+    //     formFloating.appendChild(datalist);
+
+    //     // ✅ Apply datalist Frontend validation here (AFTER datalist is created)
+    //     if (typeof applyDatalistValidation === "function") {
+    //         applyDatalistValidation(field, input, datalist);
+    //     }
+
+    //     const label = document.createElement("label");
+    //     label.id = field.id + "-label";
+    //     label.setAttribute("for", field.id);
+    //     label.textContent = field.label;
+    //     formFloating.appendChild(label);
+
+
+    //     // ✅ Add Laravel backend validation error if exists
+    //     if (window.formErrors && window.formErrors[field.id]) {
+    //         input.classList.add('is-invalid'); // Bootstrap red border
+    //         const errorDiv = document.createElement("div");
+    //         errorDiv.classList.add("invalid-feedback");
+    //         errorDiv.id = `${field.id}-error`;
+    //         errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+    //         formFloating.appendChild(errorDiv);
+    //     }
+
+
+    //      // ✅ Add helper text below input field (outside floating div)
+    //     if (field.helpertext) {
+    //         const helper = document.createElement("div");
+    //         helper.classList.add("form-text");
+    //         helper.id = `${field.id}-help`;
+    //         helper.textContent = field.helpertext;
+    //         fragment.appendChild(helper);
+    //     }
+
+    //     if (field.info) {
+    //         addFieldHelpInfo(field, formFloating);
+    //     }
+
+    //     if (field.feedback) {
+    //         addFieldFeedback(field.feedback, formFloating);
+    //     }
+    // }
+
     else if (field.type === "datalist") {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add("form-floating");
-        fragment.appendChild(formFloating);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel = formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
-        // Create input with list attribute
+        // ✅ CONDITIONAL: Label placement for normal structure
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ INPUT: Create input with list attribute
         const input = document.createElement("input");
         input.id = field.id;
         input.name = field.id;
         input.type = "text";
         input.classList.add("form-control");
-        input.setAttribute("placeholder", field.label);
         input.setAttribute("list", field.id + "-list"); // link to datalist
+        
+        // ✅ CONDITIONAL: Placeholder handling
+        if (useFloatingLabel) {
+            // Floating labels require placeholder for CSS to work
+            input.setAttribute("placeholder", field.placeholder || field.label);
+        } else if (field.placeholder) {
+            // Normal labels can optionally have placeholder
+            input.setAttribute("placeholder", field.placeholder);
+        }
 
-        formFloating.appendChild(input);
+        formContainer.appendChild(input);
 
-        // ✅ Create datalist element
+        // ✅ CREATE DATALIST: Same for both structures
         const datalist = document.createElement("datalist");
         datalist.id = field.id + "-list";
 
@@ -701,38 +958,58 @@ function addField(field, addTo) {
             });
         }
 
-        formFloating.appendChild(datalist);
+        formContainer.appendChild(datalist);
 
-        // ✅ Apply datalist Frontend validation here (AFTER datalist is created)
+        // ✅ VALIDATION: Apply datalist validation
         if (typeof applyDatalistValidation === "function") {
             applyDatalistValidation(field, input, datalist);
         }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
+        // ✅ CONDITIONAL: Label placement for floating structure
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER input and datalist
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
 
-
-        // ✅ Add Laravel backend validation error if exists
+        // ✅ ERROR HANDLING: Same for both structures
         if (window.formErrors && window.formErrors[field.id]) {
-            input.classList.add('is-invalid'); // Bootstrap red border
+            input.classList.add('is-invalid');
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
             errorDiv.id = `${field.id}-error`;
-            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-            formFloating.appendChild(errorDiv);
+            errorDiv.textContent = window.formErrors[field.id][0];
+            formContainer.appendChild(errorDiv);
+        }
+
+        // ✅ HELPER TEXT: Same for both structures
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            
+            if (useFloatingLabel) {
+                // For floating labels, helper text goes outside container
+                fragment.appendChild(helper);
+            } else {
+                // For normal labels, helper text stays in container
+                formContainer.appendChild(helper);
+            }
         }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
+
 
 
     else if (field.type === "text" && field.options && Array.isArray(field.options)) {
@@ -839,20 +1116,114 @@ function addField(field, addTo) {
 
 
     // Simple input types: text, email, password, number, date, datetime-local, time, file
+    // else if (field.type && field.label) {
+    //     const fragment = document.createElement("div");
+    //     fragment.id = addTo.id + "-field";
+    //     // fragment.classList.add();
+    //     // fragment.classList.add(...[]);
+    //     // fragment.classList.add('col-md-6');
+    //     addFieldSize(field, fragment);
+    //     addTo.appendChild(fragment);
+
+    //     const formFloating = document.createElement("div");
+    //     formFloating.id = field.id + "-container";
+    //     formFloating.classList.add(...["form-floating"]);
+    //     fragment.appendChild(formFloating);
+
+    //     const input = document.createElement("input");
+    //     input.type = field.type;
+    //     if (field.type === 'file' && field?.accept) {
+    //         input.accept = field?.accept;
+    //     }
+    //     input.id = field.id;
+    //     input.name = field.id;
+    //     input.value = field.value || "";
+    //     input.classList.add("form-control");
+    //     input.setAttribute("placeholder", field.label);
+
+
+    //     // Frontend validation
+    //     applyFieldValidation(field, input);
+
+
+
+    //     formFloating.appendChild(input);
+
+    //     const label = document.createElement("label");
+    //     label.id = field.id + "-label";
+    //     label.setAttribute("for", field.id);
+    //     label.textContent = field.label;
+    //     formFloating.appendChild(label);
+
+
+
+
+
+    //     // ✅ ADD ERROR MESSAGE ELEMENT HERE
+    //     if (window.formErrors && window.formErrors[field.id]) {
+    //         input.classList.add('is-invalid');
+
+    //         const errorDiv = document.createElement("div");
+    //         errorDiv.classList.add("invalid-feedback");
+    //         errorDiv.id = `${field.id}-error`;
+    //         errorDiv.textContent = window.formErrors[field.id][0]; // First error message
+    //         formFloating.appendChild(errorDiv);
+    //     }
+
+    //     // ✅ ADD HELPER TEXT BELOW INPUT FIELD (OUTSIDE form-floating)
+    //     if (field.helpertext) {
+    //         const helper = document.createElement("div");
+    //         helper.classList.add("form-text"); // Bootstrap helper text class
+    //         helper.id = `${field.id}-help`;
+    //         helper.textContent = field.helpertext;
+    //         fragment.appendChild(helper); // append outside floating container
+    //     }
+
+    //     if (field.info) {
+    //         addFieldHelpInfo(field, formFloating);
+    //     }
+
+    //     if (field.feedback) {
+    //         addFieldFeedback(field.feedback, formFloating);
+    //     }
+    // }
+
     else if (field.type && field.label) {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
-        // fragment.classList.add();
-        // fragment.classList.add(...[]);
-        // fragment.classList.add('col-md-6');
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add(...["form-floating"]);
-        fragment.appendChild(formFloating);
+        // console.log("field",formMeta);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel =  formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
+        // ✅ CONDITIONAL: Label placement based on floating label setting
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ INPUT: Always create input element
         const input = document.createElement("input");
         input.type = field.type;
         if (field.type === 'file' && field?.accept) {
@@ -862,45 +1233,62 @@ function addField(field, addTo) {
         input.name = field.id;
         input.value = field.value || "";
         input.classList.add("form-control");
-        input.setAttribute("placeholder", field.label);
-
+        
+        // ✅ CONDITIONAL: Placeholder handling
+        if (useFloatingLabel) {
+            // Floating labels require placeholder for CSS to work
+            input.setAttribute("placeholder", field.placeholder || field.label);
+        } else if (field.placeholder) {
+            // Normal labels can optionally have placeholder
+            input.setAttribute("placeholder", field.placeholder);
+        }
 
         // Frontend validation
-        applyFieldValidation(field, input);
+        // applyFieldValidation(field, input);
+        formContainer.appendChild(input);
 
+        // ✅ CONDITIONAL: Label placement for floating labels
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER input
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
 
+        // ✅ ERROR HANDLING: Same for both structures
+        // if (window.formErrors && window.formErrors[field.id]) {
+        //     input.classList.add('is-invalid');
 
-        formFloating.appendChild(input);
+        //     const errorDiv = document.createElement("div");
+        //     errorDiv.classList.add("invalid-feedback");
+        //     errorDiv.id = `${field.id}-error`;
+        //     errorDiv.textContent = window.formErrors[field.id][0];
+        //     formContainer.appendChild(errorDiv);
+        // }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
-
-
-
-
-
-        // ✅ ADD ERROR MESSAGE ELEMENT HERE
-        if (window.formErrors && window.formErrors[field.id]) {
-            input.classList.add('is-invalid');
-
-            const errorDiv = document.createElement("div");
-            errorDiv.classList.add("invalid-feedback");
-            errorDiv.id = `${field.id}-error`;
-            errorDiv.textContent = window.formErrors[field.id][0]; // First error message
-            formFloating.appendChild(errorDiv);
+        // ✅ HELPER TEXT: Same for both structures
+        if (field.helpertext) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext;
+            formContainer.appendChild(helper);
         }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
+
+
+
+
 }
 
 function addFieldSize(field, elementToSize) {
