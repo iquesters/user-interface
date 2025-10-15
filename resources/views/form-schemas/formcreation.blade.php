@@ -35,7 +35,7 @@
         $('.invalid-feedback').remove(); 
         
         $.ajax({
-            url: "http://127.0.0.1:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
+            url: "http://localhost:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
             method: "POST",
             data: formData,
             contentType: false,

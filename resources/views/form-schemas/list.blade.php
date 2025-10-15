@@ -74,3 +74,14 @@ Form Schemas
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        $('#form-schemas-table').DataTable({
+            responsive: true,
+            order: [[2, 'desc']]
+        });
+    });
+</script>
+@endpush

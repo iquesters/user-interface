@@ -44,7 +44,7 @@ async function setupForm(formElement) {
         formMeta = await getFormSchema(formElement.id)
     }
 
-    // console.log("formMeta = " + formMeta)
+    console.log("formMeta>>>>>>>>>>>", formMeta)
     if (!formMeta) {
         // break the code
         return;
@@ -69,6 +69,59 @@ async function setupForm(formElement) {
             setupFormFooter(cardFooter, formMeta);
         }
     }
+
+    // if (formMeta.submitButtonLabel) {
+    //     console.log("Adding submit button with label:", formMeta.submitButtonLabel);
+    //     const submitBtn = document.createElement("button");
+    //     submitBtn.type = "submit";
+    //     submitBtn.textContent = formMeta.submitButtonLabel;
+    //     formElement.appendChild(submitBtn);
+    // }
+
+    // if(formMeta.allowCancel){
+    //     console.log("Adding cancel button with label:", formMeta.allowCancel);
+    //     const cancelBtn = document.createElement("button");
+    //     cancelBtn.type = "button";
+    //     cancelBtn.textContent = "Cancel";
+    //     formElement.appendChild(cancelBtn);
+    // }
+
+    if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+        // create a container for buttons
+        const btnContainer = document.createElement("div");
+        btnContainer.classList.add("d-flex", "gap-2"); // Bootstrap flex + spacing
+
+
+        // Cancel button
+        if (formMeta.allowCancel) {
+            console.log("Adding cancel button with label:", formMeta.allowCancel);
+            const cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.classList.add("btn", "btn-secondary");
+            btnContainer.classList.add("justify-content-end");
+            btnContainer.appendChild(cancelBtn);
+            
+        }
+
+        // Submit button
+        if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+            console.log("Adding submit button with label:", formMeta.submitButtonLabel);
+            const submitBtn = document.createElement("button");
+            submitBtn.type = "submit";
+            submitBtn.textContent = formMeta.submitButtonLabel || "Submit";
+            submitBtn.classList.add("btn", "btn-primary");
+            btnContainer.classList.add("justify-content-end");
+            btnContainer.appendChild(submitBtn);
+            
+        }
+
+        
+
+        // append container to the form
+        formElement.appendChild(btnContainer);
+    }
+
 
 
 
@@ -1244,7 +1297,7 @@ function addField(field, addTo,formMeta) {
         }
 
         // Frontend validation
-        // applyFieldValidation(field, input);
+        applyFieldValidation(field, input);
         formContainer.appendChild(input);
 
         // ✅ CONDITIONAL: Label placement for floating labels
@@ -1311,6 +1364,12 @@ function addFieldSize(field, elementToSize) {
             })
         } else {
             console.log();
+            sizeClasses.push("col")
+        }
+    } else if (field.gridSize) { //Schema has gridSize property
+        if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
+            sizeClasses.push("col-" + field.gridSize)
+        } else {
             sizeClasses.push("col")
         }
     } else {
