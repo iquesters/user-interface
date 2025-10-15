@@ -13,18 +13,23 @@ class UserInterfaceSeeder extends BaseSeeder
         'module_sidebar_menu' => [
             [
                 "icon" => "fas fa-list-check",
-                "label" => "All Forms",
+                "label" => "Forms",
                 "route" => "form.list",
             ],
             [
                 "icon" => "fas fa-table",
-                "label" => "All Tables",
+                "label" => "Tables",
                 "route" => "table.list",
             ],
             [
                 "icon" => "fas fa-database",
-                "label" => "All Entities",
+                "label" => "Entities",
                 "route" => "entities.index",
+            ],
+            [
+                "icon" => "fas fa-cubes",
+                "label" => "Modules",
+                "route" => "modules.assign-to-role",
             ]
         ]
     ];

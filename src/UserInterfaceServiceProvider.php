@@ -10,6 +10,7 @@ use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Schema;
 use Iquesters\Foundation\Models\Module;
+use Illuminate\Support\Facades\Auth;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
@@ -54,11 +55,16 @@ class UserInterfaceServiceProvider extends ServiceProvider
      */
     protected function shareInstalledModules(): void
     {
-        $modules = Schema::hasTable('modules')
-            ? Module::with('metas')->get()
-            : collect();
+        View::composer('*', function ($view) {
+            $modules = collect();
+            
+            if (Schema::hasTable('modules') && Auth::check()) {
+                $user = Auth::user();
+                $modules = Module::getForUser($user);
+            }
 
-        View::share('installedModules', $modules);
+            $view->with('installedModules', $modules);
+        });
     }
     
     protected function registerSeedCommand(): void
