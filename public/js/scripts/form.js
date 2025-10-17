@@ -1070,6 +1070,62 @@ function addField(field, addTo,formMeta) {
         input.name = field.id;
         input.value = field.value || "";
         input.classList.add("form-control");
+
+        // ✅ Date & Time restrictions
+        if (["date", "datetime-local", "month", "week", "time"].includes(field.type)) {
+            const now = new Date();
+
+            // Helper formats
+            const todayDate = now.toISOString().split("T")[0];              // YYYY-MM-DD
+            const nowDateTime = now.toISOString().slice(0, 16);             // YYYY-MM-DDTHH:MM
+            const currentMonth = now.toISOString().slice(0, 7);             // YYYY-MM
+            const currentTime = now.toISOString().slice(11, 16);            // HH:MM
+
+            // Compute current ISO week (e.g., 2025-W42)
+            const year = now.getFullYear();
+            const week = Math.ceil((((now - new Date(year, 0, 1)) / 86400000) + new Date(year, 0, 1).getDay() + 1) / 7);
+            const currentWeek = `${year}-W${week.toString().padStart(2, "0")}`;
+
+            // ✅ Disable future / past logic
+            if (field.disableFuture === true) {
+                switch (field.type) {
+                    case "date":
+                        input.setAttribute("max", todayDate);
+                        break;
+                    case "datetime-local":
+                        input.setAttribute("max", nowDateTime);
+                        break;
+                    case "month":
+                        input.setAttribute("max", currentMonth);
+                        break;
+                    case "week":
+                        input.setAttribute("max", currentWeek);
+                        break;
+                    case "time":
+                        input.setAttribute("max", currentTime);
+                        break;
+                }
+            } else if (field.disablePast === true) {
+                switch (field.type) {
+                    case "date":
+                        input.setAttribute("min", todayDate);
+                        break;
+                    case "datetime-local":
+                        input.setAttribute("min", nowDateTime);
+                        break;
+                    case "month":
+                        input.setAttribute("min", currentMonth);
+                        break;
+                    case "week":
+                        input.setAttribute("min", currentWeek);
+                        break;
+                    case "time":
+                        input.setAttribute("min", currentTime);
+                        break;
+                }
+            }
+        }
+
         
         // ✅ CONDITIONAL: Placeholder handling
         if (useFloatingLabel) {
