@@ -1207,11 +1207,33 @@ function addFieldSize(field, elementToSize) {
             sizeClasses.push("col")
         }
     } else if (field.gridSize) { //Schema has gridSize property
-        if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
-            sizeClasses.push("col-" + field.gridSize)
-        } else {
-            sizeClasses.push("col")
+        // if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
+        //     sizeClasses.push("col-" + field.gridSize)
+        // } else {
+        //     sizeClasses.push("col")
+        // }
+
+        if (typeof field.gridSize === "number" && field.gridSize >= 1 && field.gridSize <= 12) {
+            // ✅ Numeric grid size (e.g. 12)
+            sizeClasses.push("col-" + field.gridSize);
+        } 
+        else if (typeof field.gridSize === "object") {
+            // ✅ Responsive grid size (e.g. { sm: 4, xs: 12 })
+            Object.keys(field.gridSize).forEach((breakpoint) => {
+                const value = field.gridSize[breakpoint];
+                if (value >= 1 && value <= 12) {
+                    sizeClasses.push(`col-${breakpoint}-${value}`);
+                }
+            });
+        } 
+        else {
+            // ✅ Fallback if invalid
+            sizeClasses.push("col");
         }
+
+
+
+
     } else {
         console.log();
         sizeClasses.push("col")
