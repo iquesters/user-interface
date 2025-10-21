@@ -70,22 +70,6 @@ async function setupForm(formElement) {
         }
     }
 
-    // if (formMeta.submitButtonLabel) {
-    //     console.log("Adding submit button with label:", formMeta.submitButtonLabel);
-    //     const submitBtn = document.createElement("button");
-    //     submitBtn.type = "submit";
-    //     submitBtn.textContent = formMeta.submitButtonLabel;
-    //     formElement.appendChild(submitBtn);
-    // }
-
-    // if(formMeta.allowCancel){
-    //     console.log("Adding cancel button with label:", formMeta.allowCancel);
-    //     const cancelBtn = document.createElement("button");
-    //     cancelBtn.type = "button";
-    //     cancelBtn.textContent = "Cancel";
-    //     formElement.appendChild(cancelBtn);
-    // }
-
     if (formMeta.submitButtonLabel || formMeta.allowCancel) {
         // create a container for buttons
         const btnContainer = document.createElement("div");
@@ -122,30 +106,200 @@ async function setupForm(formElement) {
         formElement.appendChild(btnContainer);
     }
 
+    if (formMeta.cardElevation) {
+        console.log("Applying card elevation styles");
+        formElement.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        formElement.style.borderRadius = "8px";
+        formElement.style.padding = "1rem";
+        formElement.style.backgroundColor = "#fff";
+        formElement.style.transition = "box-shadow 0.3s ease";
+
+        formElement.addEventListener("mouseover", () => {
+            formElement.style.boxShadow = "0 6px 18px rgba(0,0,0,0.2)";
+        });
+        formElement.addEventListener("mouseout", () => {
+            formElement.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        });
+    }
+
+    
+    // if (formMeta.skeletonRender) {
+    //     console.log("Applying skeleton render styles", formMeta.skeletonRender);
+
+    //     // ✅ Add skeleton CSS styles dynamically (only once)
+    //     if (!document.getElementById("skeleton-style")) {
+    //         const style = document.createElement("style");
+    //         style.id = "skeleton-style";
+    //         style.textContent = `
+    //             .skeleton-container {
+    //                 display: flex;
+    //                 flex-direction: column;
+    //                 gap: 0.75rem;
+    //                 margin: 1rem 0;
+    //             }
+    //             .skeleton-line {
+    //                 height: 14px;
+    //                 width: 100%;
+    //                 border-radius: 6px;
+    //                 background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+    //                 background-size: 200% 100%;
+    //                 animation: shimmer 1.5s infinite;
+    //             }
+    //             @keyframes shimmer {
+    //                 0% { background-position: -200% 0; }
+    //                 100% { background-position: 200% 0; }
+    //             }
+    //         `;
+    //         document.head.appendChild(style);
+    //     }else{
+    //         console.log("Skeleton styles already applied");
+    //     }
+
+    //     // ✅ Create skeleton container
+    //     const skeletonContainer = document.createElement("div");
+    //     skeletonContainer.classList.add("skeleton-container");
+
+    //     // ✅ Example skeleton lines (you can adjust count or add custom logic)
+    //     for (let i = 0; i < 5; i++) {
+    //         const skeletonLine = document.createElement("div");
+    //         skeletonLine.classList.add("skeleton-line");
+    //         skeletonContainer.appendChild(skeletonLine);
+    //     }
+
+    //     // ✅ Insert skeleton before actual form
+    //     formElement.before(skeletonContainer);
+
+    //     // ✅ Temporarily hide the real form until data is ready
+    //     formElement.style.display = "none";
+
+    //     // ✅ Simulate async delay or actual data loading
+    //     setTimeout(() => {
+    //         skeletonContainer.remove();
+    //         formElement.style.display = "block";
+    //         console.log("Skeleton render complete, form displayed");
+    //     }, formMeta.skeletonRenderDelay || 2000); // default delay = 2s
+    // }
+    if (formMeta.skeletonRender) {
+        console.log("Applying skeleton render styles", formMeta.skeletonRender);
+
+        // ✅ Inject skeleton styles dynamically (only once)
+        if (!document.getElementById("skeleton-style")) {
+            const style = document.createElement("style");
+            style.id = "skeleton-style";
+            style.textContent = `
+                .skeleton-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.2rem;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    background: #fff;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                }
+                .skeleton-field-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem; /* 👈 gap between label and input */
+                }
+                .skeleton-label {
+                    height: 12px;
+                    width: 30%;
+                    border-radius: 4px;
+                    background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                }
+                .skeleton-input {
+                    height: 38px;
+                    width: 100%;
+                    border-radius: 6px;
+                    background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                }
+                .skeleton-button {
+                    height: 40px;
+                    width: 120px;
+                    border-radius: 6px;
+                    background: linear-gradient(90deg, #e0e0e0 25%, #d5d5d5 50%, #e0e0e0 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                    margin-top: 0.5rem;
+                }
+                .skeleton-btn-container {
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 0.6rem;
+                    margin-top: 0.5rem;
+                }
+                @keyframes shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ✅ Create skeleton container
+        const skeletonWrapper = document.createElement("div");
+        skeletonWrapper.classList.add("skeleton-wrapper");
+
+        // ✅ Create skeleton items dynamically based on fields
+        if (formMeta.fields && Array.isArray(formMeta.fields)) {
+            formMeta.fields.forEach(field => {
+                const fieldGroup = document.createElement("div");
+                fieldGroup.classList.add("skeleton-field-group");
+
+                // Label placeholder
+                const labelSkeleton = document.createElement("div");
+                labelSkeleton.classList.add("skeleton-label");
+                fieldGroup.appendChild(labelSkeleton);
+
+                // Input placeholder
+                const inputSkeleton = document.createElement("div");
+                inputSkeleton.classList.add("skeleton-input");
+                fieldGroup.appendChild(inputSkeleton);
+
+                skeletonWrapper.appendChild(fieldGroup);
+            });
+        }
+
+        // ✅ Add skeleton buttons if needed
+        if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+            const btnContainer = document.createElement("div");
+            btnContainer.classList.add("skeleton-btn-container");
+
+            if (formMeta.allowCancel) {
+                const cancelBtnSkeleton = document.createElement("div");
+                cancelBtnSkeleton.classList.add("skeleton-button");
+                btnContainer.appendChild(cancelBtnSkeleton);
+            }
+
+            if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+                const submitBtnSkeleton = document.createElement("div");
+                submitBtnSkeleton.classList.add("skeleton-button");
+                btnContainer.appendChild(submitBtnSkeleton);
+            }
+
+            skeletonWrapper.appendChild(btnContainer);
+        }
+
+        // ✅ Insert skeleton before the real form
+        formElement.before(skeletonWrapper);
+
+        // ✅ Hide real form initially
+        formElement.style.display = "none";
+
+        // ✅ Replace skeleton with real form after delay
+        setTimeout(() => {
+            skeletonWrapper.remove();
+            formElement.style.display = "block";
+            console.log("Skeleton render complete, real form displayed");
+        }, formMeta.skeletonRenderDelay || 2500);
+    }
 
 
 
-
-    // formElement.addEventListener("submit", function (e) {
-    //     e.preventDefault();
-    //     console.log("form submit event called...",formElement);
-    //     // console.log("Submitting form with schema:", formElement.querySelector('input[name="form_schema"]').value);
-    //     // const formData = new FormData(formElement);
-    //     // console.log(formData.get('form_schema'));
-
-
-    //     // fetch(form.action, {
-    //     //     method: 'POST',
-    //     //     body: formData,
-    //     // })
-    //     // .then(res => res.json())
-    //     // .then(data => {
-    //     //     console.log('Form submitted:', data);
-    //     //     // handle success, show message, etc.
-    //     // })
-    //     // .catch(err => console.error('Form submit error:', err));
-
-    // })
 
     // run prepare hook func if present
     if (formMeta?.prepareHookFunc) {
