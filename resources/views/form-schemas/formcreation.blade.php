@@ -35,7 +35,7 @@
         $('.invalid-feedback').remove(); 
         
         $.ajax({
-            url: "http://localhost:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
+            url: "http://127.0.0.1:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
             method: "POST",
             data: formData,
             contentType: false,
@@ -43,6 +43,7 @@
             success: function(response) {
                 console.log("API Response:", response);
                 alert("Form submitted successfully!");
+                window.location.reload();
             },
             error: function(xhr) {
                 console.error("API Error:", xhr.responseText);
