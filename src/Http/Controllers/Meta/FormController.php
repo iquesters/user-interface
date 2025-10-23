@@ -6,6 +6,7 @@ use Iquesters\UserInterface\Constants\EntityStatus;
 use App\Http\Controllers\Controller;
 use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
 use Iquesters\UserInterface\Models\FormSchema;
+use Iquesters\UserInterface\Models\FormValue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -155,30 +156,6 @@ class FormController extends Controller
     public function delete() {}
 
 
-
-
-    public function formCreate($id)
-    {
-        $parent_id = $id;
-
-        $data = (object) [
-            'parent_id' => $parent_id
-        ];
-
-        $schema = null;
-
-        if ($parent_id > 0) {
-            $parent = FormSchema::where('id', $parent_id)->first();
-            $data->parent = $parent;
-
-            // assuming schema column holds your JSON
-            $schema = $parent->schema ? json_decode($parent->schema, true) : null;
-        }
-
-        return view('userinterface::form-schemas.dynamic-form', compact('data', 'schema'));
-    }
-
-
     public function formCreation($id = 0){
         $parent_id = $id;
 
@@ -187,7 +164,7 @@ class FormController extends Controller
         );
 
         if ($parent_id > 0) {
-            $parent = FormSchema::where('id', $parent_id)->first();
+            $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
         Log::info('Form data: ' . json_encode($data));
@@ -235,6 +212,182 @@ class FormController extends Controller
             return back()->withErrors(['form_error' => 'An error occurred: ' . $e->getMessage()])->withInput();
         }
     }
+
+
+    // public function saveformdata(Request $request,$uid){
+    //     try {
+
+    //          // Define keys to skip
+    //         $excludedKeys = ['_token', 'formId', 'form_uid'];
+
+    //         // Loop through and insert key-value pairs
+    //         foreach ($request->except($excludedKeys) as $key => $value) {
+    //             FormValue::create([
+    //                 'form_uid' => $uid,
+    //                 'field_key' => $key,
+    //                 'field_value' => is_array($value) ? json_encode($value) : $value,
+    //             ]);
+    //         }
+
+    //         return response()->json([
+    //             'status' => 'success',
+    //             'message' => 'Form data saved successfully',
+    //             'form_uid' => $uid
+    //         ], 200);
+
+    //     } catch (\Exception $e) {
+    //         Log::error('Error saving form data: ' . $e->getMessage());
+
+    //         return response()->json([
+    //             'status' => 'error',
+    //             'message' => 'An error occurred while saving form data',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    public function saveformdata(Request $request, $uid)
+    {
+        try {
+            // 1️⃣ Validate the UID against your form schema table
+            $schemaRecord = FormSchema::where('uid', $uid)->first();
+            if (!$schemaRecord) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid form UID'
+                ], 400);
+            }
+
+            // 2️⃣ Decode JSON schema
+            $schema = json_decode($schemaRecord->schema, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Invalid JSON schema: ' . json_last_error_msg());
+            }
+
+            // 3️⃣ Generate dynamic validation rules & messages
+            $rules = DynamicFormSchema::toRules($schema);
+            $messages = DynamicFormSchema::toMessages($schema);
+
+            // 4️⃣ Validate input
+            $validator = Validator::make($request->all(), $rules, $messages);
+
+            if ($validator->fails()) {
+                // ❌ Return errors as JSON
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            
+
+            $validatedData = $validator->validated();
+
+            // 5️⃣ Define keys to skip
+            $excludedKeys = ['_token', 'formId', 'form_uid'];
+
+            // 6️⃣ Save each field into the database
+            foreach ($validatedData as $key => $value) {
+                if (in_array($key, $excludedKeys)) continue;
+
+                FormValue::create([
+                    'form_uid' => $uid, // ✅ Use trusted UID from route
+                    'field_key' => $key,
+                    'field_value' => is_array($value) ? json_encode($value) : $value,
+                ]);
+            }
+
+            // 7️⃣ Return success response
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Form data saved successfully',
+                'form_uid' => $uid
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Error saving form data: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while saving form data',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+
+    public function submitAndSave(Request $request, $uid){
+        try {
+            // 1️⃣ Fetch schema record
+            $schemaRecord = FormSchema::where('uid', $uid)->first();
+            if (!$schemaRecord) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Invalid form UID'
+                ], 400);
+            }
+
+            // 2️⃣ Decode JSON schema
+            $schema = json_decode($schemaRecord->schema, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Invalid JSON schema: ' . json_last_error_msg());
+            }
+
+            // 3️⃣ Generate dynamic validation rules and messages
+            $rules = DynamicFormSchema::toRules($schema);
+            $messages = DynamicFormSchema::toMessages($schema);
+
+            // 4️⃣ Validate input
+            $validator = Validator::make($request->all(), $rules, $messages);
+
+            // if ($validator->fails()) {
+            //     return response()->json([
+            //         'status' => 'error',
+            //         'message' => 'Validation failed',
+            //         'errors' => $validator->errors()
+            //     ], 422);
+            // }
+
+            if ($validator->fails()) {
+                return back()
+                    ->withErrors($validator)
+                    ->withInput();
+            }
+
+            $validatedData = $validator->validated();
+
+            // 5️⃣ Save form data
+            $formUid = $request->input('form_uid', (string) Str::ulid());
+
+            foreach ($validatedData as $key => $value) {
+                FormValue::create([
+                    'form_uid' => $formUid,
+                    'field_key' => $key,
+                    'field_value' => is_array($value) ? json_encode($value) : $value,
+                ]);
+            }
+
+            // 6️⃣ Return success response
+            // return response()->json([
+            //     'status' => 'success',
+            //     'message' => 'Form submitted and saved successfully',
+            //     'form_uid' => $formUid
+            // ], 200);
+
+            return back()->with('success', 'Form submitted successfully');
+
+        } catch (\Exception $e) {
+            Log::error('Form submission error: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
 
 
 }

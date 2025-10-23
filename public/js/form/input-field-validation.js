@@ -31,23 +31,6 @@ window.applyFieldValidation = function (field, input) {
   input.addEventListener("input", () => input.setCustomValidity(""));
 
   // ✅ Live validation: check on blur (optional but useful)
-  input.addEventListener("blur", () => input.reportValidity());
+  // input.addEventListener("blur", () => input.reportValidity());
 };
 
-// ✅ Attach validation to submit button
-// document.addEventListener("DOMContentLoaded", () => {
-//   const forms = document.querySelectorAll("form");
-//   forms.forEach(form => {
-//     form.addEventListener("submit", (event) => {
-//       console.log("🔎 Form submit detected:", form.id);
-//       if (!form.checkValidity()) {
-//         console.log("❌ Form invalid — stopping submit");
-//         event.preventDefault();
-//         event.stopPropagation();
-//         form.reportValidity(); // show error messages
-//       } else {
-//         console.log("✅ Form valid — submitting");
-//       }
-//     });
-//   });
-// });

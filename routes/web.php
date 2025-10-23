@@ -20,9 +20,10 @@ Route::middleware(['web'])->group(function () {
         Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
 
 
-        Route::get('/formCreate/{id}', [FormController::class, 'formCreate'])->name('.formCreate');
         Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
         Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
+
+        Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
     });
 
     Route::prefix('table')->name('table')->group(function () {

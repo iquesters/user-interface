@@ -21,12 +21,12 @@ window.applyValidationMessage = function (type, field, input, messages) {
     input.setCustomValidity(messages.required);
     return; // stop here, no need to check other rules
   }
-
+  
   switch (type) {
     case VALIDATION_KEYS.TEXT:
     case VALIDATION_KEYS.PASSWORD:
     case VALIDATION_KEYS.EMAIL:
-    case VALIDATION_KEYS.TEXTAREA: 
+    // case VALIDATION_KEYS.TEXTAREA: 
       switch (true) {
         case input.validity.tooShort && !!messages.minLength:
           input.setCustomValidity(messages.minLength);
@@ -45,6 +45,43 @@ window.applyValidationMessage = function (type, field, input, messages) {
           break;
       }
       break;
+
+
+
+    // TEXTAREA 
+    case VALIDATION_KEYS.TEXTAREA:
+      const value = input.value.trim();
+
+      const minLen = field.minLength || 0;
+      const maxLen = field.maxLength || Infinity;
+
+      // Manual validation since textarea may not have minlength, maxlength, or pattern attributes
+      switch (true) {
+        case !!messages.minLength && value.length < minLen:
+          input.setCustomValidity(messages.minLength);
+          break;
+
+        case !!messages.maxLength && value.length > maxLen:
+          input.setCustomValidity(messages.maxLength);
+          break;
+
+        case !!messages.pattern && field.pattern && !new RegExp(field.pattern).test(value):
+          input.setCustomValidity(messages.pattern);
+          break;
+
+        // All good
+        default:
+          input.setCustomValidity('');
+          break;
+      }
+      break;
+
+
+
+
+
+
+
 
     case VALIDATION_KEYS.NUMBER:
     case VALIDATION_KEYS.DATE:

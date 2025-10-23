@@ -12,27 +12,12 @@ window.applyTextareaValidation = function (field, textarea) {
   textarea.addEventListener("invalid", () => {
     textarea.setCustomValidity(""); // reset any previous message
     const messages = field.messages;
-    applyValidationMessage("textarea", field, "", messages);
+    applyValidationMessage("textarea", field, textarea, messages);
   });
 
   // ✅ Clear custom message on input
   textarea.addEventListener("input", () => textarea.setCustomValidity(""));
 
   // ✅ Optional: check validity on blur for better UX
-  textarea.addEventListener("blur", () => textarea.reportValidity());
+  // textarea.addEventListener("blur", () => textarea.reportValidity());
 };
-
-// ✅ Attach validation to forms
-// document.addEventListener("DOMContentLoaded", () => {
-//   const forms = document.querySelectorAll("form");
-//   forms.forEach(form => {
-//     form.addEventListener("submit", (event) => {
-//       console.log("📝 Checking textarea validation in form:", form.id);
-//       if (!form.checkValidity()) {
-//         event.preventDefault();
-//         event.stopPropagation();
-//         form.reportValidity(); // display validation messages
-//       }
-//     });
-//   });
-// });

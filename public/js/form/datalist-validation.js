@@ -20,22 +20,8 @@ window.applyDatalistValidation = function (field, input, datalist) {
     input.setCustomValidity(""); // reset
   });
 
-  input.addEventListener("blur", () => {
-    input.reportValidity();
-  });
+  // input.addEventListener("blur", () => {
+  //   input.reportValidity();
+  // });
 
 };
-
-// ✅ Attach datalist validation to forms (optional)
-// document.addEventListener("DOMContentLoaded", () => {
-//   const forms = document.querySelectorAll("form");
-//   forms.forEach(form => {
-//     form.addEventListener("submit", (event) => {
-//       if (!form.checkValidity()) {
-//         event.preventDefault();
-//         event.stopPropagation();
-//         form.reportValidity();
-//       }
-//     });
-//   });
-// });

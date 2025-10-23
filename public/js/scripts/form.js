@@ -27,14 +27,14 @@ const DTP_VIEW_MODE_TIME = "time"
 let dtpOption
 
 async function setupForm(formElement) {
-    console.log("setuping shoz-form...")
-    console.log("formId = " + formElement.id)
+    // console.log("setuping shoz-form...")
+    // console.log("formId = " + formElement.id)
 
     // let formMeta = formElement.dataset.formMeta
 
     let form = document.getElementById("mdm-create");
     let formData = JSON.parse(form.dataset.formData);
-    // console.log("formData>>>>>",formData);
+    console.log("formData>>>>>",formData);
 
     let formMeta = formData.parent.schema;
     if (formMeta) {
@@ -44,7 +44,7 @@ async function setupForm(formElement) {
         formMeta = await getFormSchema(formElement.id)
     }
 
-    console.log("formMeta = " + formMeta)
+    console.log("formMeta>>>>>>>>>>>", formMeta)
     if (!formMeta) {
         // break the code
         return;
@@ -54,7 +54,7 @@ async function setupForm(formElement) {
     const cardProvider = new CardProvider(formMeta.placeholder);
     formElement.before(cardProvider.getCard());
 
-    if (formMeta.header) {
+    if (formMeta.header || formMeta.heading) {
         const cardHeader = cardProvider.getCardHeader();
         setupFormHeader(cardHeader, formMeta);
     }
@@ -70,29 +70,236 @@ async function setupForm(formElement) {
         }
     }
 
+    if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+        // create a container for buttons
+        const btnContainer = document.createElement("div");
+        btnContainer.classList.add("d-flex", "gap-2"); // Bootstrap flex + spacing
+
+
+        // Cancel button
+        if (formMeta.allowCancel) {
+            console.log("Adding cancel button with label:", formMeta.allowCancel);
+            const cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.classList.add("btn", "btn-secondary");
+            btnContainer.classList.add("justify-content-end");
+            btnContainer.appendChild(cancelBtn);
+            
+        }
+
+        // Submit button
+        if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+            console.log("Adding submit button with label:", formMeta.submitButtonLabel);
+            const submitBtn = document.createElement("button");
+            submitBtn.type = "submit";
+            submitBtn.textContent = formMeta.submitButtonLabel || "Submit";
+            submitBtn.classList.add("btn", "btn-primary");
+            btnContainer.classList.add("justify-content-end");
+            btnContainer.appendChild(submitBtn);
+            
+        }
+
+        
+
+        // append container to the form
+        formElement.appendChild(btnContainer);
+    }
+
+    if (formMeta.cardElevation) {
+        console.log("Applying card elevation styles");
+        formElement.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        formElement.style.borderRadius = "8px";
+        formElement.style.padding = "1rem";
+        formElement.style.backgroundColor = "#fff";
+        formElement.style.transition = "box-shadow 0.3s ease";
+
+        formElement.addEventListener("mouseover", () => {
+            formElement.style.boxShadow = "0 6px 18px rgba(0,0,0,0.2)";
+        });
+        formElement.addEventListener("mouseout", () => {
+            formElement.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+        });
+    }
+
+    
+    // if (formMeta.skeletonRender) {
+    //     console.log("Applying skeleton render styles", formMeta.skeletonRender);
+
+    //     // ✅ Add skeleton CSS styles dynamically (only once)
+    //     if (!document.getElementById("skeleton-style")) {
+    //         const style = document.createElement("style");
+    //         style.id = "skeleton-style";
+    //         style.textContent = `
+    //             .skeleton-container {
+    //                 display: flex;
+    //                 flex-direction: column;
+    //                 gap: 0.75rem;
+    //                 margin: 1rem 0;
+    //             }
+    //             .skeleton-line {
+    //                 height: 14px;
+    //                 width: 100%;
+    //                 border-radius: 6px;
+    //                 background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+    //                 background-size: 200% 100%;
+    //                 animation: shimmer 1.5s infinite;
+    //             }
+    //             @keyframes shimmer {
+    //                 0% { background-position: -200% 0; }
+    //                 100% { background-position: 200% 0; }
+    //             }
+    //         `;
+    //         document.head.appendChild(style);
+    //     }else{
+    //         console.log("Skeleton styles already applied");
+    //     }
+
+    //     // ✅ Create skeleton container
+    //     const skeletonContainer = document.createElement("div");
+    //     skeletonContainer.classList.add("skeleton-container");
+
+    //     // ✅ Example skeleton lines (you can adjust count or add custom logic)
+    //     for (let i = 0; i < 5; i++) {
+    //         const skeletonLine = document.createElement("div");
+    //         skeletonLine.classList.add("skeleton-line");
+    //         skeletonContainer.appendChild(skeletonLine);
+    //     }
+
+    //     // ✅ Insert skeleton before actual form
+    //     formElement.before(skeletonContainer);
+
+    //     // ✅ Temporarily hide the real form until data is ready
+    //     formElement.style.display = "none";
+
+    //     // ✅ Simulate async delay or actual data loading
+    //     setTimeout(() => {
+    //         skeletonContainer.remove();
+    //         formElement.style.display = "block";
+    //         console.log("Skeleton render complete, form displayed");
+    //     }, formMeta.skeletonRenderDelay || 2000); // default delay = 2s
+    // }
+    if (formMeta.skeletonRender) {
+        console.log("Applying skeleton render styles", formMeta.skeletonRender);
+
+        // ✅ Inject skeleton styles dynamically (only once)
+        if (!document.getElementById("skeleton-style")) {
+            const style = document.createElement("style");
+            style.id = "skeleton-style";
+            style.textContent = `
+                .skeleton-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.2rem;
+                    padding: 1rem;
+                    border-radius: 8px;
+                    background: #fff;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                }
+                .skeleton-field-group {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.4rem; /* 👈 gap between label and input */
+                }
+                .skeleton-label {
+                    height: 12px;
+                    width: 30%;
+                    border-radius: 4px;
+                    background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                }
+                .skeleton-input {
+                    height: 38px;
+                    width: 100%;
+                    border-radius: 6px;
+                    background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                }
+                .skeleton-button {
+                    height: 40px;
+                    width: 120px;
+                    border-radius: 6px;
+                    background: linear-gradient(90deg, #e0e0e0 25%, #d5d5d5 50%, #e0e0e0 75%);
+                    background-size: 200% 100%;
+                    animation: shimmer 1.5s infinite;
+                    margin-top: 0.5rem;
+                }
+                .skeleton-btn-container {
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 0.6rem;
+                    margin-top: 0.5rem;
+                }
+                @keyframes shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // ✅ Create skeleton container
+        const skeletonWrapper = document.createElement("div");
+        skeletonWrapper.classList.add("skeleton-wrapper");
+
+        // ✅ Create skeleton items dynamically based on fields
+        if (formMeta.fields && Array.isArray(formMeta.fields)) {
+            formMeta.fields.forEach(field => {
+                const fieldGroup = document.createElement("div");
+                fieldGroup.classList.add("skeleton-field-group");
+
+                // Label placeholder
+                const labelSkeleton = document.createElement("div");
+                labelSkeleton.classList.add("skeleton-label");
+                fieldGroup.appendChild(labelSkeleton);
+
+                // Input placeholder
+                const inputSkeleton = document.createElement("div");
+                inputSkeleton.classList.add("skeleton-input");
+                fieldGroup.appendChild(inputSkeleton);
+
+                skeletonWrapper.appendChild(fieldGroup);
+            });
+        }
+
+        // ✅ Add skeleton buttons if needed
+        if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+            const btnContainer = document.createElement("div");
+            btnContainer.classList.add("skeleton-btn-container");
+
+            if (formMeta.allowCancel) {
+                const cancelBtnSkeleton = document.createElement("div");
+                cancelBtnSkeleton.classList.add("skeleton-button");
+                btnContainer.appendChild(cancelBtnSkeleton);
+            }
+
+            if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+                const submitBtnSkeleton = document.createElement("div");
+                submitBtnSkeleton.classList.add("skeleton-button");
+                btnContainer.appendChild(submitBtnSkeleton);
+            }
+
+            skeletonWrapper.appendChild(btnContainer);
+        }
+
+        // ✅ Insert skeleton before the real form
+        formElement.before(skeletonWrapper);
+
+        // ✅ Hide real form initially
+        formElement.style.display = "none";
+
+        // ✅ Replace skeleton with real form after delay
+        setTimeout(() => {
+            skeletonWrapper.remove();
+            formElement.style.display = "block";
+            console.log("Skeleton render complete, real form displayed");
+        }, formMeta.skeletonRenderDelay || 2500);
+    }
 
 
 
-    // formElement.addEventListener("submit", function (e) {
-    //     e.preventDefault();
-    //     console.log("form submit event called...",formElement);
-    //     // console.log("Submitting form with schema:", formElement.querySelector('input[name="form_schema"]').value);
-    //     // const formData = new FormData(formElement);
-    //     // console.log(formData.get('form_schema'));
-
-
-    //     // fetch(form.action, {
-    //     //     method: 'POST',
-    //     //     body: formData,
-    //     // })
-    //     // .then(res => res.json())
-    //     // .then(data => {
-    //     //     console.log('Form submitted:', data);
-    //     //     // handle success, show message, etc.
-    //     // })
-    //     // .catch(err => console.error('Form submit error:', err));
-
-    // })
 
     // run prepare hook func if present
     if (formMeta?.prepareHookFunc) {
@@ -122,22 +329,23 @@ function setupFormHeader(cardHeader, formMeta) {
     headingDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
 
     // adding icon
-    const headingIcon = document.createElement('i')
-    headingIcon.classList.add(...["fa-fw"])
-    headingIcon.className += (" " + formMeta.header.icon)
-    headingDiv.appendChild(headingIcon)
-
+    if(formMeta.header && formMeta.header.icon){
+        const headingIcon = document.createElement('i')
+        headingIcon.classList.add(...["fa-fw"])
+        headingIcon.className += (" " + formMeta.header.icon)
+        headingDiv.appendChild(headingIcon)
+    }
     // adding text
     const headingText = document.createElement('h5')
     headingText.id = `form-heading-text-${formMeta.id}`;
     headingText.classList.add(...["mb-0", "mt-1"]);
-    headingText.textContent = formMeta.header.text
+    headingText.textContent = (formMeta.header && formMeta.header.text) || formMeta.heading;
     headingDiv.appendChild(headingText)
 
     fragment.appendChild(headingDiv)
 
     // adding header actions
-    if (formMeta.header.actions) {
+    if (formMeta.header && formMeta.header.actions) {
         const headingActionDiv = document.createElement('div')
         headingActionDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
 
@@ -420,13 +628,13 @@ function setupFormBlock(formCol, formMeta) {
         } else {
             console.log("data-form-data is not provided")
         }
-        console.log("formData = " + formData)
+        // console.log("formData = " + formData)
 
         formMeta.fields.forEach(field => {
-            console.log(field);
+            // console.log(field);
             field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
-            console.log(field);
-            addField(field, form);
+            // console.log(field);
+            addField(field, form,formMeta);
         })
     }
 }
@@ -434,7 +642,7 @@ function setupFormBlock(formCol, formMeta) {
 
 
 
-function addField(field, addTo) {
+function addField(field, addTo,formMeta) {
     if (field.type === 'radio') {
         const fragment = document.createElement("div");
         fragment.classList.add("col-12", "form-check-group");
@@ -462,7 +670,7 @@ function addField(field, addTo) {
                     input.checked = true;
                 }
 
-                // Apply validation to each radio input
+                // Apply Frontend validation to each radio input
                 applyFieldValidation(field, input);
 
                 const label = document.createElement("label");
@@ -475,6 +683,31 @@ function addField(field, addTo) {
                 fragment.appendChild(div);
             });
             
+        }
+
+
+        // ✅ Add helper text below the group
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            fragment.appendChild(helper);
+        }
+
+
+        // ✅ Laravel backend validation error for the radio group
+        if (window.formErrors && window.formErrors[field.id]) {
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback", "d-block"); // d-block so it shows for group
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            fragment.appendChild(errorDiv);
+
+            // Optionally mark all radio inputs as invalid
+            fragment.querySelectorAll(`input[name="${field.id}"]`).forEach(radio => {
+                radio.classList.add('is-invalid');
+            });
         }
     }
     
@@ -511,7 +744,27 @@ function addField(field, addTo) {
         label.textContent = field.label;
         formFloating.appendChild(label);
 
+        // Apply select Frontend validation
         applySelectValidation(field, select);
+
+        // ✅ Laravel backend validation error
+        if (window.formErrors && window.formErrors[field.id]) {
+            select.classList.add('is-invalid'); // Bootstrap red border
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            formFloating.appendChild(errorDiv);
+        }
+
+        // ✅ Add helper text below select (outside form-floating)
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            fragment.appendChild(helper);
+        }
     }
     
     
@@ -544,7 +797,7 @@ function addField(field, addTo) {
                 }
 
 
-                // Apply validation to each checkbox input
+                // Apply Frontend validation to each checkbox input
                 applyFieldValidation(field, input);
 
                 const label = document.createElement("label");
@@ -571,7 +824,7 @@ function addField(field, addTo) {
                 input.checked = true;
             }
 
-            // Apply validation to each checkbox input
+            // Apply Frontend validation to each checkbox input
             applyFieldValidation(field, input);
 
             const label = document.createElement("label");
@@ -583,8 +836,17 @@ function addField(field, addTo) {
             div.appendChild(label);
             fragment.appendChild(div);
         }
-    }
 
+        // ✅ Add helper text below checkbox or group
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            fragment.appendChild(helper);
+        }
+        
+    }
 
     else if (field.type === "textarea") {
         const fragment = document.createElement("div");
@@ -592,66 +854,164 @@ function addField(field, addTo) {
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add("form-floating");
-        fragment.appendChild(formFloating);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel = formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
+        // ✅ CONDITIONAL: Label placement for normal structure
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ TEXTAREA: Create textarea element
         const textarea = document.createElement("textarea");
         textarea.id = field.id;
         textarea.name = field.id;
-        textarea.rows = field.rows || 4; // default to 4 rows if not provided
         textarea.value = field.value || "";
         textarea.classList.add("form-control");
-        textarea.setAttribute("placeholder", field.label);
+        
+        // ✅ HEIGHT: Handle rows vs CSS height properly
+        if (useFloatingLabel) {
+            // For floating labels, use CSS height instead of rows attribute
+            if (field.rows) {
+                const heightInPx = (field.rows * 24) + 16; // Approximate line height
+                textarea.style.height = heightInPx + "px";
+            } else {
+                textarea.style.height = "100px"; // Default height for floating
+            }
+            // Floating labels require placeholder for CSS to work
+            textarea.setAttribute("placeholder", field.placeholder || field.label);
+        } else {
+            // For normal labels, rows attribute works fine
+            textarea.rows = field.rows || 4; // default to 4 rows if not provided
+            if (field.placeholder) {
+                textarea.setAttribute("placeholder", field.placeholder);
+            }
+        }
 
-        // Apply textarea validation
+        // Apply textarea Frontend validation
         applyTextareaValidation(field, textarea);
+        formContainer.appendChild(textarea);
 
-        formFloating.appendChild(textarea);
+        // ✅ CONDITIONAL: Label placement for floating structure
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER textarea
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
+        // ✅ ERROR HANDLING: Same for both structures
+        if (window.formErrors && window.formErrors[field.id]) {
+            textarea.classList.add('is-invalid');
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0];
+            formContainer.appendChild(errorDiv);
+        }
+
+        // ✅ HELPER TEXT: Conditional placement
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            
+            if (useFloatingLabel) {
+                // For floating labels, helper text goes outside container
+                fragment.appendChild(helper);
+            } else {
+                // For normal labels, helper text stays in container
+                formContainer.appendChild(helper);
+            }
+        }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
 
-
-
-
-
+    // For Datalist
     else if (field.type === "datalist") {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add("form-floating");
-        fragment.appendChild(formFloating);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel = formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
-        // Create input with list attribute
+        // ✅ CONDITIONAL: Label placement for normal structure
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ INPUT: Create input with list attribute
         const input = document.createElement("input");
         input.id = field.id;
         input.name = field.id;
         input.type = "text";
         input.classList.add("form-control");
-        input.setAttribute("placeholder", field.label);
         input.setAttribute("list", field.id + "-list"); // link to datalist
+        
+        // ✅ CONDITIONAL: Placeholder handling
+        if (useFloatingLabel) {
+            // Floating labels require placeholder for CSS to work
+            input.setAttribute("placeholder", field.placeholder || field.label);
+        } else if (field.placeholder) {
+            // Normal labels can optionally have placeholder
+            input.setAttribute("placeholder", field.placeholder);
+        }
 
-        formFloating.appendChild(input);
+        formContainer.appendChild(input);
 
-        // ✅ Create datalist element
+        // ✅ CREATE DATALIST: Same for both structures
         const datalist = document.createElement("datalist");
         datalist.id = field.id + "-list";
 
@@ -663,159 +1023,58 @@ function addField(field, addTo) {
             });
         }
 
-        formFloating.appendChild(datalist);
+        formContainer.appendChild(datalist);
 
-        // ✅ Apply datalist validation here (AFTER datalist is created)
+        // ✅ VALIDATION: Apply datalist validation
         if (typeof applyDatalistValidation === "function") {
             applyDatalistValidation(field, input, datalist);
         }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
+        // ✅ CONDITIONAL: Label placement for floating structure
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER input and datalist
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ ERROR HANDLING: Same for both structures
+        if (window.formErrors && window.formErrors[field.id]) {
+            input.classList.add('is-invalid');
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0];
+            formContainer.appendChild(errorDiv);
+        }
+
+        // ✅ HELPER TEXT: Same for both structures
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            
+            if (useFloatingLabel) {
+                // For floating labels, helper text goes outside container
+                fragment.appendChild(helper);
+            } else {
+                // For normal labels, helper text stays in container
+                formContainer.appendChild(helper);
+            }
+        }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
 
-
-
-    // Input type text with dropdown options (not a select)
-    // else if (field.type === "text" && field.options && Array.isArray(field.options)) {
-    //     const fragment = document.createElement("div");
-    //     fragment.id = addTo.id + "-field";
-    //     addFieldSize(field, fragment);
-    //     addTo.appendChild(fragment);
-
-    //     // Dropdown container
-    //     const container = document.createElement("div");
-    //     fragment.appendChild(container);
-
-    //     // Dropdown button
-    //     const button = document.createElement("button");
-    //     button.type = "button";
-    //     button.textContent = field.label + " ▼";
-    //     button.id = field.id + "-button";
-    //     container.appendChild(button);
-
-    //     // Dropdown menu (hidden by default)
-    //     const menu = document.createElement("div");
-    //     menu.id = field.id + "-menu";
-    //     menu.style.display = "none";
-    //     container.appendChild(menu);
-
-    //     // Search input inside dropdown
-    //     const search = document.createElement("input");
-    //     search.type = "text";
-    //     search.placeholder = field.placeholder || "Search...";
-    //     menu.appendChild(search);
-
-    //     // Populate items
-    //     field.options.forEach(opt => {
-    //         const item = document.createElement("div");
-    //         item.textContent = opt.label;
-    //         item.addEventListener("click", () => {
-    //             button.textContent = opt.label + " ▼"; // show selection
-    //             menu.style.display = "none";
-    //         });
-    //         menu.appendChild(item);
-    //     });
-
-    //     // Toggle dropdown on button click
-    //     button.addEventListener("click", () => {
-    //         menu.style.display = menu.style.display === "none" ? "block" : "none";
-    //         search.value = ""; // reset search
-    //         filterItems("");
-    //         search.focus();
-    //     });
-
-    //     // Filter function
-    //     function filterItems(filter) {
-    //         Array.from(menu.querySelectorAll("div")).forEach(div => {
-    //             if (div !== search) {
-    //                 div.style.display = div.textContent.toLowerCase().includes(filter) ? "" : "none";
-    //             }
-    //         });
-    //     }
-
-    //     // Filter on input
-    //     search.addEventListener("input", () => filterItems(search.value.toLowerCase()));
-
-    //     // Close when clicking outside
-    //     document.addEventListener("click", (e) => {
-    //         if (!container.contains(e.target)) {
-    //             menu.style.display = "none";
-    //         }
-    //     });
-    // }
-
-    // else if (field.type === "text" && field.options && Array.isArray(field.options)) {
-    //     const fragment = document.createElement("div");
-    //     fragment.id = addTo.id + "-field";
-    //     addFieldSize(field, fragment);
-    //     addTo.appendChild(fragment);
-
-    //     // Input to show selected value
-    //     const input = document.createElement("input");
-    //     input.type = "text";
-    //     input.name = field.id;       // will be sent in form
-    //     input.value = field.value || "";
-    //     input.placeholder = field.placeholder || field.label;
-    //     input.classList.add("form-control");
-    //     fragment.appendChild(input);
-
-    //     // HTML form validation
-    //     applyFieldValidation(field, input);
-
-    //     // Dropdown menu (hidden by default)
-    //     const menu = document.createElement("div");
-    //     menu.style.display = "none";
-    //     menu.classList.add("dropdown-menu", "w-100", "p-2", "position-absolute");
-    //     fragment.appendChild(menu);
-
-    //     // Populate items
-    //     field.options.forEach(opt => {
-    //         const item = document.createElement("div");
-    //         item.classList.add("dropdown-item");
-    //         item.textContent = opt.label;
-    //         item.addEventListener("click", () => {
-    //             input.value = opt.label;      // show selected value
-    //             input.dataset.value = opt.value; // store real value if needed
-    //             menu.style.display = "none";
-    //             input.reportValidity();
-    //         });
-    //         menu.appendChild(item);
-    //     });
-
-    //     // Show dropdown when input is focused
-    //     input.addEventListener("focus", () => {
-    //         menu.style.display = "block";
-    //     });
-
-    //     // Filter items as user types
-    //     input.addEventListener("input", () => {
-    //         const filter = input.value.toLowerCase();
-    //         Array.from(menu.children).forEach(item => {
-    //             if (item !== input) {
-    //                 item.style.display = item.textContent.toLowerCase().includes(filter) ? "" : "none";
-    //             }
-    //         });
-    //     });
-
-    //     // Close when clicking outside
-    //     document.addEventListener("click", (e) => {
-    //         if (!fragment.contains(e.target)) {
-    //             menu.style.display = "none";
-    //         }
-    //     });
-    // }
 
 
     else if (field.type === "text" && field.options && Array.isArray(field.options)) {
@@ -834,8 +1093,20 @@ function addField(field, addTo) {
         input.classList.add("form-control");
         fragment.appendChild(input);
 
-        // Validation
+        //Frontend Validation
         applyFieldValidation(field, input);
+
+
+
+        // ✅ Laravel backend validation error
+        if (window.formErrors && window.formErrors[field.id]) {
+            input.classList.add('is-invalid');
+            const errorDiv = document.createElement("div");
+            errorDiv.classList.add("invalid-feedback");
+            errorDiv.id = `${field.id}-error`;
+            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+            fragment.appendChild(errorDiv);
+        }
 
         // Dropdown menu
         const menu = document.createElement("div");
@@ -907,23 +1178,43 @@ function addField(field, addTo) {
         });
     }
 
-
-
-    // Simple input types: text, email, password, number, date, datetime-local, time, file
+    // For all other input types (text, email, password, number, date, file, etc.)
     else if (field.type && field.label) {
         const fragment = document.createElement("div");
         fragment.id = addTo.id + "-field";
-        // fragment.classList.add();
-        // fragment.classList.add(...[]);
-        // fragment.classList.add('col-md-6');
         addFieldSize(field, fragment);
         addTo.appendChild(fragment);
 
-        const formFloating = document.createElement("div");
-        formFloating.id = field.id + "-container";
-        formFloating.classList.add(...["form-floating"]);
-        fragment.appendChild(formFloating);
+        // console.log("field",formMeta);
+        // ✅ CHECK: Use floatinglabel from form schema to determine layout
+        const useFloatingLabel =  formMeta.floatinglabel === true;
+        
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const formContainer = document.createElement("div");
+        formContainer.id = field.id + "-container";
+        
+        if (useFloatingLabel) {
+            // Floating label structure
+            formContainer.classList.add("form-floating", "mb-3");
+        } else {
+            // Normal label structure  
+            formContainer.classList.add("mb-3");
+        }
+        
+        fragment.appendChild(formContainer);
 
+        // ✅ CONDITIONAL: Label placement based on floating label setting
+        if (!useFloatingLabel) {
+            // Normal structure: Label comes FIRST
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.classList.add("form-label");
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
+
+        // ✅ INPUT: Always create input element
         const input = document.createElement("input");
         input.type = field.type;
         if (field.type === 'file' && field?.accept) {
@@ -933,30 +1224,118 @@ function addField(field, addTo) {
         input.name = field.id;
         input.value = field.value || "";
         input.classList.add("form-control");
-        input.setAttribute("placeholder", field.label);
 
+        // ✅ Date & Time restrictions
+        if (["date", "datetime-local", "month", "week", "time"].includes(field.type)) {
+            const now = new Date();
 
-        // HTML form validation
+            // Helper formats
+            const todayDate = now.toISOString().split("T")[0];              // YYYY-MM-DD
+            const nowDateTime = now.toISOString().slice(0, 16);             // YYYY-MM-DDTHH:MM
+            const currentMonth = now.toISOString().slice(0, 7);             // YYYY-MM
+            const currentTime = now.toISOString().slice(11, 16);            // HH:MM
+
+            // Compute current ISO week (e.g., 2025-W42)
+            const year = now.getFullYear();
+            const week = Math.ceil((((now - new Date(year, 0, 1)) / 86400000) + new Date(year, 0, 1).getDay() + 1) / 7);
+            const currentWeek = `${year}-W${week.toString().padStart(2, "0")}`;
+
+            // ✅ Disable future / past logic
+            if (field.disableFuture === true) {
+                switch (field.type) {
+                    case "date":
+                        input.setAttribute("max", todayDate);
+                        break;
+                    case "datetime-local":
+                        input.setAttribute("max", nowDateTime);
+                        break;
+                    case "month":
+                        input.setAttribute("max", currentMonth);
+                        break;
+                    case "week":
+                        input.setAttribute("max", currentWeek);
+                        break;
+                    case "time":
+                        input.setAttribute("max", currentTime);
+                        break;
+                }
+            } else if (field.disablePast === true) {
+                switch (field.type) {
+                    case "date":
+                        input.setAttribute("min", todayDate);
+                        break;
+                    case "datetime-local":
+                        input.setAttribute("min", nowDateTime);
+                        break;
+                    case "month":
+                        input.setAttribute("min", currentMonth);
+                        break;
+                    case "week":
+                        input.setAttribute("min", currentWeek);
+                        break;
+                    case "time":
+                        input.setAttribute("min", currentTime);
+                        break;
+                }
+            }
+        }
+
+        
+        // ✅ CONDITIONAL: Placeholder handling
+        if (useFloatingLabel) {
+            // Floating labels require placeholder for CSS to work
+            input.setAttribute("placeholder", field.placeholder || field.label);
+        } else if (field.placeholder) {
+            // Normal labels can optionally have placeholder
+            input.setAttribute("placeholder", field.placeholder);
+        }
+
+        // Frontend validation
         applyFieldValidation(field, input);
+        formContainer.appendChild(input);
 
+        // ✅ CONDITIONAL: Label placement for floating labels
+        if (useFloatingLabel) {
+            // Floating structure: Label comes AFTER input
+            const label = document.createElement("label");
+            label.id = field.id + "-label";
+            label.setAttribute("for", field.id);
+            label.textContent = field.label;
+            formContainer.appendChild(label);
+        }
 
+        // ✅ ERROR HANDLING: Same for both structures
+        // if (window.formErrors && window.formErrors[field.id]) {
+        //     input.classList.add('is-invalid');
 
-        formFloating.appendChild(input);
+        //     const errorDiv = document.createElement("div");
+        //     errorDiv.classList.add("invalid-feedback");
+        //     errorDiv.id = `${field.id}-error`;
+        //     errorDiv.textContent = window.formErrors[field.id][0];
+        //     formContainer.appendChild(errorDiv);
+        // }
 
-        const label = document.createElement("label");
-        label.id = field.id + "-label";
-        label.setAttribute("for", field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
+        // ✅ HELPER TEXT: Same for both structures
+        if (field.helpertext || field.helperText) {
+            const helper = document.createElement("div");
+            helper.classList.add("form-text");
+            helper.id = `${field.id}-help`;
+            helper.textContent = field.helpertext || field.helperText;
+            formContainer.appendChild(helper);
+        }
 
         if (field.info) {
-            addFieldHelpInfo(field, formFloating);
+            addFieldHelpInfo(field, formContainer);
         }
 
         if (field.feedback) {
-            addFieldFeedback(field.feedback, formFloating);
+            addFieldFeedback(field.feedback, formContainer);
         }
     }
+
+
+
+
 }
 
 function addFieldSize(field, elementToSize) {
@@ -968,7 +1347,7 @@ function addFieldSize(field, elementToSize) {
             }
         } else if (field.size.constructor.name === 'Object') {
             Object.keys(field.size).forEach((sizeKey) => {
-                console.log(sizeKey);
+                // console.log(sizeKey);
                 if ('xs' === sizeKey) {
                     sizeClasses.push("col-" + field.size[sizeKey])
                 } else if ('sm' === sizeKey || 'md' === sizeKey || 'lg' === sizeKey || 'xl' === sizeKey || 'xxl' === sizeKey) {
@@ -981,6 +1360,34 @@ function addFieldSize(field, elementToSize) {
             console.log();
             sizeClasses.push("col")
         }
+    } else if (field.gridSize) { //Schema has gridSize property
+        // if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
+        //     sizeClasses.push("col-" + field.gridSize)
+        // } else {
+        //     sizeClasses.push("col")
+        // }
+
+        if (typeof field.gridSize === "number" && field.gridSize >= 1 && field.gridSize <= 12) {
+            // ✅ Numeric grid size (e.g. 12)
+            sizeClasses.push("col-" + field.gridSize);
+        } 
+        else if (typeof field.gridSize === "object") {
+            // ✅ Responsive grid size (e.g. { sm: 4, xs: 12 })
+            Object.keys(field.gridSize).forEach((breakpoint) => {
+                const value = field.gridSize[breakpoint];
+                if (value >= 1 && value <= 12) {
+                    sizeClasses.push(`col-${breakpoint}-${value}`);
+                }
+            });
+        } 
+        else {
+            // ✅ Fallback if invalid
+            sizeClasses.push("col");
+        }
+
+
+
+
     } else {
         console.log();
         sizeClasses.push("col")
@@ -1203,7 +1610,7 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
         if (document.readyState === "complete") {
             // Fetch all the forms marked as shoz-form
             const forms = document.querySelectorAll('.shoz-form')
-            console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
+            // console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {
                 setupForm(form)

@@ -55,10 +55,13 @@ Form Schemas
                     <td class="">{{ $form->extra_info }}</td>
                     <td class="">
                         <div class="d-flex justify-content-center gap-2">
-                            <a type="button" class="nav-link d-flex align-items-center" title="Overview of {{ $form->name }} form" href="{{route('form.overview',$form->id)}}">
+                            <a type="button" class="nav-link d-flex align-items-center text-primary" title="Form Creation of {{ $form->name }} form" href="{{route('form.formCreation',$form->uid)}}">
                                 <i class="fa-fw far fa-eye"></i>
                             </a>
-                            <a type="button" class="nav-link d-flex align-items-center" title="Delete {{ $form->name }} form" href="{{route('form.delete',$form->id)}}">
+                            <a type="button" class="nav-link d-flex align-items-center text-dark" title="Overview of {{ $form->name }} form" href="{{route('form.overview',$form->id)}}">
+                                <i class="fa-fw far fa-edit"></i>
+                            </a>
+                            <a type="button" class="nav-link d-flex align-items-center text-danger" title="Delete {{ $form->name }} form" href="{{route('form.delete',$form->id)}}">
                                 <i class="fa-fw far fa-trash-can"></i>
                             </a>
                         </div>
@@ -71,3 +74,14 @@ Form Schemas
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    $(document).ready(function() {
+        $('#form-schemas-table').DataTable({
+            responsive: true,
+            order: [[2, 'desc']]
+        });
+    });
+</script>
+@endpush
