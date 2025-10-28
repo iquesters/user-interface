@@ -25,7 +25,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
 
     public function boot()
     {
-        Log::info("✅ UserInterface package loaded from src/");
+        // Log::info("✅ UserInterface package loaded from src/");
 
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
