@@ -1,3 +1,28 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get all toggle buttons
+        const toggleButtons = document.querySelectorAll('.toggle-password');
+        
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Find the associated password input (previous sibling)
+                const passwordInput = this.parentNode.querySelector('input');
+                
+                if (passwordInput) {
+                    // Toggle password visibility
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    
+                    // Toggle icon
+                    const icon = this.querySelector('i');
+                    icon.classList.toggle('fa-eye-slash');
+                    icon.classList.toggle('fa-eye');
+                }
+            });
+        });
+    });
+</script>
+
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 
@@ -13,6 +38,8 @@
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl() }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/custom-element.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/production-performance.js') }}"></script>
+
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/recaptcha.js') }}"></script>
 
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/scripts/containers.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/scripts/data-providers.js') }}"></script>

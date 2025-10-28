@@ -9,6 +9,7 @@ class UserInterfaceConf extends BaseConf
 {
     protected ?string $identifier = Module::USER_INFE;
 
+    protected string $auth_layout;
     protected string $app_layout;
     protected string $logo;
     protected int $module_tabs;
@@ -20,6 +21,7 @@ class UserInterfaceConf extends BaseConf
 
     protected function prepareDefault(BaseConf $default_values)
     {
+        $default_values->auth_layout = 'userinterface::layouts.auth';
         $default_values->app_layout = 'userinterface::layouts.app';
         $default_values->logo = 'img/logo.png';
         $default_values->module_tabs = 7;

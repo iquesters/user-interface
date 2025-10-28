@@ -3,13 +3,17 @@
 namespace Iquesters\UserInterface;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Console\Command;
 use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
+use Iquesters\Foundation\Support\ConfProvider;
+use Iquesters\Foundation\Enums\Module as ModuleEnum;
+use Iquesters\UserManagement\Config\UserManagementConf;
+use Iquesters\UserInterface\Config\UserInterfaceConf;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Schema;
 use Iquesters\Foundation\Models\Module;
+use Iquesters\UserManagement\UserManagementServiceProvider;
 use Illuminate\Support\Facades\Auth;
 
 class UserInterfaceServiceProvider extends ServiceProvider
@@ -17,16 +21,21 @@ class UserInterfaceServiceProvider extends ServiceProvider
 
     public function register()
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/userinterface.php', 'userinterface');
+        // Register User Interface configuration
+        ConfProvider::register(ModuleEnum::USER_INFE, UserInterfaceConf::class);
 
+        // Register seeder command
         $this->registerSeedCommand();
+
+        // ✅ Conditionally register UserManagement package if available
+        if (class_exists(UserManagementServiceProvider::class)) {
+            ConfProvider::register(ModuleEnum::USER_MGMT, UserManagementConf::class);
+        }
     }
 
 
     public function boot()
     {
-        // Log::info("✅ UserInterface package loaded from src/");
-
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'userinterface');
@@ -130,7 +139,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
      */
     public static function getLogoUrl(): string
     {
-        $customLogo = config('userinterface.logo');
+        $customLogo = ConfProvider::from(ModuleEnum::USER_INFE)->logo;
 
         // If it's a full URL, return as is
         if (filter_var($customLogo, FILTER_VALIDATE_URL)) {
@@ -169,5 +178,4 @@ class UserInterfaceServiceProvider extends ServiceProvider
         return route('userinterface.asset', ['path' => $file]);
     }
 
-    
 }
