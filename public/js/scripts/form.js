@@ -630,12 +630,27 @@ function setupFormBlock(formCol, formMeta) {
         }
         // console.log("formData = " + formData)
 
-        formMeta.fields.forEach(field => {
-            // console.log(field);
-            field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
-            // console.log(field);
-            addField(field, form,formMeta);
-        })
+        // formMeta.fields.forEach(field => {
+        //     // console.log(field);
+        //     field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
+        //     // console.log(field);
+        //     addField(field, form,formMeta);
+        // })
+
+
+        if (formMeta.fields && formMeta.fields.length > 0) {
+            formMeta.fields.forEach(field => {
+                field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
+                addField(field, form, formMeta);
+            });
+        } else {
+            if (APP_ENV === 'dev') {
+                const errorMessageContainer = document.getElementById("form-error-message");
+                console.warn("No fields defined in formMeta for form:", formMeta.id);
+                errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
+            }
+        }
+
     }
 }
 

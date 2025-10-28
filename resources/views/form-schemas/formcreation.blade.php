@@ -16,11 +16,14 @@
     
     
 </form>
+<!-- APP ENV Message container -->
+<div id="form-error-message"class="alert alert-warning mb-0"></div>
 
 @endsection
 
 @pushonce('scripts')
 <script type="text/javascript">
+    const APP_ENV = "{{ config('app.env') }}";
     function prepare_MDMForm(formID) {
         // do something here
     }
