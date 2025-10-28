@@ -1,7 +1,7 @@
 @php
     use Iquesters\Foundation\Support\ConfProvider;
     use Iquesters\Foundation\Enums\Module;
-    use Iquesters\UserManagement\Config\RecaptchaConfig;
+    use Iquesters\UserManagement\UserManagementServiceProvider;
 @endphp
 
 <head>
@@ -21,7 +21,7 @@
     <link rel="icon" type="image/x-icon" href="{{ route('userinterface.asset', ['path' => 'img/favicon.png']) }}">
 
     {{-- ✅ Only load reCAPTCHA when on auth layout --}}
-    @if (!empty($isAuth))
+    @if (!empty($isAuth) && class_exists(UserManagementServiceProvider::class))
         @php
             $recaptcha = ConfProvider::from(Module::USER_MGMT)->recaptcha ?? null;
         @endphp
