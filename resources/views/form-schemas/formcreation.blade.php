@@ -1,4 +1,11 @@
-@extends(config('userinterface.layout_app'))
+@php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+    use Iquesters\UserManagement\Config\UserManagementKeys;
+    $layout=ConfProvider::from(Module::USER_INFE)->app_layout;
+@endphp 
+
+@extends($layout)
 
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
@@ -17,7 +24,7 @@
     
 </form>
 <!-- APP ENV Message container -->
-<div id="form-error-message"class="alert alert-warning mb-0"></div>
+<!-- <div id="form-error-message"class="alert alert-warning mb-0"></div> -->
 
 @endsection
 
