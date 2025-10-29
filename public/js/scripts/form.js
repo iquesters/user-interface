@@ -647,6 +647,7 @@ function setupFormBlock(formCol, formMeta) {
             if (APP_ENV === 'dev') {
                 const errorMessageContainer = document.getElementById("form-error-message");
                 console.warn("No fields defined in formMeta for form:", formMeta.id);
+                errorMessageContainer.classList.add('alert', 'alert-warning');
                 errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
             }
         }
@@ -1293,6 +1294,20 @@ function addField(field, addTo,formMeta) {
                         break;
                 }
             }
+
+            // ✅ Prevent end date/time < start date/time
+            if (field.id === "endDate" || field.id === "end_time" || field.name === "end_date") {
+                const startInput =
+                    document.getElementById("startDate") ||
+                    document.getElementById("start_time") ||
+                    document.querySelector("[name='start_date']");
+                if (startInput) {
+                    // Set dynamic min value
+                    startInput.addEventListener("change", () => {
+                        input.setAttribute("min", startInput.value);
+                    });
+                }
+            }
         }
 
         
@@ -1308,6 +1323,39 @@ function addField(field, addTo,formMeta) {
         // Frontend validation
         applyFieldValidation(field, input);
         formContainer.appendChild(input);
+       
+        // ✅ Handle dependencies.hide (e.g., hide endDate when isCurrent checked)
+        if (field.dependencies && field.dependencies.hide) {
+            // Delay until DOM is ready (so dependent field exists)
+            setTimeout(() => {
+                field.dependencies.hide.forEach(dep => {
+                    const depInput = document.getElementById(dep.id);
+                    if (depInput) {
+                        const checkHideCondition = () => {
+                            const depValue = depInput.type === "checkbox" ? depInput.checked : depInput.value;
+                            const shouldHide =
+                                dep.operator === "===" ? depValue === dep.value :
+                                dep.operator === "!==" ? depValue !== dep.value :
+                                false;
+
+                            const container = document.getElementById(field.id + "-container");
+                            if (container) {
+                                container.style.display = shouldHide ? "none" : "";
+                            }
+
+                            // optional: clear value when hidden
+                            if (shouldHide) input.value = "";
+                        };
+
+                        // Initial check + bind listener
+                        checkHideCondition();
+                        depInput.addEventListener("change", checkHideCondition);
+                    }
+                });
+            }, 0);
+        }
+
+
 
         // ✅ CONDITIONAL: Label placement for floating labels
         if (useFloatingLabel) {

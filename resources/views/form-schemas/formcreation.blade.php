@@ -24,7 +24,7 @@
     
 </form>
 <!-- APP ENV Message container -->
-<!-- <div id="form-error-message"class="alert alert-warning mb-0"></div> -->
+<div id="form-error-message"></div>
 
 @endsection
 
