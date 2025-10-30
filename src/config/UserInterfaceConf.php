@@ -12,6 +12,8 @@ class UserInterfaceConf extends BaseConf
     protected string $auth_layout;
     protected string $app_layout;
     protected string $logo;
+    protected string $app_name;
+    protected string $app_description;
     protected int $module_tabs;
     protected int $mobile_bottom_tabs;
     protected string $mobile_featured_tab;
@@ -24,6 +26,8 @@ class UserInterfaceConf extends BaseConf
         $default_values->auth_layout = 'userinterface::layouts.auth';
         $default_values->app_layout = 'userinterface::layouts.app';
         $default_values->logo = 'img/logo.png';
+        $default_values->app_name = 'Iquesters';
+        $default_values->app_description = 'Iquesters Application';
         $default_values->module_tabs = 7;
         $default_values->mobile_bottom_tabs = 4;
         $default_values->mobile_featured_tab = '';
