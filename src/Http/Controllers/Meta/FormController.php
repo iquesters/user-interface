@@ -248,6 +248,7 @@ class FormController extends Controller
 
     public function saveformdata(Request $request, $uid)
     {
+        Log::info('Saving form data for UID: ' . $uid);
         try {
             // 1️⃣ Validate the UID against your form schema table
             $schemaRecord = FormSchema::where('uid', $uid)->first();
@@ -385,6 +386,14 @@ class FormController extends Controller
                 'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+    public function getNoAuthFormSchema($slug)
+    {
+        Log::info("No Auth: Fetching form schema for slug: " . $slug);
+        return $this->getFormSchema($slug);
     }
 
 

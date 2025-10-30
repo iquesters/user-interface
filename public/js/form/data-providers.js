@@ -6,6 +6,7 @@
  * @return json formSchema 
  */
 async function getFormSchema(formID) {
+    console.log("Fetching form schema for formID: " + formID);
     let formSchema = await fetch('/api/noauth/form/'+formID)
         .then(response => response.json())
         .catch(err => console.log(err))

@@ -10,13 +10,14 @@
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
 @section('content')
-<!-- <form id="mdm-create" class="shoz-form" data-form-data="{{json_encode($data)}}"></form> -->
+<!-- <form id="{{$data->parent->uid}}" class="shoz-form"></form> -->
  <!-- action="{{ route('form.submitAndSave', ['uid' => $data->parent->uid ?? '']) }}" -->
-<form id="mdm-create" class="shoz-form" 
+<form id="{{$data->parent->uid}}" class="shoz-form" 
        
       method="POST" 
       enctype="multipart/form-data"
-      data-form-data="{{ json_encode($data) }}">
+      data-form-meta=""
+      data-form-data=''>
     @csrf
 
    

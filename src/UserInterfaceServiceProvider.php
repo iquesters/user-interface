@@ -56,7 +56,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
             __DIR__ . '/../public' => public_path('vendor/userinterface'),
         ], 'user-userinterface-assets');
 
-         $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+        //  $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
     }
 
     /**

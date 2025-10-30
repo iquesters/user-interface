@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 
+
 Route::middleware(['web'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         Route::get('/pkg-test', function () {
@@ -49,3 +50,5 @@ Route::middleware(['web'])->group(function () {
 
     });
 });
+
+require __DIR__ . '/api.php';
