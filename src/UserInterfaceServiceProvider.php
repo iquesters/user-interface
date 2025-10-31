@@ -33,7 +33,6 @@ class UserInterfaceServiceProvider extends ServiceProvider
         }
     }
 
-
     public function boot()
     {
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
@@ -42,12 +41,17 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // allow config publish
         $this->mergeConfigFrom(__DIR__.'/../config/userinterface.php', 'userinterface');
         $this->registerAssetRoute();
-
+        
         if ($this->app->runningInConsole()) {
             $this->commands([
                 'command.user-interface.seed'
             ]);
         }
+
+        // ✅ Defer until routes are ready
+        $this->app->booted(function () {
+            \Iquesters\UserInterface\Support\SetupLinkInjector::inject();
+        });
 
         // 👇 Share installed modules globally
         $this->shareInstalledModules();
@@ -149,6 +153,12 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // If it's an absolute path (starts with /), return as is
         if (str_starts_with($customLogo, '/')) {
             return $customLogo;
+        }
+        
+        // Check if file actually exists in public/
+        $publicPath = public_path($customLogo);
+        if (file_exists($publicPath)) {
+            return asset($customLogo);
         }
 
         // If it contains "::" format, convert to path

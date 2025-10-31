@@ -30,8 +30,20 @@ class UserInterfaceSeeder extends BaseSeeder
                 "icon" => "fas fa-cubes",
                 "label" => "Modules",
                 "route" => "modules.assign-to-role",
+            ],
+            [
+                "icon" => "fas fa-list-ul",
+                "label" => "All Masterdatas",
+                "route" => "master-data.index",
             ]
         ]
+    ];
+
+    protected array $permissions = [
+        'view-master_data',
+        'create-master_data',
+        'edit-master_data',
+        'delete-master_data'
     ];
     
     /**
