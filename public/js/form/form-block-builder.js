@@ -103,16 +103,8 @@ function addField(field, addTo,formMeta) {
             });
             
         }
-
-
-        // ✅ Add helper text below the group
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement(HTML_TAG.DIV);
-            helper.classList.add(STYLE_CLASS.FORM_TEXT);
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            fragment.appendChild(helper);
-        }
+        // ✅ Add helper text below radio group
+        createHelperText(field, fragment);
 
 
         // ✅ Laravel backend validation error for the radio group
@@ -175,14 +167,7 @@ function addField(field, addTo,formMeta) {
             formFloating.appendChild(errorDiv);
         }
 
-        // ✅ Add helper text below select (outside form-floating)
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement("div");
-            helper.classList.add("form-text");
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            fragment.appendChild(helper);
-        }
+        createHelperText(field, fragment);
     }
     
     
@@ -254,13 +239,7 @@ function addField(field, addTo,formMeta) {
         }
 
         // ✅ Add helper text below checkbox or group
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement("div");
-            helper.classList.add("form-text");
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            fragment.appendChild(helper);
-        }
+        createHelperText(field, fragment);
         
     }
 
@@ -270,71 +249,14 @@ function addField(field, addTo,formMeta) {
 
         // ✅ CHECK: Use floatinglabel from form schema to determine layout
         const useFloatingLabel = formMeta.floatinglabel === true;
-        
-        // ✅ CONDITIONAL: Create container with appropriate class
-        const formContainer = document.createElement(HTML_TAG.DIV);
-        formContainer.id = field.id + "-container";
-        
-        if (useFloatingLabel) {
-            // Floating label structure
-            formContainer.classList.add(STYLE_CLASS.FORM_FLOATING, STYLE_CLASS.MB_3);
-        } else {
-            // Normal label structure  
-            formContainer.classList.add(STYLE_CLASS.MB_3);
-        }
-        
+
+        const { formContainer, inputElement: textarea } = createFormFieldContainer(field, useFloatingLabel, HTML_TAG.TEXTAREA);
         fragment.appendChild(formContainer);
-
-        // ✅ CONDITIONAL: Label placement for normal structure
-        if (!useFloatingLabel) {
-            // Normal structure: Label comes FIRST
-            const label = document.createElement("label");
-            label.id = field.id + "-label";
-            label.setAttribute("for", field.id);
-            label.classList.add("form-label");
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
-
-        // ✅ TEXTAREA: Create textarea element
-        const textarea = document.createElement(HTML_TAG.TEXTAREA);
-        textarea.id = field.id;
-        textarea.name = field.id;
-        textarea.value = field.value || "";
-        textarea.classList.add(STYLE_CLASS.FORM_CONTROL);
         
-        // ✅ HEIGHT: Handle rows vs CSS height properly
-        if (useFloatingLabel) {
-            // For floating labels, use CSS height instead of rows attribute
-            if (field.rows) {
-                const heightInPx = (field.rows * 24) + 16; // Approximate line height
-                textarea.style.height = heightInPx + "px";
-            } else {
-                textarea.style.height = "100px"; // Default height for floating
-            }
-            // Floating labels require placeholder for CSS to work
-            textarea.setAttribute("placeholder", field.placeholder || field.label);
-        } else {
-            // For normal labels, rows attribute works fine
-            textarea.rows = field.rows || 4; // default to 4 rows if not provided
-            if (field.placeholder) {
-                textarea.setAttribute("placeholder", field.placeholder);
-            }
-        }
 
         // Apply textarea Frontend validation
         applyTextareaValidation(field, textarea);
         formContainer.appendChild(textarea);
-
-        // ✅ CONDITIONAL: Label placement for floating structure
-        if (useFloatingLabel) {
-            // Floating structure: Label comes AFTER textarea
-            const label = document.createElement("label");
-            label.id = field.id + "-label";
-            label.setAttribute("for", field.id);
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
 
         // ✅ ERROR HANDLING: Same for both structures
         if (window.formErrors && window.formErrors[field.id]) {
@@ -347,20 +269,7 @@ function addField(field, addTo,formMeta) {
         }
 
         // ✅ HELPER TEXT: Conditional placement
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement("div");
-            helper.classList.add("form-text");
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            fragment.appendChild(helper);
-            // if (useFloatingLabel) {
-            //     // For floating labels, helper text goes outside container
-            //     fragment.appendChild(helper);
-            // } else {
-            //     // For normal labels, helper text stays in container
-            //     formContainer.appendChild(helper);
-            // }
-        }
+        createHelperText(field, fragment);
 
         if (field.info) {
             addFieldHelpInfo(field, formContainer);
@@ -379,55 +288,15 @@ function addField(field, addTo,formMeta) {
         // ✅ CHECK: Use floatinglabel from form schema to determine layout
         const useFloatingLabel = formMeta.floatinglabel === true;
         
-        // ✅ CONDITIONAL: Create container with appropriate class
-        const formContainer = document.createElement(HTML_TAG.DIV);
-        formContainer.id = field.id + "-container";
-        
-        if (useFloatingLabel) {
-            // Floating label structure
-            formContainer.classList.add(STYLE_CLASS.FORM_FLOATING, STYLE_CLASS.MB_3);
-        } else {
-            // Normal label structure  
-            formContainer.classList.add(STYLE_CLASS.MB_3);
-        }
-        
+    
+        const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
+        input.setAttribute(ATTR_CONS.LIST, `${field.id}-list`);
         fragment.appendChild(formContainer);
 
-        // ✅ CONDITIONAL: Label placement for normal structure
-        if (!useFloatingLabel) {
-            // Normal structure: Label comes FIRST
-            const label = document.createElement("label");
-            label.id = field.id + "-label";
-            label.setAttribute("for", field.id);
-            label.classList.add("form-label");
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
-
-        // ✅ INPUT: Create input with list attribute
-        const input = document.createElement(HTML_TAG.INPUT);
-        input.id = field.id;
-        input.name = field.id;
-        input.type = INPUT_TYPE.TEXT;
-        input.classList.add(STYLE_CLASS.FORM_CONTROL);
-        input.setAttribute(ATTR_CONS.LIST, field.id + "-list"); // link to datalist
-        
-        // ✅ CONDITIONAL: Placeholder handling
-        if (useFloatingLabel) {
-            // Floating labels require placeholder for CSS to work
-            input.setAttribute("placeholder", field.placeholder || field.label);
-        } else if (field.placeholder) {
-            // Normal labels can optionally have placeholder
-            input.setAttribute("placeholder", field.placeholder);
-        }
-
-        formContainer.appendChild(input);
-
-        // ✅ CREATE DATALIST: Same for both structures
         const datalist = document.createElement(HTML_TAG.DATALIST);
-        datalist.id = field.id + "-list";
+        datalist.id = `${field.id}-list`;
 
-        if (field.options && Array.isArray(field.options)) {
+        if (Array.isArray(field.options)) {
             field.options.forEach(opt => {
                 const option = document.createElement(HTML_TAG.OPTION);
                 option.value = opt;
@@ -442,15 +311,6 @@ function addField(field, addTo,formMeta) {
             applyDatalistValidation(field, input, datalist);
         }
 
-        // ✅ CONDITIONAL: Label placement for floating structure
-        if (useFloatingLabel) {
-            // Floating structure: Label comes AFTER input and datalist
-            const label = document.createElement("label");
-            label.id = field.id + "-label";
-            label.setAttribute("for", field.id);
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
 
         // ✅ ERROR HANDLING: Same for both structures
         if (window.formErrors && window.formErrors[field.id]) {
@@ -462,21 +322,8 @@ function addField(field, addTo,formMeta) {
             formContainer.appendChild(errorDiv);
         }
 
-        // ✅ HELPER TEXT: Same for both structures
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement("div");
-            helper.classList.add("form-text");
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            fragment.appendChild(helper);
-            // if (useFloatingLabel) {
-            //     // For floating labels, helper text goes outside container
-            //     fragment.appendChild(helper);
-            // } else {
-            //     // For normal labels, helper text stays in container
-            //     formContainer.appendChild(helper);
-            // }
-        }
+        // ✅ HELPER TEXT: Conditional placement
+        createHelperText(field, fragment);
 
         if (field.info) {
             addFieldHelpInfo(field, formContainer);
@@ -517,6 +364,7 @@ function addField(field, addTo,formMeta) {
             errorDiv.textContent = window.formErrors[field.id][0]; // first error message
             fragment.appendChild(errorDiv);
         }
+        createHelperText(field,fragment);
 
         // Dropdown menu
         const menu = document.createElement("div");
@@ -592,45 +440,9 @@ function addField(field, addTo,formMeta) {
     else if (field.type && field.label) {
         const fragment = createFieldFragment(field, addTo);
 
-        // console.log("field",formMeta);
         // ✅ CHECK: Use floatinglabel from form schema to determine layout
         const useFloatingLabel =  formMeta.floatinglabel === true;
         
-        // ✅ CONDITIONAL: Create container with appropriate class
-        const formContainer = document.createElement(HTML_TAG.DIV);
-        formContainer.id = field.id + "-container";
-        
-        if (useFloatingLabel) {
-            // Floating label structure
-            formContainer.classList.add("form-floating", "mb-3");
-        } else {
-            // Normal label structure  
-            formContainer.classList.add("mb-3");
-        }
-        
-        fragment.appendChild(formContainer);
-
-        // ✅ CONDITIONAL: Label placement based on floating label setting
-        if (!useFloatingLabel) {
-            // Normal structure: Label comes FIRST
-            const label = document.createElement(HTML_TAG.LABEL);
-            label.id = field.id + "-label";
-            label.setAttribute(ATTR_CONS.FOR, field.id);
-            label.classList.add(STYLE_CLASS.FORM_LABEL);
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
-
-        // ✅ INPUT: Always create input element
-        const input = document.createElement(HTML_TAG.INPUT);
-        input.type = field.type;
-        if (field.type === INPUT_TYPE.FILE && field?.accept) {
-            input.accept = field?.accept;
-        }
-        input.id = field.id;
-        input.name = field.id;
-        input.value = field.value || "";
-        input.classList.add(STYLE_CLASS.FORM_CONTROL);
 
         // ✅ Date & Time restrictions
         if ([
@@ -707,19 +519,15 @@ function addField(field, addTo,formMeta) {
             }
         }
 
-        
-        // ✅ CONDITIONAL: Placeholder handling
-        if (useFloatingLabel) {
-            // Floating labels require placeholder for CSS to work
-            input.setAttribute("placeholder", field.placeholder || field.label);
-        } else if (field.placeholder) {
-            // Normal labels can optionally have placeholder
-            input.setAttribute("placeholder", field.placeholder);
-        }
+        // ✅ CONDITIONAL: Create container with appropriate class
+        const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
+        input.type = field.type;
+        input.value = field.value || "";
+        fragment.appendChild(formContainer);
 
         // Frontend validation
         applyFieldValidation(field, input);
-        formContainer.appendChild(input);
+        // formContainer.appendChild(input);
        
         // ✅ Handle dependencies.hide (e.g., hide endDate when isCurrent checked)
         if (field.dependencies && field.dependencies.hide) {
@@ -752,37 +560,8 @@ function addField(field, addTo,formMeta) {
             }, 0);
         }
 
-
-
-        // ✅ CONDITIONAL: Label placement for floating labels
-        if (useFloatingLabel) {
-            // Floating structure: Label comes AFTER input
-            const label = document.createElement("label");
-            label.id = field.id + "-label";
-            label.setAttribute("for", field.id);
-            label.textContent = field.label;
-            formContainer.appendChild(label);
-        }
-
-        // ✅ ERROR HANDLING: Same for both structures
-        // if (window.formErrors && window.formErrors[field.id]) {
-        //     input.classList.add('is-invalid');
-
-        //     const errorDiv = document.createElement("div");
-        //     errorDiv.classList.add("invalid-feedback");
-        //     errorDiv.id = `${field.id}-error`;
-        //     errorDiv.textContent = window.formErrors[field.id][0];
-        //     formContainer.appendChild(errorDiv);
-        // }
-
-        // ✅ HELPER TEXT: Same for both structures
-        if (field.helpertext || field.helperText) {
-            const helper = document.createElement("div");
-            helper.classList.add("form-text");
-            helper.id = `${field.id}-help`;
-            helper.textContent = field.helpertext || field.helperText;
-            formContainer.appendChild(helper);
-        }
+ 
+        createHelperText(field, fragment);
 
         if (field.info) {
             addFieldHelpInfo(field, formContainer);
@@ -877,5 +656,72 @@ function createFieldFragment(field, addTo, addClass = null) {
     addTo.appendChild(fragment);
     return fragment;
 }
+
+
+function createHelperText(field, container) {
+    if (field.helpertext || field.helperText) {
+        const helper = document.createElement(HTML_TAG.DIV);
+        helper.classList.add(STYLE_CLASS.FORM_TEXT);
+        helper.id = `${field.id}-help`;
+        helper.textContent = field.helpertext || field.helperText;
+        container.appendChild(helper);
+    }
+}
+
+
+
+/**
+ * Creates a form container with label and handles floating label layout.
+ * 
+ * @param {Object} field - Field schema containing id, label, placeholder, etc.
+ * @param {boolean} useFloatingLabel - Whether form uses floating label layout.
+ * @param {string} inputTag - The tag name of the input element (e.g. "input", "textarea").
+ * @returns {Object} { container, inputElement }
+ */
+function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.INPUT) {
+    const formContainer = document.createElement(HTML_TAG.DIV);
+    formContainer.id = `${field.id}-container`;
+
+    // ✅ Add structure classes
+    if (useFloatingLabel) {
+        formContainer.classList.add(STYLE_CLASS.FORM_FLOATING, STYLE_CLASS.MB_3);
+    } else {
+        formContainer.classList.add(STYLE_CLASS.MB_3);
+    }
+    
+
+    // ✅ Create label (for both structures)
+    const label = document.createElement(HTML_TAG.LABEL);
+    label.id = `${field.id}-label`;
+    label.setAttribute(ATTR_CONS.FOR, field.id);
+    label.classList.add(STYLE_CLASS.FORM_LABEL);
+    label.textContent = field.label;
+
+    // ✅ Create input or textarea
+    const inputElement = document.createElement(inputTag);
+    inputElement.id = field.id;
+    inputElement.name = field.id;
+    inputElement.classList.add(STYLE_CLASS.FORM_CONTROL);
+
+    // ✅ Placeholder logic
+    if (useFloatingLabel) {
+        inputElement.setAttribute("placeholder", field.placeholder || field.label);
+    } else if (field.placeholder) {
+        inputElement.setAttribute("placeholder", field.placeholder);
+    }
+
+    // ✅ Structure order
+    if (useFloatingLabel) {
+        formContainer.appendChild(inputElement);
+        formContainer.appendChild(label);
+    } else {
+        formContainer.appendChild(label);
+        formContainer.appendChild(inputElement);
+    }
+
+    return { formContainer, inputElement };
+}
+
+
 
 
