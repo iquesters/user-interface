@@ -3,3 +3,8 @@
  * example:
  * CONSTANT.MOUSE_CLICK = 'onclick'
  */
+
+const CONSTANT = {
+    MOUSE_ENTER: "mouseenter",
+    MOUSE_LEAVE: "mouseleave",
+};

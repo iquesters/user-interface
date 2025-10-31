@@ -22,8 +22,8 @@ function setupFormBlock(formCol, formMeta) {
 
         // add formId hidden field
         const formIdInput = document.createElement(HTML_TAG.INPUT)
-        formIdInput.type = "hidden"
-        formIdInput.name = "formId"
+        formIdInput.type = INPUT_TYPE.HIDDEN
+        formIdInput.name = INPUT_TYPE.FORMID
         formIdInput.value = formMeta.id
         formIdInput.setAttribute(ATTR_CONS.AUTOCOMPLETE,ATTR_CONS.OFF)
         form.appendChild(formIdInput)
@@ -67,59 +67,68 @@ function addField(field, addTo,formMeta) {
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
+        // if (field.label) {
+        //     const groupLabel = document.createElement(HTML_TAG.LABEL);
+        //     groupLabel.textContent = field.label;
+        //     groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
+        //     fragment.appendChild(groupLabel);
+        // }
+
+        // if (field.options && Array.isArray(field.options)) {
+        //     field.options.forEach(opt => {
+        //         const div = document.createElement(HTML_TAG.DIV);
+        //         div.classList.add(STYLE_CLASS.FORM_CHECK);
+
+        //         const input = document.createElement(HTML_TAG.INPUT);
+        //         input.type = INPUT_TYPE.RADIO;
+        //         input.id = field.id + "-" + opt.value;
+        //         input.name = field.id;
+        //         input.value = opt.value;
+        //         input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
+        //         if (field.value && field.value === opt.value) {
+        //             input.checked = true;
+        //         }
+
+        //         // Apply Frontend validation to each radio input
+        //         // applyFieldValidation(field, input);
+
+        //         const label = document.createElement(HTML_TAG.LABEL);
+        //         label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
+        //         label.setAttribute(ATTR_CONS.FOR, input.id);
+        //         label.textContent = opt.label;
+
+        //         div.append(input,label);
+        //         // div.appendChild(label);
+        //         fragment.appendChild(div);
+        //     });
+            
+        // }
+
         if (field.label) {
-            const groupLabel = document.createElement(HTML_TAG.LABEL);
-            groupLabel.textContent = field.label;
-            groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
-            fragment.appendChild(groupLabel);
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
         }
 
-        if (field.options && Array.isArray(field.options)) {
-            field.options.forEach(opt => {
-                const div = document.createElement(HTML_TAG.DIV);
-                div.classList.add(STYLE_CLASS.FORM_CHECK);
-
-                const input = document.createElement(HTML_TAG.INPUT);
-                input.type = INPUT_TYPE.RADIO;
-                input.id = field.id + "-" + opt.value;
-                input.name = field.id;
-                input.value = opt.value;
-                input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-                if (field.value && field.value === opt.value) {
-                    input.checked = true;
-                }
-
-                // Apply Frontend validation to each radio input
-                applyFieldValidation(field, input);
-
-                const label = document.createElement(HTML_TAG.LABEL);
-                label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-                label.setAttribute(ATTR_CONS.FOR, input.id);
-                label.textContent = opt.label;
-
-                div.appendChild(input);
-                div.appendChild(label);
-                fragment.appendChild(div);
-            });
-            
+        if (Array.isArray(field.options)) {
+            field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.RADIO)));
         }
         // ✅ Add helper text below radio group
         createHelperText(field, fragment);
 
 
         // ✅ Laravel backend validation error for the radio group
-        if (window.formErrors && window.formErrors[field.id]) {
-            const errorDiv = document.createElement("div");
-            errorDiv.classList.add("invalid-feedback", "d-block"); // d-block so it shows for group
-            errorDiv.id = `${field.id}-error`;
-            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-            fragment.appendChild(errorDiv);
+        // if (window.formErrors && window.formErrors[field.id]) {
+        //     const errorDiv = document.createElement("div");
+        //     errorDiv.classList.add("invalid-feedback", "d-block"); // d-block so it shows for group
+        //     errorDiv.id = `${field.id}-error`;
+        //     errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+        //     fragment.appendChild(errorDiv);
 
-            // Optionally mark all radio inputs as invalid
-            fragment.querySelectorAll(`input[name="${field.id}"]`).forEach(radio => {
-                radio.classList.add('is-invalid');
-            });
-        }
+        //     // Optionally mark all radio inputs as invalid
+        //     fragment.querySelectorAll(`input[name="${field.id}"]`).forEach(radio => {
+        //         radio.classList.add('is-invalid');
+        //     });
+        // }
+        appendBackendError(field, fragment);
     }
     
     
@@ -127,35 +136,45 @@ function addField(field, addTo,formMeta) {
         const fragment = createFieldFragment(field, addTo);
         
 
-        const formFloating = document.createElement(HTML_TAG.DIV);
-        formFloating.classList.add(STYLE_CLASS.FORM_FLOATING);
-        fragment.appendChild(formFloating);
+        // const formFloating = document.createElement(HTML_TAG.DIV);
+        // formFloating.classList.add(STYLE_CLASS.FORM_FLOATING);
+        // fragment.appendChild(formFloating);
 
-        const select = document.createElement(HTML_TAG.SELECT);
-        select.id = field.id;
-        select.name = field.id;
-        select.classList.add(STYLE_CLASS.FORM_SELECT);
+        // const select = document.createElement(HTML_TAG.SELECT);
+        // select.id = field.id;
+        // select.name = field.id;
+        // select.classList.add(STYLE_CLASS.FORM_SELECT);
 
-        if (field.options && Array.isArray(field.options)) {
-            field.options.forEach(opt => {
-                const option = document.createElement(HTML_TAG.OPTION);
-                option.value = opt.value;
-                option.textContent = opt.label;
-                if (field.value && field.value === opt.value) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
+        // if (field.options && Array.isArray(field.options)) {
+        //     field.options.forEach(opt => {
+        //         const option = document.createElement(HTML_TAG.OPTION);
+        //         option.value = opt.value;
+        //         option.textContent = opt.label;
+        //         if (field.value && field.value === opt.value) {
+        //             option.selected = true;
+        //         }
+        //         select.appendChild(option);
+        //     });
+        // }
+        // formFloating.appendChild(select);
+
+        // const label = document.createElement(HTML_TAG.LABEL);
+        // label.setAttribute(ATTR_CONS.FOR, field.id);
+        // label.textContent = field.label;
+        // formFloating.appendChild(label);
+
+
+        // ✅ Label (same as radio & checkbox)
+        if (field.label) {
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
         }
-        formFloating.appendChild(select);
 
-        const label = document.createElement(HTML_TAG.LABEL);
-        label.setAttribute(ATTR_CONS.FOR, field.id);
-        label.textContent = field.label;
-        formFloating.appendChild(label);
+        // ✅ Create select element
+        const select = createSelectInput(field);
+        fragment.appendChild(select);
 
         // Apply select Frontend validation
-        applySelectValidation(field, select);
+        // applySelectValidation(field, select);
 
         // ✅ Laravel backend validation error
         if (window.formErrors && window.formErrors[field.id]) {
@@ -174,71 +193,81 @@ function addField(field, addTo,formMeta) {
     else if (field.type === INPUT_TYPE.CHECKBOX) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
-        if (field.options && Array.isArray(field.options)) {
-            // ✅ Multiple checkboxes
-            if (field.label) {
-                const groupLabel = document.createElement(HTML_TAG.LABEL);
-                groupLabel.textContent = field.label;
-                groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
-                fragment.appendChild(groupLabel);
-            }
+        // if (field.options && Array.isArray(field.options)) {
+        //     // ✅ Multiple checkboxes
+        //     if (field.label) {
+        //         const groupLabel = document.createElement(HTML_TAG.LABEL);
+        //         groupLabel.textContent = field.label;
+        //         groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
+        //         fragment.appendChild(groupLabel);
+        //     }
 
-            field.options.forEach(opt => {
-                const div = document.createElement(HTML_TAG.DIV);
-                div.classList.add(STYLE_CLASS.FORM_CHECK);
+        //     field.options.forEach(opt => {
+        //         const div = document.createElement(HTML_TAG.DIV);
+        //         div.classList.add(STYLE_CLASS.FORM_CHECK);
 
-                const input = document.createElement(HTML_TAG.INPUT);
-                input.type = INPUT_TYPE.CHECKBOX;
-                input.id = field.id + "-" + opt.value;
-                input.name = field.id + "[]";
-                input.value = opt.value;
-                input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-                if (field.value && Array.isArray(field.value) && field.value.includes(opt.value)) {
-                    input.checked = true;
-                }
+        //         const input = document.createElement(HTML_TAG.INPUT);
+        //         input.type = INPUT_TYPE.CHECKBOX;
+        //         input.id = field.id + "-" + opt.value;
+        //         input.name = field.id + "[]";
+        //         input.value = opt.value;
+        //         input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
+        //         if (field.value && Array.isArray(field.value) && field.value.includes(opt.value)) {
+        //             input.checked = true;
+        //         }
 
 
-                // Apply Frontend validation to each checkbox input
-                applyFieldValidation(field, input);
+        //         // Apply Frontend validation to each checkbox input
+        //         // applyFieldValidation(field, input);
 
-                const label = document.createElement(HTML_TAG.LABEL);
-                label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-                label.setAttribute(ATTR_CONS.FOR, input.id);
-                label.textContent = opt.text; // ✅ use text instead of label
+        //         const label = document.createElement(HTML_TAG.LABEL);
+        //         label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
+        //         label.setAttribute(ATTR_CONS.FOR, input.id);
+        //         label.textContent = opt.text; // ✅ use text instead of label
 
-                div.appendChild(input);
-                div.appendChild(label);
-                fragment.appendChild(div);
-            });
-        } else {
-            // ✅ Single checkbox
-            const div = document.createElement(HTML_TAG.DIV);
-            div.classList.add(STYLE_CLASS.FORM_CHECK);
+        //         div.append(input,label);
+        //         // div.appendChild(label);
+        //         fragment.appendChild(div);
+        //     });
+        // } else {
+        //     // ✅ Single checkbox
+        //     const div = document.createElement(HTML_TAG.DIV);
+        //     div.classList.add(STYLE_CLASS.FORM_CHECK);
 
-            const input = document.createElement(HTML_TAG.INPUT);
-            input.type = INPUT_TYPE.CHECKBOX;
-            input.id = field.id;
-            input.name = field.id;
-            input.value = 1;
-            input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-            if (field.value && (field.value === true || field.value === 1 || field.value === "1")) {
-                input.checked = true;
-            }
+        //     const input = document.createElement(HTML_TAG.INPUT);
+        //     input.type = INPUT_TYPE.CHECKBOX;
+        //     input.id = field.id;
+        //     input.name = field.id;
+        //     input.value = 1;
+        //     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
+        //     if (field.value && (field.value === true || field.value === 1 || field.value === "1")) {
+        //         input.checked = true;
+        //     }
 
-            // Apply Frontend validation to each checkbox input
-            applyFieldValidation(field, input);
+        //     // Apply Frontend validation to each checkbox input
+        //     // applyFieldValidation(field, input);
 
-            const label = document.createElement(HTML_TAG.LABEL);
-            label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-            label.setAttribute(ATTR_CONS.FOR, input.id);
-            label.textContent = field.label;
+        //     const label = document.createElement(HTML_TAG.LABEL);
+        //     label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
+        //     label.setAttribute(ATTR_CONS.FOR, input.id);
+        //     label.textContent = field.label;
 
-            div.appendChild(input);
-            div.appendChild(label);
-            fragment.appendChild(div);
-        }
+        //     div.append(input,label);
+        //     // div.appendChild(label);
+        //     fragment.appendChild(div);
+        // }
 
         // ✅ Add helper text below checkbox or group
+        
+        if (Array.isArray(field.options)) {
+            if (field.label) {
+                fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+            }
+            field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.CHECKBOX)));
+        } else {
+            const div = createOptionInput(field, { value: 1, label: field.label }, INPUT_TYPE.CHECKBOX);
+            fragment.appendChild(div);
+        }
         createHelperText(field, fragment);
         
     }
@@ -255,7 +284,7 @@ function addField(field, addTo,formMeta) {
         
 
         // Apply textarea Frontend validation
-        applyTextareaValidation(field, textarea);
+        // applyTextareaValidation(field, textarea);
         formContainer.appendChild(textarea);
 
         // ✅ ERROR HANDLING: Same for both structures
@@ -271,13 +300,8 @@ function addField(field, addTo,formMeta) {
         // ✅ HELPER TEXT: Conditional placement
         createHelperText(field, fragment);
 
-        if (field.info) {
-            addFieldHelpInfo(field, formContainer);
-        }
-
-        if (field.feedback) {
-            addFieldFeedback(field.feedback, formContainer);
-        }
+        // Add info and feedback together
+        appendFieldInfoAndFeedback(field, formContainer);
     }
 
     // For Datalist
@@ -290,11 +314,11 @@ function addField(field, addTo,formMeta) {
         
     
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
-        input.setAttribute(ATTR_CONS.LIST, `${field.id}-list`);
+        input.setAttribute(ATTR_CONS.LIST, `${field.id}${SUFFIX.LIST}`);
         fragment.appendChild(formContainer);
 
         const datalist = document.createElement(HTML_TAG.DATALIST);
-        datalist.id = `${field.id}-list`;
+        datalist.id = `${field.id}${SUFFIX.LIST}`;
 
         if (Array.isArray(field.options)) {
             field.options.forEach(opt => {
@@ -307,9 +331,9 @@ function addField(field, addTo,formMeta) {
         formContainer.appendChild(datalist);
 
         // ✅ VALIDATION: Apply datalist validation
-        if (typeof applyDatalistValidation === "function") {
-            applyDatalistValidation(field, input, datalist);
-        }
+        // if (typeof applyDatalistValidation === "function") {
+        //     // applyDatalistValidation(field, input, datalist);
+        // }
 
 
         // ✅ ERROR HANDLING: Same for both structures
@@ -325,13 +349,8 @@ function addField(field, addTo,formMeta) {
         // ✅ HELPER TEXT: Conditional placement
         createHelperText(field, fragment);
 
-        if (field.info) {
-            addFieldHelpInfo(field, formContainer);
-        }
-
-        if (field.feedback) {
-            addFieldFeedback(field.feedback, formContainer);
-        }
+        // Add info and feedback together
+        appendFieldInfoAndFeedback(field, formContainer);
     }
 
 
@@ -351,7 +370,7 @@ function addField(field, addTo,formMeta) {
         fragment.appendChild(input);
 
         //Frontend Validation
-        applyFieldValidation(field, input);
+        // applyFieldValidation(field, input);
 
 
 
@@ -443,133 +462,22 @@ function addField(field, addTo,formMeta) {
         // ✅ CHECK: Use floatinglabel from form schema to determine layout
         const useFloatingLabel =  formMeta.floatinglabel === true;
         
-
-        // ✅ Date & Time restrictions
-        if ([
-            INPUT_TYPE.DATE,
-            INPUT_TYPE.DATETIME_LOCAL,
-            INPUT_TYPE.MONTH,
-            INPUT_TYPE.WEEK,
-            INPUT_TYPE.TIME
-        ].includes(field.type)) {
-            const now = new Date();
-
-            // Helper formats
-            const todayDate = now.toISOString().split("T")[0];              // YYYY-MM-DD
-            const nowDateTime = now.toISOString().slice(0, 16);             // YYYY-MM-DDTHH:MM
-            const currentMonth = now.toISOString().slice(0, 7);             // YYYY-MM
-            const currentTime = now.toISOString().slice(11, 16);            // HH:MM
-
-            // Compute current ISO week (e.g., 2025-W42)
-            const year = now.getFullYear();
-            const week = Math.ceil((((now - new Date(year, 0, 1)) / 86400000) + new Date(year, 0, 1).getDay() + 1) / 7);
-            const currentWeek = `${year}-W${week.toString().padStart(2, "0")}`;
-
-            // ✅ Disable future / past logic
-            if (field.disableFuture === true) {
-                switch (field.type) {
-                    case INPUT_TYPE.DATE:
-                        input.setAttribute(ATTR_CONS.MAX, todayDate);
-                        break;
-                    case INPUT_TYPE.DATETIME_LOCAL:
-                        input.setAttribute(ATTR_CONS.MAX, nowDateTime);
-                        break;
-                    case INPUT_TYPE.MONTH:
-                        input.setAttribute(ATTR_CONS.MAX, currentMonth);
-                        break;
-                    case INPUT_TYPE.WEEK:
-                        input.setAttribute(ATTR_CONS.MAX, currentWeek);
-                        break;
-                    case INPUT_TYPE.TIME:
-                        input.setAttribute(ATTR_CONS.MAX, currentTime);
-                        break;
-                }
-            } else if (field.disablePast === true) {
-                switch (field.type) {
-                    case INPUT_TYPE.DATE:
-                        input.setAttribute(ATTR_CONS.MIN, todayDate);
-                        break;
-                    case INPUT_TYPE.DATETIME_LOCAL:
-                        input.setAttribute(ATTR_CONS.MIN, nowDateTime);
-                        break;
-                    case INPUT_TYPE.MONTH:
-                        input.setAttribute(ATTR_CONS.MIN, currentMonth);
-                        break;
-                    case INPUT_TYPE.WEEK:
-                        input.setAttribute(ATTR_CONS.MIN, currentWeek);
-                        break;
-                    case INPUT_TYPE.TIME:
-                        input.setAttribute(ATTR_CONS.MIN, currentTime);
-                        break;
-                }
-            }
-
-            // ✅ Prevent end date/time < start date/time
-            if (field.id === "endDate" || field.id === "end_time" || field.name === "end_date") {
-                const startInput =
-                    document.getElementById("startDate") ||
-                    document.getElementById("start_time") ||
-                    document.querySelector("[name='start_date']");
-                if (startInput) {
-                    // Set dynamic min value
-                    startInput.addEventListener("change", () => {
-                        input.setAttribute("min", startInput.value);
-                    });
-                }
-            }
-        }
-
-        // ✅ CONDITIONAL: Create container with appropriate class
+        // // ✅ CONDITIONAL: Create container with appropriate class
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
         input.type = field.type;
         input.value = field.value || "";
         fragment.appendChild(formContainer);
 
-        // Frontend validation
+        // // Frontend validation
         applyFieldValidation(field, input);
-        // formContainer.appendChild(input);
+        // // formContainer.appendChild(input);
        
-        // ✅ Handle dependencies.hide (e.g., hide endDate when isCurrent checked)
-        if (field.dependencies && field.dependencies.hide) {
-            // Delay until DOM is ready (so dependent field exists)
-            setTimeout(() => {
-                field.dependencies.hide.forEach(dep => {
-                    const depInput = document.getElementById(dep.id);
-                    if (depInput) {
-                        const checkHideCondition = () => {
-                            const depValue = depInput.type === INPUT_TYPE.CHECKBOX ? depInput.checked : depInput.value;
-                            const shouldHide =
-                                dep.operator === "===" ? depValue === dep.value :
-                                dep.operator === "!==" ? depValue !== dep.value :
-                                false;
-
-                            const container = document.getElementById(field.id + "-container");
-                            if (container) {
-                                container.style.display = shouldHide ? "none" : "";
-                            }
-
-                            // optional: clear value when hidden
-                            if (shouldHide) input.value = "";
-                        };
-
-                        // Initial check + bind listener
-                        checkHideCondition();
-                        depInput.addEventListener("change", checkHideCondition);
-                    }
-                });
-            }, 0);
-        }
-
+        
  
         createHelperText(field, fragment);
 
-        if (field.info) {
-            addFieldHelpInfo(field, formContainer);
-        }
-
-        if (field.feedback) {
-            addFieldFeedback(field.feedback, formContainer);
-        }
+        // Add info and feedback together
+        appendFieldInfoAndFeedback(field, formContainer);
     }
 
 
@@ -640,8 +548,8 @@ function addFieldSize(field, elementToSize) {
 
 
 function createFieldFragment(field, addTo, addClass = null) {
-    const fragment = document.createElement("div");
-    fragment.id = addTo.id + "-field";
+    const fragment = document.createElement(HTML_TAG.DIV);
+    fragment.id = addTo.id + SUFFIX.FIELD;
     addFieldSize(field, fragment);
     
     // optional extra class (for things like 'form-check-group')
@@ -662,7 +570,7 @@ function createHelperText(field, container) {
     if (field.helpertext || field.helperText) {
         const helper = document.createElement(HTML_TAG.DIV);
         helper.classList.add(STYLE_CLASS.FORM_TEXT);
-        helper.id = `${field.id}-help`;
+        helper.id = `${field.id}${SUFFIX.HELP}`;
         helper.textContent = field.helpertext || field.helperText;
         container.appendChild(helper);
     }
@@ -680,7 +588,7 @@ function createHelperText(field, container) {
  */
 function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.INPUT) {
     const formContainer = document.createElement(HTML_TAG.DIV);
-    formContainer.id = `${field.id}-container`;
+    formContainer.id = `${field.id}${SUFFIX.CONTAINER}`;
 
     // ✅ Add structure classes
     if (useFloatingLabel) {
@@ -692,7 +600,7 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
 
     // ✅ Create label (for both structures)
     const label = document.createElement(HTML_TAG.LABEL);
-    label.id = `${field.id}-label`;
+    label.id = `${field.id}${SUFFIX.LABEL}`;
     label.setAttribute(ATTR_CONS.FOR, field.id);
     label.classList.add(STYLE_CLASS.FORM_LABEL);
     label.textContent = field.label;
@@ -705,22 +613,133 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
 
     // ✅ Placeholder logic
     if (useFloatingLabel) {
-        inputElement.setAttribute("placeholder", field.placeholder || field.label);
+        inputElement.setAttribute(ATTR_CONS.PLACEHOLDER, field.placeholder || field.label);
     } else if (field.placeholder) {
-        inputElement.setAttribute("placeholder", field.placeholder);
+        inputElement.setAttribute(ATTR_CONS.PLACEHOLDER, field.placeholder);
     }
 
     // ✅ Structure order
     if (useFloatingLabel) {
-        formContainer.appendChild(inputElement);
-        formContainer.appendChild(label);
+        formContainer.append(inputElement,label);
     } else {
-        formContainer.appendChild(label);
-        formContainer.appendChild(inputElement);
+        formContainer.append(label,inputElement);
     }
 
     return { formContainer, inputElement };
 }
+
+
+
+/**
+ * Appends optional field info and feedback to the form container.
+ *
+ * @param {Object} field - Field schema object
+ * @param {HTMLElement} formContainer - The container element (e.g., div.form-floating)
+ */
+function appendFieldInfoAndFeedback(field, formContainer) {
+    switch (true) {
+        case field.info:
+            addFieldHelpInfo(field, formContainer);
+            break;
+        case field.feedback:
+            addFieldFeedback(field.feedback, formContainer);
+            break;
+        default:
+            break;
+    }
+}
+
+
+// ✅ Create <label> element
+function createLabel(text, forId = null, classList = []) {
+    const label = document.createElement(HTML_TAG.LABEL);
+    label.textContent = text;
+    if (forId) label.setAttribute(ATTR_CONS.FOR, forId);
+    if (classList.length) label.classList.add(...classList);
+    return label;
+}
+
+
+// ✅ Create radio/checkbox option div
+function createOptionInput(field, opt, type) {
+    const div = document.createElement(HTML_TAG.DIV);
+    div.classList.add(STYLE_CLASS.FORM_CHECK);
+
+    const input = document.createElement(HTML_TAG.INPUT);
+    input.type = type;
+    input.id = field.id + "-" + opt.value;
+    input.name = type === INPUT_TYPE.CHECKBOX ? field.id + "[]" : field.id;
+    input.value = opt.value;
+    input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
+
+    if (type === INPUT_TYPE.RADIO && field.value === opt.value) {
+        input.checked = true;
+    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.includes(opt.value)) {
+        input.checked = true;
+    }
+
+    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL]);
+    div.append(input, label);
+    return div;
+}
+
+
+function createSelectInput(field) {
+    const select = document.createElement(HTML_TAG.SELECT);
+    select.id = field.id;
+    select.name = field.id;
+    select.classList.add(STYLE_CLASS.FORM_SELECT);
+
+    if (Array.isArray(field.options)) {
+        field.options.forEach(opt => {
+            const option = document.createElement(HTML_TAG.OPTION);
+            option.value = opt.value;
+            option.textContent = opt.label || opt.text || '';
+            if (field.value && field.value === opt.value) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    }
+
+    return select;
+}
+
+
+
+function appendBackendError(field, container, input = null) {
+    if (window.formErrors && window.formErrors[field.id]) {
+        const errorMsg = window.formErrors[field.id][0]; // first error
+
+        // ✅ If single input provided — mark it invalid
+        if (input) {
+            input.classList.add('is-invalid');
+        } else {
+            // ✅ Else mark all form controls inside container invalid
+            container.querySelectorAll('input, select, textarea').forEach(el => {
+                el.classList.add('is-invalid');
+            });
+        }
+
+        // ✅ Create error div
+        const errorDiv = document.createElement("div");
+        errorDiv.classList.add("invalid-feedback");
+
+        // For grouped fields (radio/checkbox), force visibility
+        if (
+            field.type === INPUT_TYPE.RADIO ||
+            field.type === INPUT_TYPE.CHECKBOX
+        ) {
+            errorDiv.classList.add("d-block");
+        }
+
+        errorDiv.id = `${field.id}-error`;
+        errorDiv.textContent = errorMsg;
+        container.appendChild(errorDiv);
+    }
+}
+
+
 
 
 

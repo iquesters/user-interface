@@ -37,7 +37,7 @@
     }
     window.formErrors = @json($errors->toArray());
 
-    $('#mdm-create').on('submit', function(e) {
+    $('#{{$data->parent->uid}}').on('submit', function(e) {
         e.preventDefault();
         console.log('Form submitted');
         const formData = new FormData(this);
@@ -46,7 +46,7 @@
         $('.invalid-feedback').remove(); 
         
         $.ajax({
-            url: "http://127.0.0.1:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
+            url: "http://127.0.0.1:8000/api/form/save-form/{{ $data->parent->uid ?? '' }}", 
             method: "POST",
             data: formData,
             contentType: false,

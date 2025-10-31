@@ -11,5 +11,6 @@ const ATTR_CONS ={
     FOR:"for",
     LIST:"list",
     MAX:"max",
-    MIN:"min"
+    MIN:"min",
+    PLACEHOLDER:"placeholder",
 }

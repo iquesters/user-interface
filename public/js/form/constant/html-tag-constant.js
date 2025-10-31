@@ -10,5 +10,7 @@ const HTML_TAG = {
     SELECT:"select",
     OPTION:"option",
     TEXTAREA:"textarea",
-    DATALIST:"datalist"
+    DATALIST:"datalist",
+    BUTTON:"button",
+    SPAN:"span"
 }
