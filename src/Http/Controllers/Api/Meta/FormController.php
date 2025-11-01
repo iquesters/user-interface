@@ -19,7 +19,7 @@ class FormController extends Controller
         ]);
 
         if ($slug) {
-            $form = FormSchema::where(['uid' => $slug, 'status' => EntityStatus::ACTIVE])->first();
+            $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
             if (isset($form)) {
                 $response->{'message'} = "Form schema found";
                 $response->{'data'} = json_decode($form->schema);
@@ -39,10 +39,56 @@ class FormController extends Controller
         return $this->getFormSchema($slug);
     }
 
+
+    // public function getNoAuthFormSchema($uid = null, $slug = null)
+    // {
+    //     Log::info("No Auth: Fetching form schema", ['uid' => $uid, 'slug' => $slug]);
+
+    //     if (!empty($uid)) {
+    //         // ✅ If UID is provided
+    //         return $this->getFormSchema($uid);
+    //     } elseif (!empty($slug)) {
+    //         // ✅ If slug is provided
+    //         return $this->getFormSchema_By_Slug($slug);
+    //     } else {
+    //         // ⚠️ If neither provided
+    //         Log::warning("No UID or Slug provided for fetching form schema");
+    //         return response()->json(['error' => 'Missing UID or Slug'], 400);
+    //     }
+    // }
+
+
+
+
     public function getAuthFormSchema($slug)
     {
         return $this->getFormSchema($slug);
     }
+
+
+
+    // public function getFormSchema_By_Uid($uid)
+    // {
+    //     Log::info("Fetching form schema for uid: " . $uid);
+    //     $response = new stdClass([
+    //         'message' => 'Schema is empty',
+    //         'data' => null
+    //     ]);
+
+    //     if ($uid) {
+    //         $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
+    //         if (isset($form)) {
+    //             $response->{'message'} = "Form schema found";
+    //             $response->{'data'} = json_decode($form->schema);
+    //         } else {
+    //             $response->{'message'} = "Form schema not found";
+    //         }
+    //     } else {
+    //         $response->{'message'} = "Form schema ID not found";
+    //     }
+
+    //     return json_encode($response);
+    // }
 
 
 

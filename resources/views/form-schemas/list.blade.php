@@ -57,12 +57,12 @@ Form Schemas
                 <tr>
                     <td class="">{{ $form->name }}</td>
                     <td class="">{{ $form->description }}</td>
-                    <td class="">{{ $form->id }}</td>
+                    <td class="">{{ $form->slug }}</td>
                     <!-- <td class="">{{ $form->schema }}</td> -->
                     <!-- <td class="">{{ $form->extra_info }}</td> -->
                     <td class="">
                         <div class="d-flex justify-content-center gap-2">
-                            <a type="button" class="nav-link d-flex align-items-center text-primary" title="Form Creation of {{ $form->name }} form" href="{{route('form.formCreation',$form->uid)}}">
+                            <a type="button" class="nav-link d-flex align-items-center text-primary" title="Form Creation of {{ $form->name }} form" href="{{route('form.formCreation_new',$form->uid)}}">
                                 <i class="fa-fw far fa-eye"></i>
                             </a>
                             <a type="button" class="nav-link d-flex align-items-center text-dark" title="Overview of {{ $form->name }} form" href="{{route('form.overview',$form->id)}}">

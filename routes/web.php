@@ -23,6 +23,7 @@ Route::middleware(['web'])->group(function () {
 
         Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
         Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
+        Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
 
         Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
     });

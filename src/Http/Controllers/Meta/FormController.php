@@ -172,6 +172,22 @@ class FormController extends Controller
     }
 
 
+    public function formCreation_new($id = 0){
+        $parent_id = $id;
+
+        $data = (object)array(
+            'parent_id' => $parent_id
+        );
+
+        if ($parent_id > 0) {
+            $parent = FormSchema::where('uid', $parent_id)->first();
+            $data->parent = $parent;
+        }
+        Log::info('Form data: ' . json_encode($data));
+        return view('userinterface::form-schemas.formcreation_new', compact('data'));
+    }
+
+
 
     public function formsubmit(Request $request,$uid)
     {
