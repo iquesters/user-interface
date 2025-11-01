@@ -1,8 +1,8 @@
 .sidebar {
   width: 250px;
-  height: calc(100vh - 56px);
+  height: calc(100vh - 102px);
   position: fixed;
-  top: 56px;
+  top: 102px;
   z-index: 1000;
   background-color: #f8f9fa;
   border-right: 1px solid #dee2e6;
