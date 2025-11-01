@@ -14,7 +14,17 @@
     }
 @endphp
 @if(!$superadminExists)
-    <div style="padding: 2rem; text-align:center" style="background-color: #f9fafb; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
+    <div style="
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #f9fafb;
+        border-radius: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    ">
+
         @if (class_exists(UserInterfaceServiceProvider::class))
             <img src="{{ UserInterfaceServiceProvider::getLogoUrl() }}" 
                 alt="Logo" 
