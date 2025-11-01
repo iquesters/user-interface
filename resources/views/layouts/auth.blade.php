@@ -42,6 +42,6 @@
         </div>
     </main>
 
-    @include('usermanagement::layouts.common.script')
+    @include('userinterface::layouts.common.js')
 </body>
 </html>
