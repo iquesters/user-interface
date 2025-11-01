@@ -1,6 +1,5 @@
 @props([
     'id' => null,
-    'data' => null,
     'method' => 'POST',
     'enctype' => 'multipart/form-data',
     'meta' => '',
