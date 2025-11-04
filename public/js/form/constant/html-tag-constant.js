@@ -12,5 +12,6 @@ const HTML_TAG = {
     TEXTAREA:"textarea",
     DATALIST:"datalist",
     BUTTON:"button",
-    SPAN:"span"
+    SPAN:"span",
+    P:"p"
 }

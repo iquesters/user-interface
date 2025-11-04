@@ -45,7 +45,7 @@
                 method="POST" 
                 enctype="multipart/form-data"
                 data-form-meta=""
-                data-form-data=''>
+                data-form-data='{"name":"Sudipta","email":"sudipta@example.com"}'>
                 @csrf   
             </form>
         </div>

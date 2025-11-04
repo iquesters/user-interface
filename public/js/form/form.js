@@ -78,7 +78,7 @@ async function setupForm(formElement) {
         }
     }
 
-    if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+    if ((formMeta.submitButtonLabel || formMeta.allowCancel) && (formMeta.formEdit ?? true)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
@@ -358,16 +358,16 @@ async function setupForm(formElement) {
  */
 function setupFormHeader(cardHeader, formMeta) {
 
-    const fragment = document.createElement('div');
+    const fragment = document.createElement(HTML_TAG.DIV);
     fragment.id = cardHeader.id + "-item"
-    fragment.classList.add(...['d-flex', 'align-items-center', 'justify-content-between', 'gap-2']);
+    fragment.classList.add(...[STYLE_CLASS.D_FLEX,STYLE_CLASS.ALIGN_ITEMS_CENTER,STYLE_CLASS.JUSTIFY_CONTENT_BETWEEN,STYLE_CLASS.GAP_2]);
     if (formMeta.placeholder) {
-        fragment.classList.add(...['placeholder', formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
+        fragment.classList.add(...[STYLE_CLASS.PLACEHOLDER, formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
     }
     cardHeader.appendChild(fragment)
 
-    const headingDiv = document.createElement('div')
-    headingDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
+    const headingDiv = document.createElement(HTML_TAG.DIV)
+    headingDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
     // adding icon
     if(formMeta.header && formMeta.header.icon){
@@ -379,16 +379,32 @@ function setupFormHeader(cardHeader, formMeta) {
     // adding text
     const headingText = document.createElement('h5')
     headingText.id = `form-heading-text-${formMeta.id}`;
-    headingText.classList.add(...["mb-0", "mt-1"]);
+    headingText.classList.add(...[STYLE_CLASS.MB_0, STYLE_CLASS.MT_1]);
     headingText.textContent = (formMeta.header && formMeta.header.text) || formMeta.heading;
     headingDiv.appendChild(headingText)
+
+
+     // ✅ Add pencil icon if formEdit is true
+    if (formMeta.formEdit === false) {
+        const editIcon = document.createElement('i');
+        editIcon.classList.add('fas', 'fa-pencil-alt');
+        editIcon.title = 'Edit Form';
+        editIcon.style.fontSize = '1rem';
+        editIcon.style.marginLeft = '15rem';
+
+        // ✅ On click handler
+        editIcon.addEventListener('click', function () {
+            console.log('Edit icon clicked');
+        });
+        headingDiv.appendChild(editIcon);
+    }
 
     fragment.appendChild(headingDiv)
 
     // adding header actions
     if (formMeta.header && formMeta.header.actions) {
-        const headingActionDiv = document.createElement('div')
-        headingActionDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
+        const headingActionDiv = document.createElement(HTML_TAG.DIV)
+        headingActionDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
         formMeta.header.actions.forEach(action => {
             addAction(action, headingActionDiv);
@@ -509,30 +525,30 @@ function addAction(action, addTo) {
 
 
 
-        let actionElement;
+        // let actionElement;
 
-        // ✅ CHANGE HERE: If action.type is "submit", create input instead of button
-        if (action.element.type === "button" && action.type === "submit") {
-            actionElement = document.createElement("input");
-            actionElement.type = "submit"; // native submit
-            actionElement.value = action.text ?? "Submit"; // text goes into value
-
-
-            // actionElement.addEventListener("click", (e) => {
-            //     console.log("Submit button clicked for form:");
-            // });
+        // // ✅ CHANGE HERE: If action.type is "submit", create input instead of button
+        // if (action.element.type === "button" && action.type === "submit") {
+        //     actionElement = document.createElement("input");
+        //     actionElement.type = "submit"; // native submit
+        //     actionElement.value = action.text ?? "Submit"; // text goes into value
 
 
-        } else {
-            actionElement = document.createElement(action.element.type);
-        }
+        //     // actionElement.addEventListener("click", (e) => {
+        //     //     console.log("Submit button clicked for form:");
+        //     // });
+
+
+        // } else {
+        //     actionElement = document.createElement(action.element.type);
+        // }
         
 
 
 
 
         // creating action element
-        // const actionElement = document.createElement(action.element.type)
+        const actionElement = document.createElement(action.element.type)
         actionElement.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
         actionElement.classList.add('btn')
         actionElement.classList.add('btn-' + action.element.size);
