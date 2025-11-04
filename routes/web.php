@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 
+
 Route::middleware(['web'])->group(function () {
     Route::middleware(['auth'])->group(function () {
         Route::get('/pkg-test', function () {
@@ -22,6 +23,7 @@ Route::middleware(['web'])->group(function () {
 
         Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
         Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
+        Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
 
         Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
     });
@@ -49,3 +51,5 @@ Route::middleware(['web'])->group(function () {
 
     });
 });
+
+require __DIR__ . '/api.php';

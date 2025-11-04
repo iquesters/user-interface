@@ -172,6 +172,22 @@ class FormController extends Controller
     }
 
 
+    public function formCreation_new($id = 0){
+        $parent_id = $id;
+
+        $data = (object)array(
+            'parent_id' => $parent_id
+        );
+
+        if ($parent_id > 0) {
+            $parent = FormSchema::where('uid', $parent_id)->first();
+            $data->parent = $parent;
+        }
+        Log::info('Form data: ' . json_encode($data));
+        return view('userinterface::form-schemas.formcreation_new', compact('data'));
+    }
+
+
 
     public function formsubmit(Request $request,$uid)
     {
@@ -248,6 +264,7 @@ class FormController extends Controller
 
     public function saveformdata(Request $request, $uid)
     {
+        Log::info('Saving form data for UID: ' . $uid);
         try {
             // 1️⃣ Validate the UID against your form schema table
             $schemaRecord = FormSchema::where('uid', $uid)->first();
@@ -385,6 +402,14 @@ class FormController extends Controller
                 'message' => 'An error occurred: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+
+
+    public function getNoAuthFormSchema($slug)
+    {
+        Log::info("No Auth: Fetching form schema for slug: " . $slug);
+        return $this->getFormSchema($slug);
     }
 
 

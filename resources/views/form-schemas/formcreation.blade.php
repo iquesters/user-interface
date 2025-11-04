@@ -1,15 +1,23 @@
-@extends(config('userinterface.layout_app'))
+@php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+    use Iquesters\UserManagement\Config\UserManagementKeys;
+    $layout=ConfProvider::from(Module::USER_INFE)->app_layout;
+@endphp 
+
+@extends($layout)
 
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
 @section('content')
-<!-- <form id="mdm-create" class="shoz-form" data-form-data="{{json_encode($data)}}"></form> -->
+<!-- <form id="{{$data->parent->uid}}" class="shoz-form"></form> -->
  <!-- action="{{ route('form.submitAndSave', ['uid' => $data->parent->uid ?? '']) }}" -->
-<form id="mdm-create" class="shoz-form" 
+<form id="{{$data->parent->uid}}" class="shoz-form" 
        
       method="POST" 
       enctype="multipart/form-data"
-      data-form-data="{{ json_encode($data) }}">
+      data-form-meta=""
+      data-form-data=''>
     @csrf
 
    
@@ -17,7 +25,7 @@
     
 </form>
 <!-- APP ENV Message container -->
-<div id="form-error-message"class="alert alert-warning mb-0"></div>
+<div id="form-error-message"></div>
 
 @endsection
 
@@ -29,7 +37,7 @@
     }
     window.formErrors = @json($errors->toArray());
 
-    $('#mdm-create').on('submit', function(e) {
+    $('#{{$data->parent->uid}}').on('submit', function(e) {
         e.preventDefault();
         console.log('Form submitted');
         const formData = new FormData(this);
@@ -38,7 +46,7 @@
         $('.invalid-feedback').remove(); 
         
         $.ajax({
-            url: "http://127.0.0.1:8000/form/save-form/{{ $data->parent->uid ?? '' }}", 
+            url: "http://127.0.0.1:8000/api/form/save-form/{{ $data->parent->uid ?? '' }}", 
             method: "POST",
             data: formData,
             contentType: false,
