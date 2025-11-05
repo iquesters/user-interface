@@ -58,7 +58,7 @@ Table Schemas
                     <td class="">{{ $table->name }}</td>
                     <td class="">{{ $table->description }}</td>
                     <td class="">{{ $table->id }}</td>
-                    <td class="">{{ $table->schema }}</td>
+                    <td class="">{{ json_encode($table->schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</td>
                     <td class="">{{ $table->extra_info }}</td>
                     <td class="">
                         <div class="d-flex justify-content-center gap-2">
@@ -77,4 +77,9 @@ Table Schemas
         </table>
     </div>
 </div>
+hola
+{{-- <table id="master_data" class="shoz-table" data-entity-uid=""></table> --}}
+<table id="users-table" class="shoz-table"></table>
+<table id="table-schema-table" class="shoz-table"></table>
+
 @endsection

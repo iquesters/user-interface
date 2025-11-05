@@ -1,12 +1,14 @@
 <?php
 
 namespace Iquesters\UserInterface\Models;
-use Illuminate\Database\Eloquent\Model;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class TableSchema extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'uid',
         'slug',
@@ -16,17 +18,11 @@ class TableSchema extends Model
         'extra_info',
         'status',
         'created_by',
-        'updated_by'
+        'updated_by',
     ];
 
-    protected $table = 'table_schemas';
-
-    public function refCreatedBy()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-    public function refUpdatedBy()
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
+    protected $casts = [
+        'schema' => 'array',
+        'extra_info' => 'array',
+    ];
 }
