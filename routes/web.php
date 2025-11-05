@@ -16,7 +16,8 @@ Route::middleware(['web'])->group(function () {
         // domain/delete/{form_schema_id}/{entity_uid}
         Route::prefix('')->name('ui')->group(function () {
             Route::get('/list/{table_schema_id}', [UIController::class, 'list'])->name('.list');
-            Route::get('/view/{form_schema_id}/{entity_uid}', [UIController::class, 'view'])->name('.view');
+            //Currently, entity_uid is optional for View routes but will be used in the future.
+            Route::get('/view/{form_schema_id}/{entity_uid?}', [UIController::class, 'view'])->name('.view');
             Route::get('/edit/{form_schema_id}/{entity_uid?}', [UIController::class, 'edit'])->name('.edit');
             Route::get('/delete/{form_schema_id}/{entity_uid}', [UIController::class, 'delete'])->name('.delete');
         });

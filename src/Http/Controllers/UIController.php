@@ -21,12 +21,16 @@ class UIController extends Controller
         return view('userinterface::form-schemas.list', compact('forms'));
     }
 
-    public function view()
+    public function view($form_schema_id, $entity_uid= null)
     {
-        
-        return view('userinterface::ui.form.view', compact('uid'));
+        Log::info("In UIController view method", [
+            'form_schema_id' => $form_schema_id,
+            'entity_uid' => $entity_uid
+        ]);
+        return view('userinterface::ui.form.view', compact('form_schema_id', 'entity_uid'));
     }
 
+    // Currently, entity_uid is optional for View routes but will be used in the future.
     public function edit($form_schema_id, $entity_uid= null)
     {
         Log::info("In UIController edit method", [
