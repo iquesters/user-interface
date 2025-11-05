@@ -41,6 +41,18 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // allow config publish
         $this->mergeConfigFrom(__DIR__.'/../config/userinterface.php', 'userinterface');
         $this->registerAssetRoute();
+
+        $uiConf = ConfProvider::from(ModuleEnum::USER_INFE);
+        if (method_exists($uiConf, 'loadConfigOnce')) {
+            $uiConf->ensureLoaded();
+        }
+
+       
+        // ✅ Now safely access the auth_layout property
+        $layout = $uiConf->app_layout;
+            
+
+        $this->app->instance('app.layout', $layout);
         
         if ($this->app->runningInConsole()) {
             $this->commands([

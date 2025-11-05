@@ -42,7 +42,7 @@ function setupFormBlock(formCol, formMeta) {
         } else {
             console.log("data-form-data is not provided")
         }
-        // console.log("formData = " + formData)
+        console.log("formData = " + formData)
 
         // add fields to form
         if (formMeta.fields && formMeta.fields.length > 0) {
@@ -355,105 +355,106 @@ function addField(field, addTo,formMeta) {
 
 
 
-    else if (field.type === INPUT_TYPE.TEXT && field.options && Array.isArray(field.options)) {
-        const fragment = createFieldFragment(field, addTo);
-        fragment.style.position = "relative";
+    // else if (field.type === INPUT_TYPE.TEXT && field.options && Array.isArray(field.options)) {
+    //     const fragment = createFieldFragment(field, addTo);
+    //     fragment.style.position = "relative";
         
 
-        // Input
-        const input = document.createElement(HTML_TAG.INPUT);
-        input.type = INPUT_TYPE.TEXT;
-        input.name = field.id;
-        input.value = field.value || "";
-        input.placeholder = field.placeholder || field.label;
-        input.classList.add(STYLE_CLASS.FORM_CONTROL);
-        fragment.appendChild(input);
+    //     // Input
+    //     const input = document.createElement(HTML_TAG.INPUT);
+    //     input.type = INPUT_TYPE.TEXT;
+    //     input.name = field.id;
+    //     input.value = field.value || "";
+    //     input.placeholder = field.placeholder || field.label;
+    //     input.classList.add(STYLE_CLASS.FORM_CONTROL);
+    //     fragment.appendChild(input);
 
-        //Frontend Validation
-        // applyFieldValidation(field, input);
+    //     //Frontend Validation
+    //     // applyFieldValidation(field, input);
 
 
 
-        // ✅ Laravel backend validation error
-        if (window.formErrors && window.formErrors[field.id]) {
-            input.classList.add('is-invalid');
-            const errorDiv = document.createElement("div");
-            errorDiv.classList.add("invalid-feedback");
-            errorDiv.id = `${field.id}-error`;
-            errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-            fragment.appendChild(errorDiv);
-        }
-        createHelperText(field,fragment);
+    //     // ✅ Laravel backend validation error
+    //     if (window.formErrors && window.formErrors[field.id]) {
+    //         input.classList.add('is-invalid');
+    //         const errorDiv = document.createElement("div");
+    //         errorDiv.classList.add("invalid-feedback");
+    //         errorDiv.id = `${field.id}-error`;
+    //         errorDiv.textContent = window.formErrors[field.id][0]; // first error message
+    //         fragment.appendChild(errorDiv);
+    //     }
+    //     createHelperText(field,fragment);
 
-        // Dropdown menu
-        const menu = document.createElement("div");
-        menu.style.display = "block";
-        menu.style.position = "absolute";
-        menu.style.top = "100%";
-        menu.style.left = "0";
-        menu.style.width = "100%";
-        menu.style.maxHeight = "0";
-        menu.style.overflow = "hidden";
-        menu.style.opacity = "0";
-        menu.style.transition = "all 0.2s ease"; // ✅ smooth transition
-        menu.style.background = "#fff";
-        menu.style.border = "1px solid #ccc";
-        menu.style.zIndex = "1000";
-        fragment.appendChild(menu);
+    //     // Dropdown menu
+    //     const menu = document.createElement("div");
+    //     menu.style.display = "block";
+    //     menu.style.position = "absolute";
+    //     menu.style.top = "100%";
+    //     menu.style.left = "0";
+    //     menu.style.width = "100%";
+    //     menu.style.maxHeight = "0";
+    //     menu.style.overflow = "hidden";
+    //     menu.style.opacity = "0";
+    //     menu.style.transition = "all 0.2s ease"; // ✅ smooth transition
+    //     menu.style.background = "#fff";
+    //     menu.style.border = "1px solid #ccc";
+    //     menu.style.zIndex = "1000";
+    //     fragment.appendChild(menu);
 
-        // Populate
-        field.options.forEach(opt => {
-            const item = document.createElement("div");
-            item.textContent = opt.label;
-            item.style.padding = "6px 10px";
-            item.style.cursor = "pointer";
-            item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
-            item.addEventListener("mouseout", () => item.style.background = "#fff");
-            item.addEventListener("click", () => {
-                input.value = opt.label;
-                input.dataset.value = opt.value;
-                closeMenu();
-                input.reportValidity();
-            });
-            menu.appendChild(item);
-        });
+    //     // Populate
+    //     field.options.forEach(opt => {
+    //         const item = document.createElement("div");
+    //         item.textContent = opt.label;
+    //         item.style.padding = "6px 10px";
+    //         item.style.cursor = "pointer";
+    //         item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
+    //         item.addEventListener("mouseout", () => item.style.background = "#fff");
+    //         item.addEventListener("click", () => {
+    //             input.value = opt.label;
+    //             input.dataset.value = opt.value;
+    //             closeMenu();
+    //             input.reportValidity();
+    //         });
+    //         menu.appendChild(item);
+    //     });
 
-        // Open/close functions
-        function openMenu() {
-            menu.style.maxHeight = "500px"; // expands smoothly
-            menu.style.opacity = "1";
-        }
+    //     // Open/close functions
+    //     function openMenu() {
+    //         menu.style.maxHeight = "500px"; // expands smoothly
+    //         menu.style.opacity = "1";
+    //     }
 
-        function closeMenu() {
-            menu.style.maxHeight = "0";
-            menu.style.opacity = "0";
-        }
+    //     function closeMenu() {
+    //         menu.style.maxHeight = "0";
+    //         menu.style.opacity = "0";
+    //     }
 
-        // Toggle on input click
-        input.addEventListener("click", () => {
-            if (menu.style.maxHeight === "0px" || menu.style.opacity === "0") {
-                openMenu();
-            } else {
-                closeMenu();
-            }
-        });
+    //     // Toggle on input click
+    //     input.addEventListener("click", () => {
+    //         if (menu.style.maxHeight === "0px" || menu.style.opacity === "0") {
+    //             openMenu();
+    //         } else {
+    //             closeMenu();
+    //         }
+    //     });
 
-        // Filter items
-        input.addEventListener("input", () => {
-            const filter = input.value.toLowerCase();
-            Array.from(menu.children).forEach(item => {
-                item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
-            });
-            openMenu();
-        });
+    //     // Filter items
+    //     input.addEventListener("input", () => {
+    //         const filter = input.value.toLowerCase();
+    //         Array.from(menu.children).forEach(item => {
+    //             item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
+    //         });
+    //         openMenu();
+    //     });
 
-        // Close when clicking outside
-        document.addEventListener("click", (e) => {
-            if (!fragment.contains(e.target)) {
-                closeMenu();
-            }
-        });
-    }
+    //     // Close when clicking outside
+    //     document.addEventListener("click", (e) => {
+    //         if (!fragment.contains(e.target)) {
+    //             closeMenu();
+    //         }
+    //     });
+    // }
+    
 
     // For all other input types (text, email, password, number, date, file, etc.)
     else if (field.type && field.label) {
@@ -461,6 +462,16 @@ function addField(field, addTo,formMeta) {
 
         // ✅ CHECK: Use floatinglabel from form schema to determine layout
         const useFloatingLabel =  formMeta.floatinglabel === true;
+
+
+         // ✅ READ-ONLY MODE: show only value, no input/label
+        if (formMeta.formEdit === false) {
+            const valueDiv = document.createElement(HTML_TAG.DIV);
+            valueDiv.textContent = field.value || "—";
+            fragment.appendChild(valueDiv);
+            addTo.appendChild(fragment);
+            return;
+        }
         
         // // ✅ CONDITIONAL: Create container with appropriate class
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
@@ -484,6 +495,61 @@ function addField(field, addTo,formMeta) {
 
 
 }
+
+// function addField(field, addTo) {
+//     if (field.type && !field.label) {
+//         const input = document.createElement("input");
+//         input.type = field.type;
+//         if (field.type === 'file' && field?.accept) {
+//             input.accept = field?.accept;
+//         }
+//         input.id = field.id;
+//         input.name = field.id;
+//         input.value = field.value || "";
+//         input.classList.add("form-control");
+//         input.setAttribute("placeholder", field.label);
+//         addTo.appendChild(input);
+//     } else if (field.type && field.label) {
+//         const fragment = document.createElement("div");
+//         fragment.id = addTo.id + "-field";
+//         // fragment.classList.add();
+//         // fragment.classList.add(...[]);
+//         // fragment.classList.add('col-md-6');
+//         addFieldSize(field, fragment);
+//         addTo.appendChild(fragment);
+
+//         const formFloating = document.createElement("div");
+//         formFloating.id = field.id + "-container";
+//         formFloating.classList.add(...["form-floating"]);
+//         fragment.appendChild(formFloating);
+
+//         const input = document.createElement("input");
+//         input.type = field.type;
+//         if (field.type === 'file' && field?.accept) {
+//             input.accept = field?.accept;
+//         }
+//         input.id = field.id;
+//         input.name = field.id;
+//         input.value = field.value || "";
+//         input.classList.add("form-control");
+//         input.setAttribute("placeholder", field.label);
+//         formFloating.appendChild(input);
+
+//         const label = document.createElement("label");
+//         label.id = field.id + "-label";
+//         label.setAttribute("for", field.id);
+//         label.textContent = field.label;
+//         formFloating.appendChild(label);
+
+//         if (field.info) {
+//             addFieldHelpInfo(field, formFloating);
+//         }
+
+//         if (field.feedback) {
+//             addFieldFeedback(field.feedback, formFloating);
+//         }
+//     }
+// }
 
 
 function addFieldSize(field, elementToSize) {

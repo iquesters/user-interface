@@ -45,6 +45,12 @@ const STYLE_CLASS = {
     PLACEHOLDER_GLOW:"placeholder-glow",
     MB_1:"mb-1",
     PLACEHOLDER_WAVE:"placeholder-wave",
+    ALIGN_ITEMS_CENTER : 'align-items-center',
+    JUSTIFY_CONTENT_BETWEEN : 'justify-content-between',
+    MB_0 : 'mb-0',
+    MT_1:"mt-1",
+    
+
 
 
 

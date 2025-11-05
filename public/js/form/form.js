@@ -78,7 +78,7 @@ async function setupForm(formElement) {
         }
     }
 
-    if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+    if ((formMeta.submitButtonLabel || formMeta.allowCancel) && (formMeta.formEdit ?? true)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
@@ -134,129 +134,8 @@ async function setupForm(formElement) {
             formElement.classList.replace(STYLE_CLASS.SHADOW_LG, STYLE_CLASS.SHADOW);
         });
     }
-
-
-        
-    // if (formMeta.skeletonRender) {
-    //     console.log("Applying skeleton render styles", formMeta.skeletonRender);
-
-    //     // ✅ Inject skeleton styles dynamically (only once)
-    //     if (!document.getElementById("skeleton-style")) {
-    //         const style = document.createElement("style");
-    //         style.id = "skeleton-style";
-    //         style.textContent = `
-    //             .skeleton-wrapper {
-    //                 display: flex;
-    //                 flex-direction: column;
-    //                 gap: 1.2rem;
-    //                 padding: 1rem;
-    //                 border-radius: 8px;
-    //                 background: #fff;
-    //                 box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    //             }
-    //             .skeleton-field-group {
-    //                 display: flex;
-    //                 flex-direction: column;
-    //                 gap: 0.4rem; /* 👈 gap between label and input */
-    //             }
-    //             .skeleton-label {
-    //                 height: 12px;
-    //                 width: 30%;
-    //                 border-radius: 4px;
-    //                 background: linear-gradient(90deg, #eee 25%, #ddd 50%, #eee 75%);
-    //                 background-size: 200% 100%;
-    //                 animation: shimmer 1.5s infinite;
-    //             }
-    //             .skeleton-input {
-    //                 height: 38px;
-    //                 width: 100%;
-    //                 border-radius: 6px;
-    //                 background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 50%, #f0f0f0 75%);
-    //                 background-size: 200% 100%;
-    //                 animation: shimmer 1.5s infinite;
-    //             }
-    //             .skeleton-button {
-    //                 height: 40px;
-    //                 width: 120px;
-    //                 border-radius: 6px;
-    //                 background: linear-gradient(90deg, #e0e0e0 25%, #d5d5d5 50%, #e0e0e0 75%);
-    //                 background-size: 200% 100%;
-    //                 animation: shimmer 1.5s infinite;
-    //                 margin-top: 0.5rem;
-    //             }
-    //             .skeleton-btn-container {
-    //                 display: flex;
-    //                 justify-content: flex-end;
-    //                 gap: 0.6rem;
-    //                 margin-top: 0.5rem;
-    //             }
-    //             @keyframes shimmer {
-    //                 0% { background-position: -200% 0; }
-    //                 100% { background-position: 200% 0; }
-    //             }
-    //         `;
-    //         document.head.appendChild(style);
-    //     }
-
-    //     // ✅ Create skeleton container
-    //     const skeletonWrapper = document.createElement("div");
-    //     skeletonWrapper.classList.add("skeleton-wrapper");
-
-    //     // ✅ Create skeleton items dynamically based on fields
-    //     if (formMeta.fields && Array.isArray(formMeta.fields)) {
-    //         formMeta.fields.forEach(field => {
-    //             const fieldGroup = document.createElement("div");
-    //             fieldGroup.classList.add("skeleton-field-group");
-
-    //             // Label placeholder
-    //             const labelSkeleton = document.createElement("div");
-    //             labelSkeleton.classList.add("skeleton-label");
-    //             fieldGroup.appendChild(labelSkeleton);
-
-    //             // Input placeholder
-    //             const inputSkeleton = document.createElement("div");
-    //             inputSkeleton.classList.add("skeleton-input");
-    //             fieldGroup.appendChild(inputSkeleton);
-
-    //             skeletonWrapper.appendChild(fieldGroup);
-    //         });
-    //     }
-
-    //     // ✅ Add skeleton buttons if needed
-    //     if (formMeta.submitButtonLabel || formMeta.allowCancel) {
-    //         const btnContainer = document.createElement("div");
-    //         btnContainer.classList.add("skeleton-btn-container");
-
-    //         if (formMeta.allowCancel) {
-    //             const cancelBtnSkeleton = document.createElement("div");
-    //             cancelBtnSkeleton.classList.add("skeleton-button");
-    //             btnContainer.appendChild(cancelBtnSkeleton);
-    //         }
-
-    //         if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-    //             const submitBtnSkeleton = document.createElement("div");
-    //             submitBtnSkeleton.classList.add("skeleton-button");
-    //             btnContainer.appendChild(submitBtnSkeleton);
-    //         }
-
-    //         skeletonWrapper.appendChild(btnContainer);
-    //     }
-
-    //     // ✅ Insert skeleton before the real form
-    //     formElement.before(skeletonWrapper);
-
-    //     // ✅ Hide real form initially
-    //     formElement.style.display = "none";
-
-    //     // ✅ Replace skeleton with real form after delay
-    //     setTimeout(() => {
-    //         skeletonWrapper.remove();
-    //         formElement.style.display = "block";
-    //         console.log("Skeleton render complete, real form displayed");
-    //     }, formMeta.skeletonRenderDelay || 2500);
-    // }
-
-
+    
+    // Skeleton screen rendering
     if (formMeta.skeletonRender) {
         console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
@@ -358,16 +237,16 @@ async function setupForm(formElement) {
  */
 function setupFormHeader(cardHeader, formMeta) {
 
-    const fragment = document.createElement('div');
+    const fragment = document.createElement(HTML_TAG.DIV);
     fragment.id = cardHeader.id + "-item"
-    fragment.classList.add(...['d-flex', 'align-items-center', 'justify-content-between', 'gap-2']);
+    fragment.classList.add(...[STYLE_CLASS.D_FLEX,STYLE_CLASS.ALIGN_ITEMS_CENTER,STYLE_CLASS.JUSTIFY_CONTENT_BETWEEN,STYLE_CLASS.GAP_2]);
     if (formMeta.placeholder) {
-        fragment.classList.add(...['placeholder', formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
+        fragment.classList.add(...[STYLE_CLASS.PLACEHOLDER, formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
     }
     cardHeader.appendChild(fragment)
 
-    const headingDiv = document.createElement('div')
-    headingDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
+    const headingDiv = document.createElement(HTML_TAG.DIV)
+    headingDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
     // adding icon
     if(formMeta.header && formMeta.header.icon){
@@ -379,16 +258,32 @@ function setupFormHeader(cardHeader, formMeta) {
     // adding text
     const headingText = document.createElement('h5')
     headingText.id = `form-heading-text-${formMeta.id}`;
-    headingText.classList.add(...["mb-0", "mt-1"]);
+    headingText.classList.add(...[STYLE_CLASS.MB_0, STYLE_CLASS.MT_1]);
     headingText.textContent = (formMeta.header && formMeta.header.text) || formMeta.heading;
     headingDiv.appendChild(headingText)
+
+
+     // ✅ Add pencil icon if formEdit is true
+    if (formMeta.formEdit === false) {
+        const editIcon = document.createElement('i');
+        editIcon.classList.add('fas', 'fa-pencil-alt');
+        editIcon.title = 'Edit Form';
+        editIcon.style.fontSize = '1rem';
+        editIcon.style.marginLeft = '15rem';
+
+        // ✅ On click handler
+        editIcon.addEventListener('click', function () {
+            console.log('Edit icon clicked');
+        });
+        headingDiv.appendChild(editIcon);
+    }
 
     fragment.appendChild(headingDiv)
 
     // adding header actions
     if (formMeta.header && formMeta.header.actions) {
-        const headingActionDiv = document.createElement('div')
-        headingActionDiv.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
+        const headingActionDiv = document.createElement(HTML_TAG.DIV)
+        headingActionDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
         formMeta.header.actions.forEach(action => {
             addAction(action, headingActionDiv);
@@ -509,30 +404,30 @@ function addAction(action, addTo) {
 
 
 
-        let actionElement;
+        // let actionElement;
 
-        // ✅ CHANGE HERE: If action.type is "submit", create input instead of button
-        if (action.element.type === "button" && action.type === "submit") {
-            actionElement = document.createElement("input");
-            actionElement.type = "submit"; // native submit
-            actionElement.value = action.text ?? "Submit"; // text goes into value
-
-
-            // actionElement.addEventListener("click", (e) => {
-            //     console.log("Submit button clicked for form:");
-            // });
+        // // ✅ CHANGE HERE: If action.type is "submit", create input instead of button
+        // if (action.element.type === "button" && action.type === "submit") {
+        //     actionElement = document.createElement("input");
+        //     actionElement.type = "submit"; // native submit
+        //     actionElement.value = action.text ?? "Submit"; // text goes into value
 
 
-        } else {
-            actionElement = document.createElement(action.element.type);
-        }
+        //     // actionElement.addEventListener("click", (e) => {
+        //     //     console.log("Submit button clicked for form:");
+        //     // });
+
+
+        // } else {
+        //     actionElement = document.createElement(action.element.type);
+        // }
         
 
 
 
 
         // creating action element
-        // const actionElement = document.createElement(action.element.type)
+        const actionElement = document.createElement(action.element.type)
         actionElement.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
         actionElement.classList.add('btn')
         actionElement.classList.add('btn-' + action.element.size);
