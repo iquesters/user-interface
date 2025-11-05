@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('description')->nullable(true);
             $table->json('schema')->nullable(false);
             $table->json('extra_info')->nullable(true);
-            $table->tinyInteger('status')->default(0);
+            $table->string('status')->default('unknown');
             $table->bigInteger('created_by')->default(0);
             $table->bigInteger('updated_by')->default(0);
             $table->timestamps();
