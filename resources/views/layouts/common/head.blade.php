@@ -11,6 +11,10 @@
     <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @auth
+        <meta name="sanctum-token" content="{{ Iquesters\UserManagement\Helpers\LoginHelper::get_sanctum_token(auth()->user()) }}">
+    @endauth
+
     <title>
         @hasSection('title')
             @yield('title') -

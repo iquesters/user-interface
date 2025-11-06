@@ -1,6 +1,7 @@
 <?php
 
 namespace Iquesters\UserInterface\Http\Controllers;
+
 use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
 
@@ -11,10 +12,16 @@ class UIController extends Controller
      * 
      * @return FormSchema[]
      */
-    public function list()
+    public function list($table_schema_id)
     {
-        
-        return view('userinterface::form-schemas.list', compact('forms'));
+        try {
+            Log::info("In UIController list method", [
+                'table_schema_id' => $table_schema_id
+            ]);
+            return view('userinterface::ui.list', compact('table_schema_id'));
+        } catch (\Throwable $th) {
+            //throw $th;
+        }
     }
 
     public function view($form_schema_id, $entity_uid= null)

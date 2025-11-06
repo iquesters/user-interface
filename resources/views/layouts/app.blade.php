@@ -23,8 +23,8 @@
     @include('userinterface::layouts.common.js') --}}
 
     {{-- @include('utils.backdrop-loader') --}}
+    @include('userinterface::components.admin-bar')
     <div class="ui-wrapper">
-        
         {{-- @auth --}}
         {{-- @include('userinterface::layouts.common.mobile-navbar') --}}
 
@@ -34,7 +34,6 @@
         @endif
         {{-- @endif --}}
         <div class="ui-main">
-            @include('userinterface::components.admin-bar')
             @include('userinterface::layouts.header')
             <div class="ui-workarea gap-1">
                 <div id="ui-sidebar" class="ui-sidebar animate-all rounded">
