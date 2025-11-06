@@ -49,6 +49,9 @@ const STYLE_CLASS = {
     JUSTIFY_CONTENT_BETWEEN : 'justify-content-between',
     MB_0 : 'mb-0',
     MT_1:"mt-1",
+    ALERT:'alert', 
+    ALERT_DANGER:'alert-danger', 
+    TEXT_CENTER:'text-center',
     
 
 

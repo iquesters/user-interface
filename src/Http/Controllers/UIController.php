@@ -1,10 +1,6 @@
 <?php
 
 namespace Iquesters\UserInterface\Http\Controllers;
-
-
-
-
 use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
 

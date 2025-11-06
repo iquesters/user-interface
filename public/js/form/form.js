@@ -1,48 +1,8 @@
-//Constants regarding shoz-form
-// const DEFAULT_PLACEHOLDER_COLOR = 'bg-secondary'
-
-//Constants regarding shoz-form-element
-//const FORM_GROUP_CONTAINER = "<div class=\"form-group has-feedback\"></div>"
-// const FORM_GROUP_CONTAINER = "<div class=\"form-group\"></div>"
-// const FORM_GROUP_CONTAINER = "<div class=\"form-floating\"></div>"
-// const INPUT_GROUP_CONTAINER = "<div class=\"input-group\"></div>"
-
-// const TYPE_PASSWORD = "password"
-
-// const DATA_TYPE_DATETIME = "datetime"
-
-// const DTP_FORMAT_YEAR = "YYYY"
-// const DTP_FORMAT_MONTH = "MMM, YYYY"
-// const DTP_FORMAT_DATE = "MMM DD, YYYY"
-// const DTP_FORMAT_TIME = "HH:mm:ss"
-// const DTP_FORMAT_DATE_TIME = DTP_FORMAT_DATE + " " + DTP_FORMAT_TIME
-
-/* datetime is default */
-// const DTP_VIEW_MODE_DATE_TIME = "datetime"
-// const DTP_VIEW_MODE_YEARS = "years"
-// const DTP_VIEW_MODE_MONTHS = "months"
-// const DTP_VIEW_MODE_DATE = "date"
-// const DTP_VIEW_MODE_TIME = "time"
-
 let dtpOption
 
 async function setupForm(formElement) {
     console.log("setuping shoz-form...")
     console.log("formId = " + formElement.id)
-
-    // let formMeta = formElement.dataset.formMeta
-
-    // let form = document.getElementById("mdm-create");
-    // let formData = JSON.parse(form.dataset.formData);
-    // console.log("formData>>>>>",formData);
-
-    // // let formMeta = formData.parent.schema;
-    // if (formMeta) {
-    //     formMeta = JSON.parse(formMeta)
-    //     delete formElement.dataset.formMeta
-    // } else {
-    //     formMeta = await getFormSchema(formElement.id)
-    // }
 
     let formMeta = formElement.dataset.formMeta
     if (formMeta) {
@@ -57,6 +17,13 @@ async function setupForm(formElement) {
         // break the code
         return;
     }
+
+    // ✅ Access check
+    const hasAccess = checkFormAccess(formMeta,formElement);
+    if (!hasAccess) {
+        return;
+    }
+    
     formMeta.id = formElement.id
 
     const cardProvider = new CardProvider(formMeta.placeholder);
@@ -134,10 +101,10 @@ async function setupForm(formElement) {
             formElement.classList.replace(STYLE_CLASS.SHADOW_LG, STYLE_CLASS.SHADOW);
         });
     }
-    
+
     // Skeleton screen rendering
     if (formMeta.skeletonRender) {
-        console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
+        // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
         // ✅ Create skeleton container
         const skeletonWrapper = document.createElement(HTML_TAG.DIV);
@@ -213,7 +180,7 @@ async function setupForm(formElement) {
         setTimeout(() => {
             skeletonWrapper.remove();
             formElement.classList.remove("d-none");
-            console.log("Skeleton render complete, real form displayed");
+            // console.log("Skeleton render complete, real form displayed");
         }, formMeta.skeletonRenderDelay || 2500);
     }
 
@@ -222,9 +189,9 @@ async function setupForm(formElement) {
 
 
     // run prepare hook func if present
-    if (formMeta?.prepareHookFunc) {
-        window[formMeta?.prepareHookFunc](formElement?.id);
-    }
+    // if (formMeta?.prepareHookFunc) {
+    //     window[formMeta?.prepareHookFunc](formElement?.id);
+    // }
 
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
@@ -718,6 +685,45 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
     // toWrap.before(wrapper);
     return wrapper.appendChild(toWrap);
 }
+
+
+// Form access check (view or edit permissions)
+function checkFormAccess(formMeta, formElement) {
+    const currentURL = new URL(window.location.href);
+    const pathname = currentURL.pathname.toLowerCase();
+
+    console.log("Checking access for:", pathname);
+
+    // ✅ Default to true if keys are missing
+    const allowView = formMeta.allowView ?? true;
+    const allowEdit = formMeta.allowEdit ?? true;
+
+
+    // ✅ Allow only if URL contains 'view' or 'edit' and formMeta allows view
+    const isAllowedRoute = pathname.includes('view') || pathname.includes('edit');
+
+    // if (!isAllowedRoute || (!allowView && !allowEdit)) {
+    if(!allowView){
+        const message = document.createElement(HTML_TAG.P);
+        message.textContent = 'You are not supposed to view this page';
+        message.classList.add(
+            STYLE_CLASS.ALERT,
+            STYLE_CLASS.ALERT_DANGER,
+            STYLE_CLASS.TEXT_CENTER,
+            STYLE_CLASS.MT_3
+        );
+
+        // ✅ Clear only form content, not the whole page
+        formElement.innerHTML = '';
+        formElement.appendChild(message);
+        return false;
+    }
+    
+
+    return true;
+}
+
+
 
 
 // setupCoreFormElement()
