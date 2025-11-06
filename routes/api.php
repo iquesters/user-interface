@@ -16,6 +16,6 @@ Route::prefix('api')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/form/{slug}', [FormController::class, 'getFormSchema'])->name('auth.form');
     Route::post('/form/save-form/{uid}', [FormController::class, 'saveformdata']);
     
-    Route::get('/entity/{entity}', [DynamicEntityController::class, 'getEntityData']);
+    Route::get('/entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
     
 });
