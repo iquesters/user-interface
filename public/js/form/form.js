@@ -103,86 +103,86 @@ async function setupForm(formElement) {
     }
 
     // Skeleton screen rendering
-    if (formMeta.skeletonRender) {
-        // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
+    // if (formMeta.skeletonRender) {
+    //     // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
-        // ✅ Create skeleton container
-        const skeletonWrapper = document.createElement(HTML_TAG.DIV);
-        skeletonWrapper.classList.add(
-            STYLE_CLASS.CARD, 
-            STYLE_CLASS.P_4, 
-            STYLE_CLASS.MB_3, 
-            STYLE_CLASS.SHADOW_SM, 
-            STYLE_CLASS.ROUNDED_3, 
-            STYLE_CLASS.SKELETON_WRAPPER
-        );
+    //     // ✅ Create skeleton container
+    //     const skeletonWrapper = document.createElement(HTML_TAG.DIV);
+    //     skeletonWrapper.classList.add(
+    //         STYLE_CLASS.CARD, 
+    //         STYLE_CLASS.P_4, 
+    //         STYLE_CLASS.MB_3, 
+    //         STYLE_CLASS.SHADOW_SM, 
+    //         STYLE_CLASS.ROUNDED_3, 
+    //         STYLE_CLASS.SKELETON_WRAPPER
+    //     );
 
-        // ✅ Create skeleton items dynamically based on fields
-        if (Array.isArray(formMeta.fields)) {
-            formMeta.fields.forEach(() => {
-                const fieldGroup = document.createElement(HTML_TAG.DIV);
-                fieldGroup.classList.add(STYLE_CLASS.MB_3);
+    //     // ✅ Create skeleton items dynamically based on fields
+    //     if (Array.isArray(formMeta.fields)) {
+    //         formMeta.fields.forEach(() => {
+    //             const fieldGroup = document.createElement(HTML_TAG.DIV);
+    //             fieldGroup.classList.add(STYLE_CLASS.MB_3);
 
-                // Label placeholder
-                const labelSkeleton = document.createElement(HTML_TAG.SPAN);
-                labelSkeleton.classList.add(
-                    STYLE_CLASS.PLACEHOLDER, 
-                    STYLE_CLASS.COL_4, 
-                    STYLE_CLASS.ROUNDED, 
-                    STYLE_CLASS.PLACEHOLDER_GLOW, 
-                    STYLE_CLASS.MB_1
-                );
+    //             // Label placeholder
+    //             const labelSkeleton = document.createElement(HTML_TAG.SPAN);
+    //             labelSkeleton.classList.add(
+    //                 STYLE_CLASS.PLACEHOLDER, 
+    //                 STYLE_CLASS.COL_4, 
+    //                 STYLE_CLASS.ROUNDED, 
+    //                 STYLE_CLASS.PLACEHOLDER_GLOW, 
+    //                 STYLE_CLASS.MB_1
+    //             );
 
-                // Input placeholder
-                const inputSkeleton = document.createElement(HTML_TAG.SPAN);
-                inputSkeleton.classList.add(
-                    STYLE_CLASS.PLACEHOLDER, 
-                    STYLE_CLASS.COLL_12, 
-                    STYLE_CLASS.ROUNDED, 
-                    STYLE_CLASS.PLACEHOLDER_WAVE
-                );
-                inputSkeleton.style.height = "2.5rem"; // optional height for input shape
+    //             // Input placeholder
+    //             const inputSkeleton = document.createElement(HTML_TAG.SPAN);
+    //             inputSkeleton.classList.add(
+    //                 STYLE_CLASS.PLACEHOLDER, 
+    //                 STYLE_CLASS.COLL_12, 
+    //                 STYLE_CLASS.ROUNDED, 
+    //                 STYLE_CLASS.PLACEHOLDER_WAVE
+    //             );
+    //             inputSkeleton.style.height = "2.5rem"; // optional height for input shape
 
-                fieldGroup.appendChild(labelSkeleton);
-                fieldGroup.appendChild(inputSkeleton);
+    //             fieldGroup.appendChild(labelSkeleton);
+    //             fieldGroup.appendChild(inputSkeleton);
 
-                skeletonWrapper.appendChild(fieldGroup);
-            });
-        }
+    //             skeletonWrapper.appendChild(fieldGroup);
+    //         });
+    //     }
 
-        // ✅ Add skeleton buttons if needed
-        if (formMeta.submitButtonLabel || formMeta.allowCancel) {
-            const btnContainer = document.createElement(HTML_TAG.DIV);
-            btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.JUSTIFY_CONTENT_END, STYLE_CLASS.GAP_2, STYLE_CLASS.MT_3);
+    //     // ✅ Add skeleton buttons if needed
+    //     if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+    //         const btnContainer = document.createElement(HTML_TAG.DIV);
+    //         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.JUSTIFY_CONTENT_END, STYLE_CLASS.GAP_2, STYLE_CLASS.MT_3);
 
-            if (formMeta.allowCancel) {
-                const cancelBtn = document.createElement(HTML_TAG.SPAN);
-                cancelBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
-                btnContainer.appendChild(cancelBtn);
-            }
+    //         if (formMeta.allowCancel) {
+    //             const cancelBtn = document.createElement(HTML_TAG.SPAN);
+    //             cancelBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
+    //             btnContainer.appendChild(cancelBtn);
+    //         }
 
-            if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-                const submitBtn = document.createElement(HTML_TAG.SPAN);
-                submitBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
-                btnContainer.appendChild(submitBtn);
-            }
+    //         if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+    //             const submitBtn = document.createElement(HTML_TAG.SPAN);
+    //             submitBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
+    //             btnContainer.appendChild(submitBtn);
+    //         }
 
-            skeletonWrapper.appendChild(btnContainer);
-        }
+    //         skeletonWrapper.appendChild(btnContainer);
+    //     }
 
-        // ✅ Insert skeleton before form
-        formElement.before(skeletonWrapper);
+    //     // ✅ Insert skeleton before form
+    //     formElement.before(skeletonWrapper);
 
-        // ✅ Hide real form initially
-        formElement.classList.add("d-none");
+    //     // ✅ Hide real form initially
+    //     formElement.classList.add("d-none");
 
-        // ✅ Replace skeleton with real form after delay
-        setTimeout(() => {
-            skeletonWrapper.remove();
-            formElement.classList.remove("d-none");
-            // console.log("Skeleton render complete, real form displayed");
-        }, formMeta.skeletonRenderDelay || 2500);
-    }
+    //     // ✅ Replace skeleton with real form after delay
+    //     setTimeout(() => {
+    //         skeletonWrapper.remove();
+    //         formElement.classList.remove("d-none");
+    //         // console.log("Skeleton render complete, real form displayed");
+    //     }, formMeta.skeletonRenderDelay || 25000);
+    // }
 
 
 
