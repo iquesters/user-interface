@@ -124,6 +124,7 @@ async function fetchTableSchema(slug) {
 async function fetchEntityData(entity) {
     try {
         const token = getSanctumToken();
+        console.log('Using token for API call:', token ? token : 'No token');
         const res = await fetch(`/api/entity/${entity}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
