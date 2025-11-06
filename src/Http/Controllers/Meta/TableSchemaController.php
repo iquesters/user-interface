@@ -4,7 +4,6 @@ namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
 use Iquesters\UserInterface\Constants\EntityStatus;
 use App\Http\Controllers\Controller;
-use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
 use Iquesters\UserInterface\Models\TableSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -54,42 +53,49 @@ class TableSchemaController extends Controller
      */
     public function store(Request $request)
     {
-        // validate payload
         $errMsgs = [
             'name.required' => 'Please provide name',
             'schema.required' => 'Please provide schema',
         ];
 
-        $validation_expression = [
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'max:190'],
             'schema' => ['required'],
-        ];
-        $validator = Validator::make($request->all(), $validation_expression, $errMsgs);
+        ], $errMsgs);
 
         if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator->errors())->withInput();
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        // create slug
-        $slug = isset($request['slug']) ? $request['slug'] : StringUtil::generateSlug($request['name']);
+        $slug = $request->input('slug') 
+            ? Str::slug($request->input('slug')) 
+            : Str::slug($request->input('name')) . '-' . Str::random(4);
 
-        // create table
-        $result = TableSchema::create([
-            // 'uid' => Str::ulid()->toString(),
+        // decode schema and extra_info if JSON
+        $schema = json_decode($request->input('schema'), true);
+        $extra_info = json_decode($request->input('extra_info'), true);
+        
+        $userId = auth()->check() ? auth()->id() : 0;
+
+        // store
+        $table = TableSchema::create([
             'uid' => (string) Str::ulid(),
-            'name' => $request['name'],
+            'name' => $request->input('name'),
             'slug' => $slug,
-            'description' => $request['description'],
-            'schema' => $request['schema'],
-            'extra_info' => $request['extra_info'],
-            'status' => EntityStatus::ACTIVE
+            'description' => $request->input('description'),
+            'schema' => $schema,
+            'extra_info' => $extra_info,
+            'status' => EntityStatus::ACTIVE,
+            'created_by' => $userId,
+            'updated_by' => $userId,
         ]);
 
-        if ($result) {
-            return redirect()->route('table.overview', $result->id)->with('success', 'Successfully created a table!');
-        } else {
-            return redirect()->back()->with('error', 'Failed to create a table!')->withInput();
+        if ($table) {
+            return redirect()->route('table.overview', $table->id)
+                ->with('success', 'Successfully created a table!');
         }
+
+        return redirect()->back()->with('error', 'Failed to create a table!')->withInput();
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
@@ -14,6 +15,11 @@ Route::middleware(['web'])->group(function () {
             Route::get('/view/{form_schema_id}/{entity_uid?}', [UIController::class, 'view'])->name('.view');
             Route::get('/edit/{form_schema_id}/{entity_uid?}', [UIController::class, 'edit'])->name('.edit');
             Route::get('/delete/{form_schema_id}/{entity_uid}', [UIController::class, 'delete'])->name('.delete');
+        });
+
+        Route::get('api/entity/{entity}', [DynamicEntityController::class, 'getEntityData']);
+        Route::get('/pkg-test', function () {
+            return "✅ User Interface Package is working!";
         });
 
     Route::prefix('form')->name('form')->group(function () {

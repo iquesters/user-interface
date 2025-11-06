@@ -9,7 +9,7 @@ class EntityStatus
 {
     const UNKNOWN = 'unknown';
     const NEW = 'new';
-    const ACTIVE = 0;
+    const ACTIVE = 'active';
     const APPROVED = 'approved';
     const INACTIVE = 'inactive';
     const DELETED = 'deleted';
