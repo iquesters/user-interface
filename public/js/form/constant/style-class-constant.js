@@ -52,6 +52,8 @@ const STYLE_CLASS = {
     ALERT:'alert', 
     ALERT_DANGER:'alert-danger', 
     TEXT_CENTER:'text-center',
+    DISABLED:"disabled",
+    COL_3:"col-3",
     
 
 

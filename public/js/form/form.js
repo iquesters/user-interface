@@ -152,18 +152,18 @@ async function setupForm(formElement) {
 
         // ✅ Add skeleton buttons if needed
         if (formMeta.submitButtonLabel || formMeta.allowCancel) {
-            const btnContainer = document.createElement("div");
-            btnContainer.classList.add("d-flex", "justify-content-end", "gap-2", "mt-3");
+            const btnContainer = document.createElement(HTML_TAG.DIV);
+            btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.JUSTIFY_CONTENT_END, STYLE_CLASS.GAP_2, STYLE_CLASS.MT_3);
 
             if (formMeta.allowCancel) {
-                const cancelBtn = document.createElement("span");
-                cancelBtn.classList.add("placeholder", "btn", "btn-secondary", "disabled", "col-3");
+                const cancelBtn = document.createElement(HTML_TAG.SPAN);
+                cancelBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
                 btnContainer.appendChild(cancelBtn);
             }
 
             if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-                const submitBtn = document.createElement("span");
-                submitBtn.classList.add("placeholder", "btn", "btn-primary", "disabled", "col-3");
+                const submitBtn = document.createElement(HTML_TAG.SPAN);
+                submitBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
                 btnContainer.appendChild(submitBtn);
             }
 
