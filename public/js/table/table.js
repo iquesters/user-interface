@@ -1,11 +1,51 @@
 /**
- * table.js
- * Dynamically builds a DataTable using dt-options from the Laravel TableSchema API,
- * including support for nested meta fields like "meta.registered_at".
+ * table.js - Updated to wait for Sanctum token
  */
 
-document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".shoz-table").forEach(initShozTable);
+// Get Sanctum token from meta tag with retry logic
+const getSanctumToken = () => {
+    const tokenMeta = document.querySelector('meta[name="sanctum-token"]');
+    return tokenMeta ? tokenMeta.getAttribute('content') : '';
+};
+
+// Wait for token to be available
+const waitForToken = (maxWaitTime = 5000) => {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        
+        const checkToken = () => {
+            const token = getSanctumToken();
+            
+            if (token) {
+                resolve(token);
+                return;
+            }
+            
+            if (Date.now() - startTime > maxWaitTime) {
+                reject(new Error('Sanctum token not found after waiting'));
+                return;
+            }
+            
+            setTimeout(checkToken, 100);
+        };
+        
+        checkToken();
+    });
+};
+
+document.addEventListener("DOMContentLoaded", async () => {
+    console.log('DOMContentLoaded - Starting table initialization');
+    
+    try {
+        // Wait for Sanctum token to be available
+        await waitForToken();
+        console.log('Sanctum token found, initializing tables');
+        
+        document.querySelectorAll(".shoz-table").forEach(initShozTable);
+    } catch (error) {
+        console.warn('Sanctum token not available:', error.message);
+        showAuthWarning();
+    }
 });
 
 /**
@@ -13,13 +53,13 @@ document.addEventListener("DOMContentLoaded", () => {
  */
 async function initShozTable(tableElement) {
     const slug = tableElement.id;
-    if (!slug) return console.warn("⚠️ Missing table id (expected slug name)");
+    if (!slug) return console.warn("Missing table id (expected slug name)");
 
     console.log(`📡 Fetching schema for slug: ${slug}`);
     const schemaResponse = await fetchTableSchema(slug);
 
     if (!schemaResponse?.data) {
-        return showErrorMessage(tableElement, "❌ Table schema not found");
+        return showErrorMessage(tableElement, "Table schema not found");
     }
 
     const schema = schemaResponse.data;
@@ -27,7 +67,7 @@ async function initShozTable(tableElement) {
     const dtConfig = schema["dt-options"] || {};
 
     if (!entity || !dtConfig.columns) {
-        return showErrorMessage(tableElement, "❌ Invalid dt-options or missing entity");
+        return showErrorMessage(tableElement, "Invalid dt-options or missing entity");
     }
 
     console.log(`📡 Fetching entity data for: ${entity}`);
@@ -41,29 +81,93 @@ async function initShozTable(tableElement) {
 }
 
 /**
- * Fetch the table schema from Laravel API
+ * Fetch the table schema from Laravel API with Sanctum token
  */
 async function fetchTableSchema(slug) {
     try {
-        const res = await fetch(`/api/noauth/table/${slug}`);
-        return await res.json();
+        const token = getSanctumToken();
+        console.log('Using token for API call:', token ? 'Token present' : 'No token');
+        console.log('Token value (first 20 chars):', token ? token.substring(0, 20) + '...' : 'No token');
+        
+        const res = await fetch(`/api/auth/table/${slug}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        console.log('API Response status:', res.status);
+        console.log('API Response headers:', Object.fromEntries(res.headers.entries()));
+        
+        // Try to read the response body for more error details
+        const responseText = await res.text();
+        console.log('API Response body:', responseText);
+        
+        if (res.status === 401) {
+            handleUnauthorized();
+            return null;
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        return JSON.parse(responseText);
     } catch (err) {
-        console.error("🔥 Schema fetch failed:", err);
+        console.error("Schema fetch failed:", err);
         return null;
     }
 }
 
 /**
- * Fetch entity data from Laravel API
+ * Fetch entity data from Laravel API with Sanctum token
  */
 async function fetchEntityData(entity) {
     try {
-        const res = await fetch(`/api/entity/${entity}`);
+        const token = getSanctumToken();
+        const res = await fetch(`/api/entity/${entity}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+        });
+        
+        if (res.status === 401) {
+            handleUnauthorized();
+            return { success: false, error: 'Authentication required' };
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
         return await res.json();
     } catch (err) {
         console.error("🔥 Entity data fetch failed:", err);
         return { success: false, error: err.message };
     }
+}
+
+function handleUnauthorized() {
+    console.error('Authentication required - redirecting to login');
+    // Clear any invalid token
+    localStorage.removeItem('auth_token');
+    // Redirect to login
+    // window.location.href = '/login?error=token_expired';
+}
+
+function showAuthWarning() {
+    document.querySelectorAll(".shoz-table").forEach(table => {
+        table.innerHTML = `
+            <tr>
+                <td colspan="10" class="text-center py-4">
+                    <div class="alert alert-warning">
+                        <h5>Authentication Required</h5>
+                        <p>Please log in to view this table.</p>
+                        <a href="/login" class="btn btn-primary">Login</a>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
 }
 
 /**

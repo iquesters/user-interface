@@ -77,9 +77,4 @@ Table Schemas
         </table>
     </div>
 </div>
-hola
-{{-- <table id="master_data" class="shoz-table" data-entity-uid=""></table> --}}
-<table id="users-table" class="shoz-table"></table>
-<table id="table-schema-table" class="shoz-table"></table>
-
 @endsection
