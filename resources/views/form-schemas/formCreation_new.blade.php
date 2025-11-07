@@ -40,7 +40,7 @@
         <!-- Right Side -->
         <!-- <div class="col-md-6"> -->
         <div class="resizable-right" style="flex: 1; min-width: 200px;">
-            <form id="{{$data->parent->slug}}" class="shoz-form" 
+            <form id="{{$data->parent->uid}}" class="shoz-form" 
                 
                 method="POST" 
                 enctype="multipart/form-data"

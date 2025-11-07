@@ -1,48 +1,8 @@
-//Constants regarding shoz-form
-// const DEFAULT_PLACEHOLDER_COLOR = 'bg-secondary'
-
-//Constants regarding shoz-form-element
-//const FORM_GROUP_CONTAINER = "<div class=\"form-group has-feedback\"></div>"
-// const FORM_GROUP_CONTAINER = "<div class=\"form-group\"></div>"
-// const FORM_GROUP_CONTAINER = "<div class=\"form-floating\"></div>"
-// const INPUT_GROUP_CONTAINER = "<div class=\"input-group\"></div>"
-
-// const TYPE_PASSWORD = "password"
-
-// const DATA_TYPE_DATETIME = "datetime"
-
-// const DTP_FORMAT_YEAR = "YYYY"
-// const DTP_FORMAT_MONTH = "MMM, YYYY"
-// const DTP_FORMAT_DATE = "MMM DD, YYYY"
-// const DTP_FORMAT_TIME = "HH:mm:ss"
-// const DTP_FORMAT_DATE_TIME = DTP_FORMAT_DATE + " " + DTP_FORMAT_TIME
-
-/* datetime is default */
-// const DTP_VIEW_MODE_DATE_TIME = "datetime"
-// const DTP_VIEW_MODE_YEARS = "years"
-// const DTP_VIEW_MODE_MONTHS = "months"
-// const DTP_VIEW_MODE_DATE = "date"
-// const DTP_VIEW_MODE_TIME = "time"
-
 let dtpOption
 
 async function setupForm(formElement) {
     console.log("setuping shoz-form...")
     console.log("formId = " + formElement.id)
-
-    // let formMeta = formElement.dataset.formMeta
-
-    // let form = document.getElementById("mdm-create");
-    // let formData = JSON.parse(form.dataset.formData);
-    // console.log("formData>>>>>",formData);
-
-    // // let formMeta = formData.parent.schema;
-    // if (formMeta) {
-    //     formMeta = JSON.parse(formMeta)
-    //     delete formElement.dataset.formMeta
-    // } else {
-    //     formMeta = await getFormSchema(formElement.id)
-    // }
 
     let formMeta = formElement.dataset.formMeta
     if (formMeta) {
@@ -57,6 +17,22 @@ async function setupForm(formElement) {
         // break the code
         return;
     }
+
+
+    //Skeleton remove
+    const skeletonContainer = formElement.querySelector(".form-skeleton");
+    if (skeletonContainer) {
+        skeletonContainer.remove();
+    }
+
+
+
+    // ✅ Access check
+    const hasAccess = checkFormAccess(formMeta,formElement);
+    if (!hasAccess) {
+        return;
+    }
+    
     formMeta.id = formElement.id
 
     const cardProvider = new CardProvider(formMeta.placeholder);
@@ -134,97 +110,97 @@ async function setupForm(formElement) {
             formElement.classList.replace(STYLE_CLASS.SHADOW_LG, STYLE_CLASS.SHADOW);
         });
     }
-    
+
     // Skeleton screen rendering
-    if (formMeta.skeletonRender) {
-        console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
+    // if (formMeta.skeletonRender) {
+    //     // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
-        // ✅ Create skeleton container
-        const skeletonWrapper = document.createElement(HTML_TAG.DIV);
-        skeletonWrapper.classList.add(
-            STYLE_CLASS.CARD, 
-            STYLE_CLASS.P_4, 
-            STYLE_CLASS.MB_3, 
-            STYLE_CLASS.SHADOW_SM, 
-            STYLE_CLASS.ROUNDED_3, 
-            STYLE_CLASS.SKELETON_WRAPPER
-        );
+    //     // ✅ Create skeleton container
+    //     const skeletonWrapper = document.createElement(HTML_TAG.DIV);
+    //     skeletonWrapper.classList.add(
+    //         STYLE_CLASS.CARD, 
+    //         STYLE_CLASS.P_4, 
+    //         STYLE_CLASS.MB_3, 
+    //         STYLE_CLASS.SHADOW_SM, 
+    //         STYLE_CLASS.ROUNDED_3, 
+    //         STYLE_CLASS.SKELETON_WRAPPER
+    //     );
 
-        // ✅ Create skeleton items dynamically based on fields
-        if (Array.isArray(formMeta.fields)) {
-            formMeta.fields.forEach(() => {
-                const fieldGroup = document.createElement(HTML_TAG.DIV);
-                fieldGroup.classList.add(STYLE_CLASS.MB_3);
+    //     // ✅ Create skeleton items dynamically based on fields
+    //     if (Array.isArray(formMeta.fields)) {
+    //         formMeta.fields.forEach(() => {
+    //             const fieldGroup = document.createElement(HTML_TAG.DIV);
+    //             fieldGroup.classList.add(STYLE_CLASS.MB_3);
 
-                // Label placeholder
-                const labelSkeleton = document.createElement(HTML_TAG.SPAN);
-                labelSkeleton.classList.add(
-                    STYLE_CLASS.PLACEHOLDER, 
-                    STYLE_CLASS.COL_4, 
-                    STYLE_CLASS.ROUNDED, 
-                    STYLE_CLASS.PLACEHOLDER_GLOW, 
-                    STYLE_CLASS.MB_1
-                );
+    //             // Label placeholder
+    //             const labelSkeleton = document.createElement(HTML_TAG.SPAN);
+    //             labelSkeleton.classList.add(
+    //                 STYLE_CLASS.PLACEHOLDER, 
+    //                 STYLE_CLASS.COL_4, 
+    //                 STYLE_CLASS.ROUNDED, 
+    //                 STYLE_CLASS.PLACEHOLDER_GLOW, 
+    //                 STYLE_CLASS.MB_1
+    //             );
 
-                // Input placeholder
-                const inputSkeleton = document.createElement(HTML_TAG.SPAN);
-                inputSkeleton.classList.add(
-                    STYLE_CLASS.PLACEHOLDER, 
-                    STYLE_CLASS.COLL_12, 
-                    STYLE_CLASS.ROUNDED, 
-                    STYLE_CLASS.PLACEHOLDER_WAVE
-                );
-                inputSkeleton.style.height = "2.5rem"; // optional height for input shape
+    //             // Input placeholder
+    //             const inputSkeleton = document.createElement(HTML_TAG.SPAN);
+    //             inputSkeleton.classList.add(
+    //                 STYLE_CLASS.PLACEHOLDER, 
+    //                 STYLE_CLASS.COLL_12, 
+    //                 STYLE_CLASS.ROUNDED, 
+    //                 STYLE_CLASS.PLACEHOLDER_WAVE
+    //             );
+    //             inputSkeleton.style.height = "2.5rem"; // optional height for input shape
 
-                fieldGroup.appendChild(labelSkeleton);
-                fieldGroup.appendChild(inputSkeleton);
+    //             fieldGroup.appendChild(labelSkeleton);
+    //             fieldGroup.appendChild(inputSkeleton);
 
-                skeletonWrapper.appendChild(fieldGroup);
-            });
-        }
+    //             skeletonWrapper.appendChild(fieldGroup);
+    //         });
+    //     }
 
-        // ✅ Add skeleton buttons if needed
-        if (formMeta.submitButtonLabel || formMeta.allowCancel) {
-            const btnContainer = document.createElement("div");
-            btnContainer.classList.add("d-flex", "justify-content-end", "gap-2", "mt-3");
+    //     // ✅ Add skeleton buttons if needed
+    //     if (formMeta.submitButtonLabel || formMeta.allowCancel) {
+    //         const btnContainer = document.createElement(HTML_TAG.DIV);
+    //         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.JUSTIFY_CONTENT_END, STYLE_CLASS.GAP_2, STYLE_CLASS.MT_3);
 
-            if (formMeta.allowCancel) {
-                const cancelBtn = document.createElement("span");
-                cancelBtn.classList.add("placeholder", "btn", "btn-secondary", "disabled", "col-3");
-                btnContainer.appendChild(cancelBtn);
-            }
+    //         if (formMeta.allowCancel) {
+    //             const cancelBtn = document.createElement(HTML_TAG.SPAN);
+    //             cancelBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
+    //             btnContainer.appendChild(cancelBtn);
+    //         }
 
-            if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-                const submitBtn = document.createElement("span");
-                submitBtn.classList.add("placeholder", "btn", "btn-primary", "disabled", "col-3");
-                btnContainer.appendChild(submitBtn);
-            }
+    //         if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
+    //             const submitBtn = document.createElement(HTML_TAG.SPAN);
+    //             submitBtn.classList.add(STYLE_CLASS.PLACEHOLDER, STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY, STYLE_CLASS.DISABLED, STYLE_CLASS.COL_3);
+    //             btnContainer.appendChild(submitBtn);
+    //         }
 
-            skeletonWrapper.appendChild(btnContainer);
-        }
+    //         skeletonWrapper.appendChild(btnContainer);
+    //     }
 
-        // ✅ Insert skeleton before form
-        formElement.before(skeletonWrapper);
+    //     // ✅ Insert skeleton before form
+    //     formElement.before(skeletonWrapper);
 
-        // ✅ Hide real form initially
-        formElement.classList.add("d-none");
+    //     // ✅ Hide real form initially
+    //     formElement.classList.add("d-none");
 
-        // ✅ Replace skeleton with real form after delay
-        setTimeout(() => {
-            skeletonWrapper.remove();
-            formElement.classList.remove("d-none");
-            console.log("Skeleton render complete, real form displayed");
-        }, formMeta.skeletonRenderDelay || 2500);
-    }
+    //     // ✅ Replace skeleton with real form after delay
+    //     setTimeout(() => {
+    //         skeletonWrapper.remove();
+    //         formElement.classList.remove("d-none");
+    //         // console.log("Skeleton render complete, real form displayed");
+    //     }, formMeta.skeletonRenderDelay || 25000);
+    // }
 
 
 
 
 
     // run prepare hook func if present
-    if (formMeta?.prepareHookFunc) {
-        window[formMeta?.prepareHookFunc](formElement?.id);
-    }
+    // if (formMeta?.prepareHookFunc) {
+    //     window[formMeta?.prepareHookFunc](formElement?.id);
+    // }
 
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
@@ -718,6 +694,45 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
     // toWrap.before(wrapper);
     return wrapper.appendChild(toWrap);
 }
+
+
+// Form access check (view or edit permissions)
+function checkFormAccess(formMeta, formElement) {
+    const currentURL = new URL(window.location.href);
+    const pathname = currentURL.pathname.toLowerCase();
+
+    console.log("Checking access for:", pathname);
+
+    // ✅ Default to true if keys are missing
+    const allowView = formMeta.allowView ?? true;
+    const allowEdit = formMeta.allowEdit ?? true;
+
+
+    // ✅ Allow only if URL contains 'view' or 'edit' and formMeta allows view
+    const isAllowedRoute = pathname.includes('view') || pathname.includes('edit');
+
+    // if (!isAllowedRoute || (!allowView && !allowEdit)) {
+    if(!allowView){
+        const message = document.createElement(HTML_TAG.P);
+        message.textContent = 'You are not supposed to view this page';
+        message.classList.add(
+            STYLE_CLASS.ALERT,
+            STYLE_CLASS.ALERT_DANGER,
+            STYLE_CLASS.TEXT_CENTER,
+            STYLE_CLASS.MT_3
+        );
+
+        // ✅ Clear only form content, not the whole page
+        formElement.innerHTML = '';
+        formElement.appendChild(message);
+        return false;
+    }
+    
+
+    return true;
+}
+
+
 
 
 // setupCoreFormElement()
