@@ -8,6 +8,12 @@ use Iquesters\UserInterface\Http\Controllers\UIController;
 
 Route::middleware(['web'])->group(function () {
     Route::middleware(['auth'])->group(function () {
+
+        // domain/list/{table_schema_id}
+        // domain/view/{form_schema_id}/{entity_uid}
+        // domain/edit/{form_schema_id}/- this is create mode
+        // domain/edit/{form_schema_id}/{entity_uid}
+        // domain/delete/{form_schema_id}/{entity_uid}
         Route::prefix('')->name('ui')->group(function () {
             Route::get('/list/{table_schema_id}', [UIController::class, 'list'])->name('.list');
             //Currently, entity_uid is optional for View routes but will be used in the future.
