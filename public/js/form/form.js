@@ -18,6 +18,15 @@ async function setupForm(formElement) {
         return;
     }
 
+
+    //Skeleton remove
+    const skeletonContainer = formElement.querySelector(".form-skeleton");
+    if (skeletonContainer) {
+        skeletonContainer.remove();
+    }
+
+
+
     // ✅ Access check
     const hasAccess = checkFormAccess(formMeta,formElement);
     if (!hasAccess) {
