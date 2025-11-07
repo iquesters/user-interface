@@ -39,9 +39,16 @@ class DynamicEntityController extends Controller
             $query = DB::table($entity);
 
             if ($entity_uid) {
+                /**
+                 * @todo
+                 * Must read from cache
+                 */
+                // $start = now();
                 $hasUid = Schema::hasColumn($entity, 'uid');
                 $hasId  = Schema::hasColumn($entity, 'id');
-
+                // $end = now();
+                // Log::info('Schema check time', ['time' => $end->diffInSeconds($start)]);
+                
                 // 🚫 If the table uses UID but user passed an ID-looking value
                 if ($hasUid && is_numeric($entity_uid)) {
                     return response()->json([

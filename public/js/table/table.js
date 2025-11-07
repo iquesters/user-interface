@@ -55,7 +55,7 @@ async function initShozTable(tableElement) {
     const slug = tableElement.id;
     if (!slug) return console.warn("Missing table id (expected slug name)");
 
-    console.log(`📡 Fetching schema for slug: ${slug}`);
+    console.log(`Fetching schema for slug: ${slug}`);
     const schemaResponse = await fetchTableSchema(slug);
 
     if (!schemaResponse?.data) {
@@ -70,14 +70,20 @@ async function initShozTable(tableElement) {
         return showErrorMessage(tableElement, "Invalid dt-options or missing entity");
     }
 
-    console.log(`📡 Fetching entity data for: ${entity}`);
+    console.log(`Fetching entity data for: ${entity}`);
     const entityResponse = await fetchEntityData(entity);
 
     if (!entityResponse.success || !entityResponse.data) {
         return showErrorMessage(tableElement, entityResponse.error || "Failed to load data");
     }
 
-    renderDataTable(tableElement, entityResponse.data, dtConfig, entity);
+    // Merge root-level form-schema-uid into DataTable config
+    const mergedConfig = {
+        ...dtConfig,
+        "form-schema-uid": schema["form-schema-uid"],
+    };
+
+    renderDataTable(tableElement, entityResponse.data, mergedConfig, entity);
 }
 
 /**
@@ -142,7 +148,7 @@ async function fetchEntityData(entity) {
         
         return await res.json();
     } catch (err) {
-        console.error("🔥 Entity data fetch failed:", err);
+        console.error("Entity data fetch failed:", err);
         return { success: false, error: err.message };
     }
 }
@@ -180,6 +186,7 @@ function renderDataTable(tableElement, data, dtConfig, entityName) {
     }
 
     const { columns, options } = dtConfig;
+    const rootFormSchemaUid = dtConfig["form-schema-uid"] || "";
 
     // Reset the table structure
     tableElement.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
@@ -193,31 +200,50 @@ function renderDataTable(tableElement, data, dtConfig, entityName) {
         }
     });
 
-    // 🧩 Build DataTable column definitions with meta field handling
+    // Build DataTable column definitions with meta field handling
     const resolvedColumns = columns
         .filter(col => col.visible !== false)
         .map(col => ({
             data: null,
             title: col.title,
             render: (row) => {
-                // handle meta.* references
+                let cellValue = "";
+
+                // Handle meta.* keys
                 if (col.data.startsWith("meta.")) {
                     const metaKey = col.data.split(".")[1];
                     const metaItem = (row.meta || []).find(m => m.meta_key === metaKey);
-                    return metaItem ? metaItem.meta_value : "";
+                    cellValue = metaItem ? metaItem.meta_value : "";
+                } else if (col.data.includes(".")) {
+                    cellValue = col.data.split(".").reduce((acc, key) => acc?.[key], row) ?? "";
+                } else {
+                    cellValue = row[col.data] ?? "";
                 }
-                // handle nested object (e.g., "profile.name")
-                if (col.data.includes(".")) {
-                    return col.data.split(".").reduce((acc, key) => acc?.[key], row) ?? "";
+
+                // Handle link column
+                if (col.link === true) {
+                    const entityUid = row.uid;
+                    if (!entityUid) return cellValue;
+
+                    const formSchemaUid =
+                        col["form-schema-uid"] || rootFormSchemaUid;
+
+                    if (!formSchemaUid) {
+                        console.warn(`Missing form-schema-uid for link column "${col.data}"`);
+                        return cellValue;
+                    }
+
+                    const targetUrl = `/edit/${formSchemaUid}/${entityUid}`;
+                    return `<a href="${targetUrl}" class="datatable-link text-primary" style="text-decoration:none;">${cellValue}</a>`;
                 }
-                // regular direct property
-                return row[col.data] ?? "";
+
+                return cellValue;
             }
         }));
 
     // Initialize DataTable
     $(tableElement).DataTable({
-        data: data,
+        data,
         columns: resolvedColumns,
         responsive: options?.responsive ?? true,
         pageLength: options?.pageLength ?? 10,
@@ -230,7 +256,7 @@ function renderDataTable(tableElement, data, dtConfig, entityName) {
         },
     });
 
-    console.log(`✅ DataTable rendered for entity: ${entityName}`);
+    console.log(`DataTable rendered for entity: ${entityName}`);
 }
 
 /**
