@@ -4,6 +4,7 @@
     'enctype' => 'multipart/form-data',
     'meta' => '',
     'formData' => '',
+    'entity_uid' => null,
 ])
 
 
@@ -15,7 +16,8 @@
       method="{{ strtoupper($method) }}"
       enctype="{{ $enctype }}"
       data-form-meta="{{ $meta }}"
-      data-form-data='{{ $formData }}'>
+      data-form-data='{{ $formData }}'
+      data-entity-uid="{{ $entity_uid }}">
     @csrf
 
   <div class="form-skeleton">

@@ -7,7 +7,7 @@
  * @param {*} formCol 
  * @param {*} formMeta 
 */
-function setupFormBlock(formCol, formMeta) {
+async function setupFormBlock(formCol, formMeta) {
     if (formMeta.fields) {
         const fragment = document.createElement(HTML_TAG.DIV)
         fragment.id = formCol.id + "-item"
@@ -59,11 +59,16 @@ function setupFormBlock(formCol, formMeta) {
             }
         }
 
+        // Fetch and render entity data if entity and entityUId are provided
+        const entityUId = form.dataset.entityUid;
+        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId); 
+        renderEntityDataToForm('.shoz-form', getentityResponse.data);
+
     }
 }
 
 
-function addField(field, addTo,formMeta) {
+async function addField(field, addTo,formMeta) {
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
@@ -804,6 +809,56 @@ function appendBackendError(field, container, input = null) {
         container.appendChild(errorDiv);
     }
 }
+
+/**
+ * Fetch entity data from Laravel API with Sanctum token
+ */
+async function getfetchEntityData(entity,entityUId) {
+    try {
+        const token = getSanctumToken();
+        console.log('Using token for API call11111111111111:', token ? token : 'No token');
+        const res = await fetch(`/api/entity/${entity}/${entityUId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+        });
+        
+        if (res.status === 401) {
+            handleUnauthorized();
+            return { success: false, error: 'Authentication required' };
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        return await res.json();
+    } catch (err) {
+        console.error("🔥 Entity data fetch failed:", err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 
+ * Render fetched entity data into form fields 
+ */
+async function renderEntityDataToForm(formSelector, entityResponse) {
+    const form = document.querySelector(formSelector);
+    const entityData = entityResponse?.[0];
+
+    if (!form || !entityData) return;
+
+    for (const [key, value] of Object.entries(entityData)) {
+        const field = form.querySelector(`#${key}`);
+        if (field) field.value = value ?? "";
+    }
+}
+
+
+
+
+
 
 
 
