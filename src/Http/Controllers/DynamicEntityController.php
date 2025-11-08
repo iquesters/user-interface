@@ -18,7 +18,6 @@ class DynamicEntityController extends Controller
                 return response()->json(['error' => 'Entity name is required'], 400);
             }
 
-            // ✅ Ensure main table exists
             if (! Schema::hasTable($entity)) {
                 Log::warning("Entity fetch failed: Table '{$entity}' not found");
                 return response()->json(['error' => "Table {$entity} does not exist"], 404);
@@ -38,18 +37,11 @@ class DynamicEntityController extends Controller
             // ✅ Build query
             $query = DB::table($entity);
 
+            // ✅ Handle filtering by entity_uid
             if ($entity_uid) {
-                /**
-                 * @todo
-                 * Must read from cache
-                 */
-                // $start = now();
                 $hasUid = Schema::hasColumn($entity, 'uid');
                 $hasId  = Schema::hasColumn($entity, 'id');
-                // $end = now();
-                // Log::info('Schema check time', ['time' => $end->diffInSeconds($start)]);
-                
-                // 🚫 If the table uses UID but user passed an ID-looking value
+
                 if ($hasUid && is_numeric($entity_uid)) {
                     return response()->json([
                         'success' => false,
@@ -57,7 +49,6 @@ class DynamicEntityController extends Controller
                     ], 400);
                 }
 
-                // ✅ Choose correct column for filtering
                 if ($hasUid) {
                     $query->where('uid', $entity_uid);
                 } elseif ($hasId) {
@@ -70,7 +61,13 @@ class DynamicEntityController extends Controller
                 }
             }
 
-            $data = $query->get();
+            // ✅ Add pagination / lazy loading parameters
+            $offset = request()->get('offset', 0);
+            $length = request()->get('length', 50);
+
+            $totalCount = $query->count(); // before limit
+
+            $data = $query->offset($offset)->limit($length)->get();
 
             // ✅ Attach meta data if available
             if ($metaTable) {
@@ -83,22 +80,16 @@ class DynamicEntityController extends Controller
                 });
             }
 
-            Log::info('Entity data retrieved successfully', [
-                'entity' => $entity,
-                'meta_table' => $metaTable ?? 'none',
-                'record_count' => $data->count(),
-                'entity_uid' => $entity_uid ?? 'none',
-                'timestamp' => now()->toDateTimeString(),
-            ]);
-
             return response()->json([
                 'success' => true,
                 'entity' => $entity,
                 'meta_table' => $metaTable ?? 'none',
-                'entity_uid' => $entity_uid ?? null,
+                'offset' => (int)$offset,
+                'length' => (int)$length,
+                'total' => $totalCount,
                 'count' => $data->count(),
                 'data' => $data,
-            ], 200);
+            ]);
 
         } catch (Throwable $e) {
             Log::error('Entity Data API Error', [
