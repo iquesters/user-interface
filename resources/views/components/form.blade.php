@@ -4,8 +4,18 @@
     'enctype' => 'multipart/form-data',
     'meta' => '',
     'formData' => '',
+    'entity_uid' => null,
 ])
 
+@if($mode === 'view')
+  <div class="form-edit" style="text-align: end;">
+    <a href="{{ url('edit/' . $form_schema_id . '/' . $entity_uid) }}"
+       class="text-primary"
+       title="Edit Form">
+      <i class="fas fa-pencil-alt fa-md"></i>
+    </a>
+  </div>    
+@endif
 
 
 
@@ -15,7 +25,8 @@
       method="{{ strtoupper($method) }}"
       enctype="{{ $enctype }}"
       data-form-meta="{{ $meta }}"
-      data-form-data='{{ $formData }}'>
+      data-form-data='{{ $formData }}'
+      data-entity-uid="{{ $entity_uid }}">
     @csrf
 
   <div class="form-skeleton">

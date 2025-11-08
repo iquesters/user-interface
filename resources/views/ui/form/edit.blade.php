@@ -6,7 +6,10 @@
 
     @include('userinterface::components.form',
         [
-            'id' => $form_schema_id
+            'id' => $form_schema_id,
+            'entity_uid' => $entity_uid,
+            'mode' => 'edit'
+
         ])
 @endsection
 

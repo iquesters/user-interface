@@ -7,7 +7,7 @@
  * @param {*} formCol 
  * @param {*} formMeta 
 */
-function setupFormBlock(formCol, formMeta) {
+async function setupFormBlock(formCol, formMeta) {
     if (formMeta.fields) {
         const fragment = document.createElement(HTML_TAG.DIV)
         fragment.id = formCol.id + "-item"
@@ -59,11 +59,16 @@ function setupFormBlock(formCol, formMeta) {
             }
         }
 
+        // Fetch and render entity data if entity and entityUId are provided
+        const entityUId = form.dataset.entityUid;
+        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId); 
+        renderEntityDataToForm('.shoz-form', getentityResponse.data);
+
     }
 }
 
 
-function addField(field, addTo,formMeta) {
+async function addField(field, addTo,formMeta) {
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
@@ -352,109 +357,6 @@ function addField(field, addTo,formMeta) {
         // Add info and feedback together
         appendFieldInfoAndFeedback(field, formContainer);
     }
-
-
-
-    // else if (field.type === INPUT_TYPE.TEXT && field.options && Array.isArray(field.options)) {
-    //     const fragment = createFieldFragment(field, addTo);
-    //     fragment.style.position = "relative";
-        
-
-    //     // Input
-    //     const input = document.createElement(HTML_TAG.INPUT);
-    //     input.type = INPUT_TYPE.TEXT;
-    //     input.name = field.id;
-    //     input.value = field.value || "";
-    //     input.placeholder = field.placeholder || field.label;
-    //     input.classList.add(STYLE_CLASS.FORM_CONTROL);
-    //     fragment.appendChild(input);
-
-    //     //Frontend Validation
-    //     // applyFieldValidation(field, input);
-
-
-
-    //     // ✅ Laravel backend validation error
-    //     if (window.formErrors && window.formErrors[field.id]) {
-    //         input.classList.add('is-invalid');
-    //         const errorDiv = document.createElement("div");
-    //         errorDiv.classList.add("invalid-feedback");
-    //         errorDiv.id = `${field.id}-error`;
-    //         errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-    //         fragment.appendChild(errorDiv);
-    //     }
-    //     createHelperText(field,fragment);
-
-    //     // Dropdown menu
-    //     const menu = document.createElement("div");
-    //     menu.style.display = "block";
-    //     menu.style.position = "absolute";
-    //     menu.style.top = "100%";
-    //     menu.style.left = "0";
-    //     menu.style.width = "100%";
-    //     menu.style.maxHeight = "0";
-    //     menu.style.overflow = "hidden";
-    //     menu.style.opacity = "0";
-    //     menu.style.transition = "all 0.2s ease"; // ✅ smooth transition
-    //     menu.style.background = "#fff";
-    //     menu.style.border = "1px solid #ccc";
-    //     menu.style.zIndex = "1000";
-    //     fragment.appendChild(menu);
-
-    //     // Populate
-    //     field.options.forEach(opt => {
-    //         const item = document.createElement("div");
-    //         item.textContent = opt.label;
-    //         item.style.padding = "6px 10px";
-    //         item.style.cursor = "pointer";
-    //         item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
-    //         item.addEventListener("mouseout", () => item.style.background = "#fff");
-    //         item.addEventListener("click", () => {
-    //             input.value = opt.label;
-    //             input.dataset.value = opt.value;
-    //             closeMenu();
-    //             input.reportValidity();
-    //         });
-    //         menu.appendChild(item);
-    //     });
-
-    //     // Open/close functions
-    //     function openMenu() {
-    //         menu.style.maxHeight = "500px"; // expands smoothly
-    //         menu.style.opacity = "1";
-    //     }
-
-    //     function closeMenu() {
-    //         menu.style.maxHeight = "0";
-    //         menu.style.opacity = "0";
-    //     }
-
-    //     // Toggle on input click
-    //     input.addEventListener("click", () => {
-    //         if (menu.style.maxHeight === "0px" || menu.style.opacity === "0") {
-    //             openMenu();
-    //         } else {
-    //             closeMenu();
-    //         }
-    //     });
-
-    //     // Filter items
-    //     input.addEventListener("input", () => {
-    //         const filter = input.value.toLowerCase();
-    //         Array.from(menu.children).forEach(item => {
-    //             item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
-    //         });
-    //         openMenu();
-    //     });
-
-    //     // Close when clicking outside
-    //     document.addEventListener("click", (e) => {
-    //         if (!fragment.contains(e.target)) {
-    //             closeMenu();
-    //         }
-    //     });
-    // }
-    
 
     // For all other input types (text, email, password, number, date, file, etc.)
     else if (field.type && field.label) {
@@ -804,6 +706,56 @@ function appendBackendError(field, container, input = null) {
         container.appendChild(errorDiv);
     }
 }
+
+/**
+ * Fetch entity data from Laravel API with Sanctum token
+ */
+async function getfetchEntityData(entity,entityUId) {
+    try {
+        const token = getSanctumToken();
+        console.log('Using token for API call11111111111111:', token ? token : 'No token');
+        const res = await fetch(`/api/entity/${entity}/${entityUId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+        });
+        
+        if (res.status === 401) {
+            handleUnauthorized();
+            return { success: false, error: 'Authentication required' };
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        return await res.json();
+    } catch (err) {
+        console.error("🔥 Entity data fetch failed:", err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 
+ * Render fetched entity data into form fields 
+ */
+async function renderEntityDataToForm(formSelector, entityResponse) {
+    const form = document.querySelector(formSelector);
+    const entityData = entityResponse?.[0];
+
+    if (!form || !entityData) return;
+
+    for (const [key, value] of Object.entries(entityData)) {
+        const field = form.querySelector(`#${key}`);
+        if (field) field.value = value ?? "";
+    }
+}
+
+
+
+
+
 
 
 
