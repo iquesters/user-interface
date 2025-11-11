@@ -22,9 +22,9 @@ on:
         required: false
         default: ""
 
-  pull_request:
-    types:
-      - closed
+  # pull_request:
+  #   types:
+  #     - closed
 
 permissions:
   contents: write
