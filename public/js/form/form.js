@@ -698,39 +698,28 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
 
 // Form access check (view or edit permissions)
 function checkFormAccess(formMeta, formElement) {
-    const currentURL = new URL(window.location.href);
-    const pathname = currentURL.pathname.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
+    const { allowView = true, allowEdit = true } = formMeta;
 
-    console.log("Checking access for:", pathname);
+    const noAccess =
+        (pathname.includes('edit') && !allowEdit) ||
+        (pathname.includes('view') && !allowView);
 
-    // ✅ Default to true if keys are missing
-    const allowView = formMeta.allowView ?? true;
-    const allowEdit = formMeta.allowEdit ?? true;
-
-
-    // ✅ Allow only if URL contains 'view' or 'edit' and formMeta allows view
-    const isAllowedRoute = pathname.includes('view') || pathname.includes('edit');
-
-    // if (!isAllowedRoute || (!allowView && !allowEdit)) {
-    if(!allowView){
-        const message = document.createElement(HTML_TAG.P);
-        message.textContent = 'You are not supposed to view this page';
-        message.classList.add(
-            STYLE_CLASS.ALERT,
+    if (noAccess) {
+        const msg = document.createElement('p');
+        msg.textContent = 'You are not supposed to view this page';
+        msg.classList.add(STYLE_CLASS.ALERT,
             STYLE_CLASS.ALERT_DANGER,
             STYLE_CLASS.TEXT_CENTER,
-            STYLE_CLASS.MT_3
-        );
-
-        // ✅ Clear only form content, not the whole page
+            STYLE_CLASS.MT_3);
         formElement.innerHTML = '';
-        formElement.appendChild(message);
+        formElement.appendChild(msg);
         return false;
     }
-    
 
     return true;
 }
+
 
 
 

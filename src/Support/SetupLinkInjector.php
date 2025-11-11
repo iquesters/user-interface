@@ -11,10 +11,10 @@ class SetupLinkInjector
     {
         $flagPath = storage_path('app/iquesters_ui_installed.flag');
         $marker = '<!-- IQUESTERS-SETUP-LINK -->';
-        Log::info('[UserInterface] SetupLinkInjector::inject() called.');
+        // Log::info('[UserInterface] SetupLinkInjector::inject() called.');
 
         if (file_exists($flagPath)) {
-            Log::info('[UserInterface] Injection already done — skipping.');
+            // Log::info('[UserInterface] Injection already done — skipping.');
             return;
         }
 
