@@ -79,6 +79,11 @@
                     </a>
                 </li>
                 <li>
+                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
+                        <i class="fa fa-cog me-2"></i> Settings
+                    </a>
+                </li>
+                <li>
                     <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
                         <i class="fas fa-fw fa-question-circle me-2"></i> Help
                     </a>

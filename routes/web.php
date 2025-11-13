@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
+use Iquesters\Foundation\Http\Controllers\MasterDataController;
+use Iquesters\UserManagement\Http\Controllers\ProfileController;
 
 
 Route::middleware(['web'])->group(function () {
@@ -26,43 +28,48 @@ Route::middleware(['web'])->group(function () {
             return "✅ User Interface Package is working!";
         });
 
-    Route::prefix('form')->name('form')->group(function () {
-        Route::get('/list', [FormController::class, 'list'])->name('.list');
-        Route::get('/create', [FormController::class, 'create'])->name('.create');
-        Route::post('/store', [FormController::class, 'store'])->name('.store');
-        Route::get('/{id}/overview', [FormController::class, 'overview'])->name('.overview');
-        Route::get('/{id}/update', [FormController::class, 'update'])->name('.update');
-        Route::post('/{id}/update', [FormController::class, 'update'])->name('.update.schema');
-        Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
+        Route::get('/theme', [UIController::class, 'setTheme'])->name('ui.theme');
+
+        Route::put('/master-data/{master_datum}', [MasterDataController::class, 'update'])->name('master-data.update');
+
+        Route::prefix('form')->name('form')->group(function () {
+            Route::get('/list', [FormController::class, 'list'])->name('.list');
+            Route::get('/create', [FormController::class, 'create'])->name('.create');
+            Route::post('/store', [FormController::class, 'store'])->name('.store');
+            Route::get('/{id}/overview', [FormController::class, 'overview'])->name('.overview');
+            Route::get('/{id}/update', [FormController::class, 'update'])->name('.update');
+            Route::post('/{id}/update', [FormController::class, 'update'])->name('.update.schema');
+            Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
 
 
-        Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
-        Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
-        Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
+            Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
+            Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
+            Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
 
-        Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
-    });
+            Route::get('/submitAndSave/{uid}', [FormController::class, 'submitAndSave'])->name('.submitAndSave');
+        });
 
-    Route::prefix('table')->name('table')->group(function () {
-        Route::get('/list', [TableSchemaController::class, 'list'])->name('.list');
-        Route::get('/create', [TableSchemaController::class, 'create'])->name('.create');
-        Route::post('/store', [TableSchemaController::class, 'store'])->name('.store');
-        Route::get('/{id}/overview', [TableSchemaController::class, 'overview'])->name('.overview');
-        Route::get('/{id}/update', [TableSchemaController::class, 'update'])->name('.update');
-        Route::post('/{id}/update', [TableSchemaController::class, 'update'])->name('.update.schema');
-        Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
-    });
+        Route::prefix('table')->name('table')->group(function () {
+            Route::get('/list', [TableSchemaController::class, 'list'])->name('.list');
+            Route::get('/create', [TableSchemaController::class, 'create'])->name('.create');
+            Route::post('/store', [TableSchemaController::class, 'store'])->name('.store');
+            Route::get('/{id}/overview', [TableSchemaController::class, 'overview'])->name('.overview');
+            Route::get('/{id}/update', [TableSchemaController::class, 'update'])->name('.update');
+            Route::post('/{id}/update', [TableSchemaController::class, 'update'])->name('.update.schema');
+            Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
+        });
 
+        Route::get('/settings',[ProfileController::class, 'setting'])->name('settings');
 
-    // Route::get('userinterface/assets/{path}', function ($path) {
-    //     $file = __DIR__ . '/../public/' . $path;
+        // Route::get('userinterface/assets/{path}', function ($path) {
+        //     $file = __DIR__ . '/../public/' . $path;
 
-    //     if (!File::exists($file)) {
-    //         abort(404);
-    //     }
+        //     if (!File::exists($file)) {
+        //         abort(404);
+        //     }
 
-    //     return response()->file($file);
-    // })->where('path', '.*')->name('userinterface.asset');
+        //     return response()->file($file);
+        // })->where('path', '.*')->name('userinterface.asset');
 
     });
 });
