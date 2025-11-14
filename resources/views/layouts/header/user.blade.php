@@ -73,11 +73,21 @@
 
                 <li><div class="dropdown-divider my-2"></div></li>
 
+                @if(Route::has('myprofile'))
                 <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
+                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('myprofile') }}">
                         <i class="fa-solid fa-fw fa-user-circle me-2"></i> My Profile
                     </a>
                 </li>
+                @endif
+
+                @if(Route::has('settings'))
+                <li>
+                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
+                        <i class="fa fa-cog me-2"></i> Settings
+                    </a>
+                </li>
+                @endif
                 <li>
                     <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
                         <i class="fas fa-fw fa-question-circle me-2"></i> Help

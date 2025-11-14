@@ -59,5 +59,8 @@
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/textarea-validation.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/customValidationMessage.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/table/table.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/modal.js') }}"></script>
+
+<script src="{{ Iquesters\UserManagement\UserManagementServiceProvider::getJsUrl('js/password-validation.js') }}"></script>
 <!-- Dynamic JavaScript inclusion ENDS -->
 @stack('scripts')
