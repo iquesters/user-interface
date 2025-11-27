@@ -50,7 +50,14 @@ function showModal(modalContent) {
             shozModalHeader.style.display = "block"
         }
         if (body?.enabled) {
-            shozModalBody.innerHTML = body?.content
+            // shozModalBody.innerHTML = body?.content
+            shozModalBody.innerHTML = "";
+            if (body.content instanceof Node) {
+                body.content.classList.remove("d-none");
+                shozModalBody.appendChild(body.content);  // MOVE DOM node
+            } else {
+                shozModalBody.innerHTML = body.content;   // fallback for HTML string
+            }
         }
         if (footer?.enabled) {
             shozModalFooter.style.display = "flex"
