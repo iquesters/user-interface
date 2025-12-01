@@ -7,7 +7,7 @@
  * @param {*} formCol 
  * @param {*} formMeta 
 */
-function setupFormBlock(formCol, formMeta) {
+async function setupFormBlock(formCol, formMeta) {
     if (formMeta.fields) {
         const fragment = document.createElement(HTML_TAG.DIV)
         fragment.id = formCol.id + "-item"
@@ -59,50 +59,18 @@ function setupFormBlock(formCol, formMeta) {
             }
         }
 
+        // Fetch and render entity data if entity and entityUId are provided
+        const entityUId = form.dataset.entityUid;
+        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId); 
+        renderEntityDataToForm('.shoz-form', getentityResponse.data);
+
     }
 }
 
 
-function addField(field, addTo,formMeta) {
+async function addField(field, addTo,formMeta) {
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
-
-        // if (field.label) {
-        //     const groupLabel = document.createElement(HTML_TAG.LABEL);
-        //     groupLabel.textContent = field.label;
-        //     groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
-        //     fragment.appendChild(groupLabel);
-        // }
-
-        // if (field.options && Array.isArray(field.options)) {
-        //     field.options.forEach(opt => {
-        //         const div = document.createElement(HTML_TAG.DIV);
-        //         div.classList.add(STYLE_CLASS.FORM_CHECK);
-
-        //         const input = document.createElement(HTML_TAG.INPUT);
-        //         input.type = INPUT_TYPE.RADIO;
-        //         input.id = field.id + "-" + opt.value;
-        //         input.name = field.id;
-        //         input.value = opt.value;
-        //         input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-        //         if (field.value && field.value === opt.value) {
-        //             input.checked = true;
-        //         }
-
-        //         // Apply Frontend validation to each radio input
-        //         // applyFieldValidation(field, input);
-
-        //         const label = document.createElement(HTML_TAG.LABEL);
-        //         label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-        //         label.setAttribute(ATTR_CONS.FOR, input.id);
-        //         label.textContent = opt.label;
-
-        //         div.append(input,label);
-        //         // div.appendChild(label);
-        //         fragment.appendChild(div);
-        //     });
-            
-        // }
 
         if (field.label) {
             fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
@@ -114,20 +82,6 @@ function addField(field, addTo,formMeta) {
         // ✅ Add helper text below radio group
         createHelperText(field, fragment);
 
-
-        // ✅ Laravel backend validation error for the radio group
-        // if (window.formErrors && window.formErrors[field.id]) {
-        //     const errorDiv = document.createElement("div");
-        //     errorDiv.classList.add("invalid-feedback", "d-block"); // d-block so it shows for group
-        //     errorDiv.id = `${field.id}-error`;
-        //     errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-        //     fragment.appendChild(errorDiv);
-
-        //     // Optionally mark all radio inputs as invalid
-        //     fragment.querySelectorAll(`input[name="${field.id}"]`).forEach(radio => {
-        //         radio.classList.add('is-invalid');
-        //     });
-        // }
         appendBackendError(field, fragment);
     }
     
@@ -135,35 +89,6 @@ function addField(field, addTo,formMeta) {
     else if (field.type === INPUT_TYPE.SELECT || field.element === INPUT_TYPE.SELECT) {
         const fragment = createFieldFragment(field, addTo);
         
-
-        // const formFloating = document.createElement(HTML_TAG.DIV);
-        // formFloating.classList.add(STYLE_CLASS.FORM_FLOATING);
-        // fragment.appendChild(formFloating);
-
-        // const select = document.createElement(HTML_TAG.SELECT);
-        // select.id = field.id;
-        // select.name = field.id;
-        // select.classList.add(STYLE_CLASS.FORM_SELECT);
-
-        // if (field.options && Array.isArray(field.options)) {
-        //     field.options.forEach(opt => {
-        //         const option = document.createElement(HTML_TAG.OPTION);
-        //         option.value = opt.value;
-        //         option.textContent = opt.label;
-        //         if (field.value && field.value === opt.value) {
-        //             option.selected = true;
-        //         }
-        //         select.appendChild(option);
-        //     });
-        // }
-        // formFloating.appendChild(select);
-
-        // const label = document.createElement(HTML_TAG.LABEL);
-        // label.setAttribute(ATTR_CONS.FOR, field.id);
-        // label.textContent = field.label;
-        // formFloating.appendChild(label);
-
-
         // ✅ Label (same as radio & checkbox)
         if (field.label) {
             fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
@@ -192,70 +117,6 @@ function addField(field, addTo,formMeta) {
     
     else if (field.type === INPUT_TYPE.CHECKBOX) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
-
-        // if (field.options && Array.isArray(field.options)) {
-        //     // ✅ Multiple checkboxes
-        //     if (field.label) {
-        //         const groupLabel = document.createElement(HTML_TAG.LABEL);
-        //         groupLabel.textContent = field.label;
-        //         groupLabel.classList.add(STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD);
-        //         fragment.appendChild(groupLabel);
-        //     }
-
-        //     field.options.forEach(opt => {
-        //         const div = document.createElement(HTML_TAG.DIV);
-        //         div.classList.add(STYLE_CLASS.FORM_CHECK);
-
-        //         const input = document.createElement(HTML_TAG.INPUT);
-        //         input.type = INPUT_TYPE.CHECKBOX;
-        //         input.id = field.id + "-" + opt.value;
-        //         input.name = field.id + "[]";
-        //         input.value = opt.value;
-        //         input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-        //         if (field.value && Array.isArray(field.value) && field.value.includes(opt.value)) {
-        //             input.checked = true;
-        //         }
-
-
-        //         // Apply Frontend validation to each checkbox input
-        //         // applyFieldValidation(field, input);
-
-        //         const label = document.createElement(HTML_TAG.LABEL);
-        //         label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-        //         label.setAttribute(ATTR_CONS.FOR, input.id);
-        //         label.textContent = opt.text; // ✅ use text instead of label
-
-        //         div.append(input,label);
-        //         // div.appendChild(label);
-        //         fragment.appendChild(div);
-        //     });
-        // } else {
-        //     // ✅ Single checkbox
-        //     const div = document.createElement(HTML_TAG.DIV);
-        //     div.classList.add(STYLE_CLASS.FORM_CHECK);
-
-        //     const input = document.createElement(HTML_TAG.INPUT);
-        //     input.type = INPUT_TYPE.CHECKBOX;
-        //     input.id = field.id;
-        //     input.name = field.id;
-        //     input.value = 1;
-        //     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
-        //     if (field.value && (field.value === true || field.value === 1 || field.value === "1")) {
-        //         input.checked = true;
-        //     }
-
-        //     // Apply Frontend validation to each checkbox input
-        //     // applyFieldValidation(field, input);
-
-        //     const label = document.createElement(HTML_TAG.LABEL);
-        //     label.classList.add(STYLE_CLASS.FORM_CHECK_LABEL);
-        //     label.setAttribute(ATTR_CONS.FOR, input.id);
-        //     label.textContent = field.label;
-
-        //     div.append(input,label);
-        //     // div.appendChild(label);
-        //     fragment.appendChild(div);
-        // }
 
         // ✅ Add helper text below checkbox or group
         
@@ -353,109 +214,6 @@ function addField(field, addTo,formMeta) {
         appendFieldInfoAndFeedback(field, formContainer);
     }
 
-
-
-    // else if (field.type === INPUT_TYPE.TEXT && field.options && Array.isArray(field.options)) {
-    //     const fragment = createFieldFragment(field, addTo);
-    //     fragment.style.position = "relative";
-        
-
-    //     // Input
-    //     const input = document.createElement(HTML_TAG.INPUT);
-    //     input.type = INPUT_TYPE.TEXT;
-    //     input.name = field.id;
-    //     input.value = field.value || "";
-    //     input.placeholder = field.placeholder || field.label;
-    //     input.classList.add(STYLE_CLASS.FORM_CONTROL);
-    //     fragment.appendChild(input);
-
-    //     //Frontend Validation
-    //     // applyFieldValidation(field, input);
-
-
-
-    //     // ✅ Laravel backend validation error
-    //     if (window.formErrors && window.formErrors[field.id]) {
-    //         input.classList.add('is-invalid');
-    //         const errorDiv = document.createElement("div");
-    //         errorDiv.classList.add("invalid-feedback");
-    //         errorDiv.id = `${field.id}-error`;
-    //         errorDiv.textContent = window.formErrors[field.id][0]; // first error message
-    //         fragment.appendChild(errorDiv);
-    //     }
-    //     createHelperText(field,fragment);
-
-    //     // Dropdown menu
-    //     const menu = document.createElement("div");
-    //     menu.style.display = "block";
-    //     menu.style.position = "absolute";
-    //     menu.style.top = "100%";
-    //     menu.style.left = "0";
-    //     menu.style.width = "100%";
-    //     menu.style.maxHeight = "0";
-    //     menu.style.overflow = "hidden";
-    //     menu.style.opacity = "0";
-    //     menu.style.transition = "all 0.2s ease"; // ✅ smooth transition
-    //     menu.style.background = "#fff";
-    //     menu.style.border = "1px solid #ccc";
-    //     menu.style.zIndex = "1000";
-    //     fragment.appendChild(menu);
-
-    //     // Populate
-    //     field.options.forEach(opt => {
-    //         const item = document.createElement("div");
-    //         item.textContent = opt.label;
-    //         item.style.padding = "6px 10px";
-    //         item.style.cursor = "pointer";
-    //         item.addEventListener("mouseover", () => item.style.background = "#f0f0f0");
-    //         item.addEventListener("mouseout", () => item.style.background = "#fff");
-    //         item.addEventListener("click", () => {
-    //             input.value = opt.label;
-    //             input.dataset.value = opt.value;
-    //             closeMenu();
-    //             input.reportValidity();
-    //         });
-    //         menu.appendChild(item);
-    //     });
-
-    //     // Open/close functions
-    //     function openMenu() {
-    //         menu.style.maxHeight = "500px"; // expands smoothly
-    //         menu.style.opacity = "1";
-    //     }
-
-    //     function closeMenu() {
-    //         menu.style.maxHeight = "0";
-    //         menu.style.opacity = "0";
-    //     }
-
-    //     // Toggle on input click
-    //     input.addEventListener("click", () => {
-    //         if (menu.style.maxHeight === "0px" || menu.style.opacity === "0") {
-    //             openMenu();
-    //         } else {
-    //             closeMenu();
-    //         }
-    //     });
-
-    //     // Filter items
-    //     input.addEventListener("input", () => {
-    //         const filter = input.value.toLowerCase();
-    //         Array.from(menu.children).forEach(item => {
-    //             item.style.display = item.textContent.toLowerCase().includes(filter) ? "block" : "none";
-    //         });
-    //         openMenu();
-    //     });
-
-    //     // Close when clicking outside
-    //     document.addEventListener("click", (e) => {
-    //         if (!fragment.contains(e.target)) {
-    //             closeMenu();
-    //         }
-    //     });
-    // }
-    
-
     // For all other input types (text, email, password, number, date, file, etc.)
     else if (field.type && field.label) {
         const fragment = createFieldFragment(field, addTo);
@@ -491,65 +249,7 @@ function addField(field, addTo,formMeta) {
         appendFieldInfoAndFeedback(field, formContainer);
     }
 
-
-
-
 }
-
-// function addField(field, addTo) {
-//     if (field.type && !field.label) {
-//         const input = document.createElement("input");
-//         input.type = field.type;
-//         if (field.type === 'file' && field?.accept) {
-//             input.accept = field?.accept;
-//         }
-//         input.id = field.id;
-//         input.name = field.id;
-//         input.value = field.value || "";
-//         input.classList.add("form-control");
-//         input.setAttribute("placeholder", field.label);
-//         addTo.appendChild(input);
-//     } else if (field.type && field.label) {
-//         const fragment = document.createElement("div");
-//         fragment.id = addTo.id + "-field";
-//         // fragment.classList.add();
-//         // fragment.classList.add(...[]);
-//         // fragment.classList.add('col-md-6');
-//         addFieldSize(field, fragment);
-//         addTo.appendChild(fragment);
-
-//         const formFloating = document.createElement("div");
-//         formFloating.id = field.id + "-container";
-//         formFloating.classList.add(...["form-floating"]);
-//         fragment.appendChild(formFloating);
-
-//         const input = document.createElement("input");
-//         input.type = field.type;
-//         if (field.type === 'file' && field?.accept) {
-//             input.accept = field?.accept;
-//         }
-//         input.id = field.id;
-//         input.name = field.id;
-//         input.value = field.value || "";
-//         input.classList.add("form-control");
-//         input.setAttribute("placeholder", field.label);
-//         formFloating.appendChild(input);
-
-//         const label = document.createElement("label");
-//         label.id = field.id + "-label";
-//         label.setAttribute("for", field.id);
-//         label.textContent = field.label;
-//         formFloating.appendChild(label);
-
-//         if (field.info) {
-//             addFieldHelpInfo(field, formFloating);
-//         }
-
-//         if (field.feedback) {
-//             addFieldFeedback(field.feedback, formFloating);
-//         }
-//     }
-// }
 
 
 function addFieldSize(field, elementToSize) {
@@ -804,6 +504,56 @@ function appendBackendError(field, container, input = null) {
         container.appendChild(errorDiv);
     }
 }
+
+/**
+ * Fetch entity data from Laravel API with Sanctum token
+ */
+async function getfetchEntityData(entity,entityUId) {
+    try {
+        const token = getSanctumToken();
+        console.log('Using token for API call11111111111111:', token ? token : 'No token');
+        const res = await fetch(`/api/entity/${entity}/${entityUId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+        });
+        
+        if (res.status === 401) {
+            handleUnauthorized();
+            return { success: false, error: 'Authentication required' };
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        return await res.json();
+    } catch (err) {
+        console.error("🔥 Entity data fetch failed:", err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 
+ * Render fetched entity data into form fields 
+ */
+async function renderEntityDataToForm(formSelector, entityResponse) {
+    const form = document.querySelector(formSelector);
+    const entityData = entityResponse?.[0];
+
+    if (!form || !entityData) return;
+
+    for (const [key, value] of Object.entries(entityData)) {
+        const field = form.querySelector(`#${key}`);
+        if (field) field.value = value ?? "";
+    }
+}
+
+
+
+
+
 
 
 
