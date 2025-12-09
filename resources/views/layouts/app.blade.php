@@ -59,8 +59,8 @@
                     @endauth --}}
                 </div>
             </div>
-            {{-- @include('layouts.common.modal')
-            @include('layouts.common.footer') --}}
+            @include('userinterface::layouts.common.modal')
+            {{-- @include('layouts.common.footer') --}}
         </div>
         <!-- <div class="ui-minibar">
             <a class="btn toggle-btn">
