@@ -35,6 +35,11 @@ class UserInterfaceSeeder extends BaseSeeder
                 "icon" => "fas fa-list-ul",
                 "label" => "All Masterdatas",
                 "route" => "master-data.index",
+            ],
+            [
+                "icon" => "fas fa-building-columns",
+                "label" => "All Organisations",
+                "route" => "organisations.index",
             ]
         ]
     ];
@@ -43,7 +48,11 @@ class UserInterfaceSeeder extends BaseSeeder
         'view-master_data',
         'create-master_data',
         'edit-master_data',
-        'delete-master_data'
+        'delete-master_data',
+        'view-organisations',
+        'create-organisations',
+        'edit-organisations',
+        'delete-organisations'
     ];
     
     /**
