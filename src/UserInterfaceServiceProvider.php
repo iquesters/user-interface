@@ -16,6 +16,8 @@ use Iquesters\Foundation\Models\Module;
 use Iquesters\UserManagement\UserManagementServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
+use Iquesters\UserManagement\Models\UserMeta;
+use Illuminate\Support\Facades\Log;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
@@ -263,20 +265,89 @@ class UserInterfaceServiceProvider extends ServiceProvider
         return route('userinterface.asset', ['path' => ltrim($customLogo, '/')]);
     }
 
+
+    /**
+     * Get version string for cache-busting
+     */
+    public static function getAssetVersion(string $file): string
+    {
+        $path = base_path('packages/Iquesters/UserInterface/public/' . $file);
+
+        if (file_exists($path)) {
+            return (string) filemtime($path);
+        }
+
+        // fallback version if file not found
+        return (string) time();
+    }
+
+
     /**
      * Get the CSS URL for the package
      */
-    public static function getCssUrl(string $file = 'css/app.css'): string
+    public static function getCssUrl(string $file = 'css/app.css',bool $defaultcache = true): string
     {
         return route('userinterface.asset', ['path' => $file]);
+        // $params = ['path' => $file];
+
+        // if ($defaultcache) {
+        //     $params['v'] = self::getAssetVersion($file);
+        // }
+
+        // return route('userinterface.asset', $params);
     }
     
     /**
      * Get the JS URL for the package
      */
-    public static function getJsUrl(string $file = 'js/app.js'): string
+    public static function getJsUrl(string $file = 'js/app.js',bool $defaultcache = true): string
     {
         return route('userinterface.asset', ['path' => $file]);
+        // $params = ['path' => $file];
+
+        // if ($defaultcache) {
+        //     $params['v'] = self::getAssetVersion($file);
+        // }
+
+        // return route('userinterface.asset', $params);
+    }
+
+
+    /**
+     * Get the current theme from MasterData
+     */
+    public static function getCurrentTheme(): ?string
+    {
+        try {
+            $user = Auth::user();
+
+            $userTheme = null;
+            // Check user-specific theme
+            if ($user) {
+                $userTheme = UserMeta::where('ref_parent', $user->id)
+                    ->where('meta_key', 'theme')
+                    ->where('status', 'active')
+                    ->first(); 
+
+                if (!empty($userTheme)) {
+                    return $userTheme->meta_value;
+                }
+            }
+
+            // Check MasterData global theme
+            $themeData = \Iquesters\Foundation\Models\MasterData::where([
+                ['key', '=', 'current_theme'],
+                ['status', '=', \Iquesters\Foundation\Constants\EntityStatus::ACTIVE],
+            ])->first();
+
+            if (!empty($themeData)) {
+                return $themeData->value;
+            }
+            return $userTheme;
+        } catch (\Exception $e) {
+            Log::error('Failed to get user theme', ['error' => $e->getMessage()]);
+            return 'default';
+        }
     }
 
 }

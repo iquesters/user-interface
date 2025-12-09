@@ -13,11 +13,17 @@
 <!-- JSON Editor -->
 <link href="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.css" rel="stylesheet">
 
-<link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/bootstrap.min.css') }}" rel="stylesheet">
+{{-- Theme Render Logic --}}
+@php
+    $theme = Iquesters\UserInterface\UserInterfaceServiceProvider::getCurrentTheme() ?? 'default';
+@endphp
+{{-- Load user-specific theme --}}
+<link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/theme/' . $theme . '/bootstrap.min.css') }}" rel="stylesheet">
+{{-- <link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/theme/' . $theme . '/bootstrap.min.css?v=' . filemtime(public_path('css/theme/' . $theme . '/bootstrap.min.css'))) }}" rel="stylesheet"> --}}
+
 <link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/bootstrap-override.css') }}" rel="stylesheet">
 
 <!-- app.css -->
-<link rel="stylesheet" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl() }}">
 <link rel="stylesheet" type="text/css" media="screen" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl() }}">
 <link rel="stylesheet" type="text/css" media="screen and (min-width:  576px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-sm.css') }}">
 <link rel="stylesheet" type="text/css" media="screen and (min-width:  768px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-md.css') }}">

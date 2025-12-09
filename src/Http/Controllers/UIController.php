@@ -4,6 +4,7 @@ namespace Iquesters\UserInterface\Http\Controllers;
 
 use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
+use Iquesters\Foundation\Models\MasterData;
 
 class UIController extends Controller
 {
@@ -55,6 +56,23 @@ class UIController extends Controller
     {
         
         return view('userinterface::form-schemas.list', compact('forms'));
+    }
+
+
+    public function setTheme()
+    {
+        try {
+            $themes = MasterData::where('parent_id', 4)
+            ->where('status', 'active')
+            ->get(['id', 'key', 'value']);
+
+            // Fetch current active theme masterdata (assuming key='theme' or parent_id=4)
+            $themeMasterData = MasterData::where('key', 'current_theme')->first();
+           
+            return view('userinterface::ui.theme-selector',compact('themes','themeMasterData'));
+        } catch (\Throwable $th) {
+            throw $th;
+        }
     }
 
 
