@@ -3,7 +3,9 @@
     border-color: #6c757d;
     color: #ffffff;
 }
-
+.bg-gray-100 {
+    background-color: var(--bs-gray-100) !important;
+}
 .bg-primary-subtle {
     background-color:var(--bs-primary-bg-subtle) !important
 }
@@ -21,4 +23,31 @@
 }
 .bg-danger-subtle {
     background-color:var(--bs-danger-bg-subtle) !important
+}
+
+.badge-draft,
+.badge-unknown,
+.badge-inactive {
+    background-color: var(--bs-dark-bg-subtle);
+    border: 1px solid var(--bs-secondary);
+    color: var(--bs-gray-600);
+}
+
+.badge-active,
+.badge-approved {
+    background-color: var(--bs-success-bg-subtle);
+    border: 1px solid var(--bs-success);
+    color: var(--bs-success);
+}
+
+.badge-deleted {
+    background-color: var(--bs-light);
+    border: 1px solid var(--bs-danger);
+    color: var(--bs-danger);
+}
+
+.badge-cancel {
+    background-color: var(--bs-danger-bg-subtle);
+    border: 1px solid var(--bs-danger);
+    color: var(--bs-danger);
 }

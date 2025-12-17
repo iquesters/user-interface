@@ -9,7 +9,7 @@
         <div class="w-100 d-flex align-items-center justify-content-center px-4" style="min-height: 100vh;">
             <div class="row justify-content-md-center w-100">
                 {{-- <div class="col-md-7 col-lg-4 d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4"> --}}
-                <div class="col-md-7 d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4">
+                <div class="col-md-4 d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4">
                     
                     <!-- Logo (now responsive) -->
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" 
