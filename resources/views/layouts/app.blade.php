@@ -45,7 +45,7 @@
                     @include('userinterface::layouts.common.alert')
                     {{-- @auth --}}
                     <div class="row row-cols-1 p-2 g-2">
-                        <div class="col col-md-9">
+                        <div class="col col-md-12">
                             {{-- @stack('content') --}}
                             @yield('content')
                         </div>
