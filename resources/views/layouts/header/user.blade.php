@@ -2,10 +2,15 @@
     use Carbon\Carbon;
     
     $user = Auth::user();
-    $userAvatar = $user->getMeta('logo')
-        ? route('profile-image')
-        : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
+    // $userAvatar = $user->getMeta('logo')
+    //     ? route('profile-image')
+    //     : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
 
+    $profilePath  = $user->getMeta('profile_picture_path');
+    $profileFile  = $user->getMeta('profile_picture');
+    $userAvatar = $profileFile
+        ? $profilePath . $profileFile
+        : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
 
     $lastLoginRaw = $user->getMeta('last_login_at');
 
@@ -21,6 +26,19 @@
     } else {
         $lastLoginFormatted = 'Unknown';
     }
+
+
+    $options = (object)array(
+        'img' => (object)array(
+            'id' => 'image',
+            'src' => $userAvatar,
+            'alt' => 'Image',
+            'width' => '40px',
+            'class' => 'rounded',
+            'container_class' => '',
+            'aspect_ratio' => ''
+        ),
+    );
 @endphp
 
 <div class="d-flex gap-2 align-items-center">
@@ -28,6 +46,7 @@
         <li class="nav-item navbar-dropdown dropdown-user dropdown ms-2">
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">
                 <div class="avatar avatar-online">
+                    {{-- @include('usermanagement::utils.image', ['options' => $options]) --}}
                     <img src="{{ $userAvatar }}" 
                          alt="User Avatar" 
                          class="avatar h-auto rounded-circle" 
@@ -42,6 +61,7 @@
                     <div class="d-flex align-items-center">
                         <!-- Profile Image Column -->
                         <div class="me-3 position-relative">
+                            {{-- @include('usermanagement::utils.image', ['options' => $options]) --}}
                             <img src="{{ $userAvatar }}" 
                                  alt="User Avatar" 
                                  class="rounded-circle" 
@@ -73,11 +93,21 @@
 
                 <li><div class="dropdown-divider my-2"></div></li>
 
+                @if(Route::has('myprofile'))
                 <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
+                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('myprofile') }}">
                         <i class="fa-solid fa-fw fa-user-circle me-2"></i> My Profile
                     </a>
                 </li>
+                @endif
+
+                @if(Route::has('settings'))
+                <li>
+                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
+                        <i class="fa fa-cog me-2"></i> Settings
+                    </a>
+                </li>
+                @endif
                 <li>
                     <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
                         <i class="fa fa-cog me-2"></i> Settings
