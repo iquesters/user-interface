@@ -41,7 +41,7 @@
     );
 @endphp
 
-<div class="d-flex gap-2 align-items-center">
+<div class="d-flex gap-2 align-items-center" style="padding-right: 5px">
     <ul class="navbar-nav flex-row align-items-center ms-auto">
         <li class="nav-item navbar-dropdown dropdown-user dropdown ms-2">
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">
@@ -108,11 +108,6 @@
                     </a>
                 </li>
                 @endif
-                <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
-                        <i class="fa fa-cog me-2"></i> Settings
-                    </a>
-                </li>
                 <li>
                     <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
                         <i class="fas fa-fw fa-question-circle me-2"></i> Help

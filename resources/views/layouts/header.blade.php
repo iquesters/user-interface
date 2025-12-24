@@ -26,7 +26,7 @@
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" alt="Logo" class="brand-logo-sm" style="height: 25px;">
                 </a>            
                 @if(config('app.debug'))
-                    <div class="text-bg-danger ms-2 fw-bold px-2 py-1 rounded">{{ \Illuminate\Support\Str::upper(config('app.env')) }}</div>
+                    <div class="badge badge-deleted">{{ \Illuminate\Support\Str::upper(config('app.env')) }}</div>
                 @endif
             </div>
 
