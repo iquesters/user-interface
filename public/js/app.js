@@ -104,3 +104,13 @@ function initializeTooltips() {
 }
 
 document.addEventListener('DOMContentLoaded', initializeTooltips);
+
+document.addEventListener('DOMContentLoaded', function () {
+    const adminBar = document.getElementById('super-admin-navbar');
+    const header = document.querySelector('header.sticky-top');
+
+    if (adminBar && header) {
+        const height = adminBar.offsetHeight;
+        header.style.top = height + 'px';
+    }
+});

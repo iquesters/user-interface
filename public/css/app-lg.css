@@ -29,16 +29,11 @@
         width: 80px;
         flex-shrink: 0;
         padding: 0.5rem;
-        color: inherit;
         transition: all 0.2s;
     }
 
     .module-tab-desktop {
         border-right: 1px solid white;
-    }
-
-    .module-tab-vertical {
-        border-bottom: 1px solid white;
     }
 
     .module-tab-desktop .module-tab-icon-wrapper,

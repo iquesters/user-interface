@@ -1,21 +1,17 @@
 .sidebar {
   width: 250px;
-  height: calc(100vh - 83px);
+  height: calc(100vh - 56px);
   position: fixed;
-  top: 83px;
   z-index: 1000;
-  background-color: #f8f9fa;
-  border-right: 1px solid #dee2e6;
-  overflow-y: auto;
   transition: all 0.3s ease;
+  overflow-y: scroll;
+}
+.ui-workarea {
+  padding-top: 0.1px;
 }
 
-.sidebar.has-minibar {
-  left: 70px;
-}
-
-.sidebar.no-minibar {
-  left: 0;
+.list-group-item {
+  border: none !important;
 }
 
 /* Mobile behavior - sidebar off by default */
@@ -28,7 +24,7 @@
 
   .sidebar.active {
     transform: translateX(0); /* Show over content when active */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    /* box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); */
   }
 
   .main-content {
@@ -44,13 +40,8 @@
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
 }
 
-.dropdown-item:hover {
-  background-color: #cbced4 !important;
-  transition: background-color 0.2s ease-in-out;
-}
-
 .active-module {
-  background-color: aqua;
+  background-color: var(--bs-light);
 }
 /* 
 .main-content {
@@ -69,7 +60,7 @@
 
 .mobile-nav-tab:active,
 .mobile-nav-tab:hover {
-  background-color: rgba(102, 126, 234, 0.1);
+  /* background-color: rgba(102, 126, 234, 0.1); */
   border-radius: 12px;
 }
 
@@ -78,7 +69,7 @@
 }
 
 .ui-main {
-  background-color: #fafbfe;
+  /* background-color: #fafbfe; */
   height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
@@ -134,9 +125,8 @@
   min-width: 0;
   height: 100%;
   justify-content: center;
-  color: #212529;
   transition: all 0.2s;
-  border-right: 1px solid #e6e3e3;
+  /* border-right: 1px solid #e6e3e3; */
 }
 
 .module-tab-mobile .module-tab-icon-wrapper {
@@ -197,4 +187,25 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+}
+
+/* Custom Scrollbar Styling */
+*::-webkit-scrollbar {
+    height: 5px;
+    width: 5px;
+}
+
+/* Track */
+*::-webkit-scrollbar-track {
+    background: rgba(var(--bs-light-rgb), 0.67);
+}
+
+/* Handle */
+*::-webkit-scrollbar-thumb {
+    background: rgba(var(--bs-dark-rgb), 0.67);
+}
+
+/* Handle on hover */
+*::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--bs-secondary-rgb), 0.8);
 }
