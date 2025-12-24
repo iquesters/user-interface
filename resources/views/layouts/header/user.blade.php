@@ -1,4 +1,6 @@
 @php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
     use Carbon\Carbon;
     
     $user = Auth::user();
@@ -41,7 +43,8 @@
     );
 @endphp
 
-<div class="d-flex gap-2 align-items-center" style="padding-right: 5px">
+<div class="d-flex gap-2 align-items-center"
+     style="{{ ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar' ? 'padding-right: 5px;' : '' }}">
     <ul class="navbar-nav flex-row align-items-center ms-auto">
         <li class="nav-item navbar-dropdown dropdown-user dropdown ms-2">
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">

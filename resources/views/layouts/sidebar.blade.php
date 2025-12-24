@@ -6,7 +6,7 @@
 <aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
     <div class="sidebar-body">
         <div class="list-group list-group-flush" id="sidebarMenu">
-            <div class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center">
+            <div class="list-group-item dropdown-item ps-3 pe-2 py-1 d-flex justify-content-between align-items-center">
                 Loading menu...
             </div>
         </div>
@@ -41,13 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.innerHTML = '';
 
         if (!menu || menu.length === 0) {
-            sidebar.innerHTML = `<div class="text-muted px-2 py-1">No menu available for ${name}</div>`;
+            sidebar.innerHTML = `<div class="text-muted ps-3 pe-2 py-1">No menu available for ${name}</div>`;
             return;
         }
 
         menu.forEach(item => {
             const link = document.createElement('a');
-            link.className = 'list-group-item dropdown-item px-2 py-1 d-flex align-items-center';
+            link.className = 'list-group-item dropdown-item ps-3 pe-2 py-1 d-flex align-items-center';
             link.href = item.url || '#';
             link.innerHTML = `<i class="${item.icon} me-2"></i><span>${item.label}</span>`;
             sidebar.appendChild(link);
