@@ -74,10 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
        INITIAL LOAD
     ================================= */
     const mode = getCurrentViewMode();
-    const tabs = getTabs(mode);
-    const dropdownItems = getDropdownItems(mode);
+    let tabs = getTabs(mode);
+    let dropdownItems = getDropdownItems(mode);
 
-    if (!tabs.length) return;
+    // fallback for header/minibar if no tabs in current mode
+    if (!tabs.length) {
+        tabs = getTabs('desktop'); // try desktop tabs
+    }
+    if (!dropdownItems.length) {
+        dropdownItems = getDropdownItems('desktop');
+    }
+
+    if (!tabs.length) return; // still none? exit
 
     let savedIndex = localStorage.getItem('activeModuleIndex');
     let activeElement = tabs[0];

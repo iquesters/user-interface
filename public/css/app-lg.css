@@ -32,10 +32,6 @@
         transition: all 0.2s;
     }
 
-    .module-tab-desktop {
-        border-right: 1px solid white;
-    }
-
     .module-tab-desktop .module-tab-icon-wrapper,
     .module-tab-vertical .module-tab-icon-wrapper {
         display: contents;

@@ -60,14 +60,14 @@
     // View mode configurations
     $viewConfigs = [
         'desktop' => [
-            'container' => 'd-none d-lg-flex border-start border-white ',
+            'container' => 'd-none d-lg-flex ',
             'inner' => 'd-flex flex-grow-1',
             'innerStyle' => '',
             'placement' => 'bottom',
             'dropdownIcon' => 'fa-caret-down',
         ],
         'vertical' => [
-            'container' => 'd-none d-lg-flex flex-column align-items-center border-start border-white',
+            'container' => 'd-none d-lg-flex flex-column align-items-center',
             'inner' => 'd-flex flex-grow-1 flex-column align-items-center overflow-hidden',
             'innerStyle' => '',
             'placement' => 'bottom',

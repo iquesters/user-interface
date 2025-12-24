@@ -4,7 +4,7 @@
 @endphp
 
 <div class="d-none d-lg-flex">
-    <div class="minibar bg-primary-subtle">
+    <div class="minibar bg-primary-subtle overflow-y-auto">
         <div class="minibar-nav">
             <ul class="minibar-header">
                 <li class="h-100 w-100 d-flex justify-content-center align-items-center">
