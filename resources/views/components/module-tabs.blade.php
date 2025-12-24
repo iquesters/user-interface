@@ -1,13 +1,16 @@
 @php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+    
     // Configuration
     $viewMode = $viewMode ?? 'desktop';
     $maxVisible = $viewMode === 'mobile' 
-        ? config('userinterface.mobile_bottom_tabs')
-        : config('userinterface.module_tabs');
+        ? ConfProvider::from(Module::USER_INFE)->mobile_bottom_tabs
+        : ConfProvider::from(Module::USER_INFE)->module_tabs;
     
     // Mobile featured tab configuration
-    $featuredTabName = config('userinterface.mobile_featured_tab');
-    $featuredPosition = config('userinterface.mobile_featured_position', 'center');
+    $featuredTabName = ConfProvider::from(Module::USER_INFE)->mobile_featured_tab;
+    $featuredPosition = ConfProvider::from(Module::USER_INFE)->mobile_featured_position ?? 'center';
     
     // Process modules
     $visibleModules = $installedModules->take($maxVisible);
@@ -57,9 +60,8 @@
     // View mode configurations
     $viewConfigs = [
         'desktop' => [
-            'container' => 'd-none d-lg-flex border-start border-white',
+            'container' => 'd-none d-lg-flex border-start border-white ',
             'inner' => 'd-flex flex-grow-1',
-            'containerStyle' => 'background-color: #e6e3e3;',
             'innerStyle' => '',
             'placement' => 'bottom',
             'dropdownIcon' => 'fa-caret-down',
@@ -67,13 +69,12 @@
         'vertical' => [
             'container' => 'd-none d-lg-flex flex-column align-items-center border-start border-white',
             'inner' => 'd-flex flex-grow-1 flex-column align-items-center overflow-hidden',
-            'containerStyle' => 'background-color: #e6e3e3;',
             'innerStyle' => '',
             'placement' => 'bottom',
             'dropdownIcon' => 'fa-caret-right',
         ],
         'mobile' => [
-            'container' => 'd-flex d-lg-none align-items-center border-top bg-white shadow-sm vw-100',
+            'container' => 'align-items-center border-top shadow-sm vw-100 bg-primary-subtle text-primary',
             'inner' => 'd-flex w-100 h-100 align-items-center ' . ($visibleModules->count() < $maxVisible ? 'justify-content-center' : 'justify-content-around'),
             'containerStyle' => 'height: 70px; position: fixed; bottom: 0; z-index: 1050;',
             'innerStyle' => 'padding: 0 8px;',
@@ -85,8 +86,11 @@
     $config = $viewConfigs[$viewMode];
 @endphp
 
+@if ($viewMode === 'mobile')
+<div class="d-flex d-lg-none" style="{{ $config['containerStyle'] }}">
+@endif
+
 <div class="{{ $config['container'] }}" 
-     style="{{ $config['containerStyle'] }}"
      data-view-mode="{{ $viewMode }}">
     
     <div class="{{ $config['inner'] }}" 
@@ -100,7 +104,8 @@
             @endphp
 
             <a href="{{ $menu[0]['url'] ?? '#' }}" 
-               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} d-flex flex-column align-items-center text-center text-decoration-none"
+               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} d-flex flex-column align-items-center text-center text-decoration-none text-primary"
+               data-view-mode="{{ $viewMode }}"
                data-menu='@json($menu)'
                data-name="{{ ucfirst($module->name) }}"
                data-index="{{ $index }}"
@@ -137,6 +142,7 @@
                         @php $menu = $generateMenu($module); @endphp
                         <li>
                             <a class="dropdown-item d-flex align-items-center text-truncate"
+                               data-view-mode="{{ $viewMode }}"
                                href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($menu[0]['url'] ?? '#') }}"
                                data-menu='@json($menu)'
                                data-name="{{ ucfirst($module->name) }}"
@@ -153,6 +159,10 @@
         @endif
     </div>
 </div>
+
+@if ($viewMode === 'mobile')
+</div>
+@endif
 
 @push('scripts')
 <script>

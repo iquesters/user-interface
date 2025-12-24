@@ -1,18 +1,23 @@
-<header class="sticky-top bg-white shadow-sm" style="height: 56px;">        
+@php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+@endphp
+
+<header class="sticky-top bg-primary-subtle shadow-sm" style="height: 56px;">     
     <div class="d-flex justify-content-between pe-2 align-items-center h-100">
         <div class="d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center py-2" style="min-width: 250px">
 
                 <div class="d-lg-none d-flex align-items-center justify-content-center" style="width: 70px">
                     @include('userinterface::components.hamburger', [
-                        'classes' => 'text-muted'
+                        'classes' => ''
                     ])
                 </div>
 
-                @if(config('userinterface.nav_style') === 'header')
+                @if(ConfProvider::from(Module::USER_INFE)->nav_style === 'header')
                     <div class="d-lg-flex d-none align-items-center justify-content-center" style="width: 70px">
                         @include('userinterface::components.hamburger', [
-                            'classes' => 'text-muted'
+                            'classes' => ''
                         ])
                     </div>
                 @endif
@@ -26,7 +31,7 @@
             </div>
 
             <!-- Display header nav bar based of configuration -->
-            @if(config('userinterface.nav_style') === 'header')
+            @if(ConfProvider::from(Module::USER_INFE)->nav_style === 'header')
                 <div class="d-none d-lg-flex h-100">
                     <!-- Module Tabs -->
                     @include('userinterface::components.module-tabs', [

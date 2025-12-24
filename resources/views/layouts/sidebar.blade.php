@@ -1,7 +1,14 @@
-<aside class="sidebar bg-light text-dark p-1 {{ config('userinterface.nav_style') === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
+@php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+@endphp
+
+<aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
     <div class="sidebar-body">
         <div class="list-group list-group-flush" id="sidebarMenu">
-            <div class="text-muted px-2 py-1">Loading menu...</div>
+            <div class="list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center">
+                Loading menu...
+            </div>
         </div>
     </div>
 </aside>
@@ -9,13 +16,30 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const sidebar = document.getElementById('sidebarMenu');
-    const tabs = document.querySelectorAll('.module-tab');
-    const dropdownItems = document.querySelectorAll('.dropdown-item[data-menu]');
 
-    // Render sidebar
+    const sidebar = document.getElementById('sidebarMenu');
+
+    /* ================================
+       VIEW MODE HELPERS
+    ================================= */
+    function getCurrentViewMode() {
+        return window.innerWidth < 992 ? 'mobile' : 'vertical';
+    }
+
+    function getTabs(mode) {
+        return document.querySelectorAll(`.module-tab[data-view-mode="${mode}"]`);
+    }
+
+    function getDropdownItems(mode) {
+        return document.querySelectorAll(`.dropdown-item[data-menu][data-view-mode="${mode}"]`);
+    }
+
+    /* ================================
+       SIDEBAR RENDER
+    ================================= */
     function renderSidebar(menu, name) {
         sidebar.innerHTML = '';
+
         if (!menu || menu.length === 0) {
             sidebar.innerHTML = `<div class="text-muted px-2 py-1">No menu available for ${name}</div>`;
             return;
@@ -23,44 +47,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
         menu.forEach(item => {
             const link = document.createElement('a');
-            link.className = 'list-group-item dropdown-item px-2 py-1 d-flex justify-content-between align-items-center';
+            link.className = 'list-group-item dropdown-item px-2 py-1 d-flex align-items-center';
             link.href = item.url || '#';
-            link.innerHTML = `<span><i class="${item.icon} me-2"></i>${item.label}</span>`;
+            link.innerHTML = `<i class="${item.icon} me-2"></i><span>${item.label}</span>`;
             sidebar.appendChild(link);
         });
     }
 
-    // Set active tab
+    /* ================================
+       ACTIVE STATE HANDLER
+    ================================= */
     function setActive(element) {
-        // Remove active from all tabs
-        tabs.forEach(t => t.classList.remove('active-module'));
-        dropdownItems.forEach(d => d.classList.remove('active'));
-        
-        // Add active to current element
-        element.classList.add(element.classList.contains('module-tab') ? 'active-module' : 'active');
+        const mode = element.dataset.viewMode;
+
+        getTabs(mode).forEach(t => t.classList.remove('active-module'));
+        getDropdownItems(mode).forEach(d => d.classList.remove('active'));
+
+        element.classList.add(
+            element.classList.contains('module-tab') ? 'active-module' : 'active'
+        );
+
         localStorage.setItem('activeModuleIndex', element.dataset.index);
     }
 
-    // Load saved module or default first
+    /* ================================
+       INITIAL LOAD
+    ================================= */
+    const mode = getCurrentViewMode();
+    const tabs = getTabs(mode);
+    const dropdownItems = getDropdownItems(mode);
+
+    if (!tabs.length) return;
+
     let savedIndex = localStorage.getItem('activeModuleIndex');
-    let defaultElement = tabs[0];
+    let activeElement = tabs[0];
 
     if (savedIndex) {
-        // Check in tabs first
-        let element = Array.from(tabs).find(t => t.dataset.index === savedIndex);
-        
-        // If not found in tabs, check dropdown items
-        if (!element) {
-            element = Array.from(dropdownItems).find(d => d.dataset.index === savedIndex);
-        }
-        
-        if (element) defaultElement = element;
+        activeElement =
+            [...tabs].find(t => t.dataset.index === savedIndex) ||
+            [...dropdownItems].find(d => d.dataset.index === savedIndex) ||
+            activeElement;
     }
 
-    renderSidebar(JSON.parse(defaultElement.dataset.menu || '[]'), defaultElement.dataset.name);
-    setActive(defaultElement);
+    renderSidebar(JSON.parse(activeElement.dataset.menu || '[]'), activeElement.dataset.name);
+    setActive(activeElement);
 
-    // Attach click events to tabs
+    /* ================================
+       CLICK HANDLERS
+    ================================= */
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             renderSidebar(JSON.parse(tab.dataset.menu || '[]'), tab.dataset.name);
@@ -68,21 +102,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Attach click events to dropdown items
     dropdownItems.forEach(item => {
-        item.addEventListener('click', (e) => {
+        item.addEventListener('click', e => {
             e.preventDefault();
+
             renderSidebar(JSON.parse(item.dataset.menu || '[]'), item.dataset.name);
             setActive(item);
-            
-            // Close the dropdown after selection
-            const dropdownBtn = document.querySelector('[data-bs-toggle="dropdown"]');
-            if (dropdownBtn) {
-                const dropdown = bootstrap.Dropdown.getInstance(dropdownBtn);
-                if (dropdown) dropdown.hide();
-            }
+
+            // Close dropdown
+            const btn = item.closest('.dropdown')?.querySelector('[data-bs-toggle="dropdown"]');
+            if (btn) bootstrap.Dropdown.getInstance(btn)?.hide();
         });
     });
+
 });
 </script>
 @endpush

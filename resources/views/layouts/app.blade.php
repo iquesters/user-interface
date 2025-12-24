@@ -3,6 +3,11 @@
 
 @include('userinterface::layouts.common.head')
 
+@php
+    use Iquesters\Foundation\Support\ConfProvider;
+    use Iquesters\Foundation\Enums\Module;
+@endphp
+
 <body>
     {{-- <div class="d-flex">
         <div class="d-flex">
@@ -28,20 +33,18 @@
         {{-- @include('userinterface::layouts.common.mobile-navbar') --}}
 
         <!-- Display minibar nav bar based of configuration -->
-        @if(config('userinterface.nav_style') === 'minibar')
+        @if (ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar')
             @include('userinterface::layouts.common.minibar')
         @endif
-        {{-- @endif --}}
+
         <div class="ui-main">
             @include('userinterface::components.admin-bar')
             @include('userinterface::layouts.header')
             <div class="ui-workarea gap-1">
-                <div id="ui-sidebar" class="ui-sidebar animate-all rounded">
-                    <div class="ui-sidebar-content list-group h-100 w-100">
-                        @include('userinterface::layouts.sidebar')
-                    </div>
-                </div>
-                <div class="ui-content animate-all bg-white" id="mainContent">
+                {{-- <div id="ui-sidebar" class=" animate-all rounded"> --}}
+                    @include('userinterface::layouts.sidebar')
+                {{-- </div> --}}
+                <div class="ui-content animate-all" id="mainContent">
                     @include('userinterface::layouts.common.alert')
                     {{-- @auth --}}
                     <div class="row row-cols-1 p-2 g-2">

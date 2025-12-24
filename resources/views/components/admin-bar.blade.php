@@ -15,7 +15,7 @@
             $buttonText = "Switch to Admin Mode";
         @endphp
     @endif
-    <div class="bg-danger-subtle small p-1 d-flex justify-content-between align-items-center gap-3 position-sticky top-0 shadow-sm" style="z-index: 1050;">
+    <div id="super-admin-navbar" class="bg-danger-subtle small p-1 d-flex justify-content-between align-items-center gap-3 position-sticky top-0 shadow-sm" style="z-index: 1050;">
         <div class="small">
             [{{$modeDescription}}]
 
