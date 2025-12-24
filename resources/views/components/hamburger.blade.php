@@ -6,7 +6,7 @@
 ])
 
 <button 
-    {{ $attributes->merge(['class' => "sidebar-toggle btn btn-light text-primary rounded-circle d-flex align-items-center justify-content-center $classes"]) }}
+    {{ $attributes->merge(['class' => "sidebar-toggle btn text-primary rounded-circle d-flex align-items-center justify-content-center $classes"]) }}
     type="button"
     style="height: {{ $size }} !important; width: {{ $size }}; {{ $style }}"
 >

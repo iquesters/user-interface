@@ -1,28 +1,42 @@
 document.addEventListener('DOMContentLoaded', function () {
     const sidebar = document.getElementById('appSidebar');
     const mainContent = document.getElementById('mainContent');
-    const sidebarToggles = document.querySelectorAll('.sidebar-toggle');
     const body = document.body;
+
     const isMobile = () => window.innerWidth < 992;
 
-    // Ensure sidebar exists
-    if (!sidebar || !sidebarToggles.length) {
-        console.error('Sidebar or toggle buttons not found');
+    if (!sidebar) {
+        console.error('Sidebar not found');
         return;
     }
 
-    // Initialize sidebar state
+    /* ----------------------------
+       Update hamburger buttons
+    ---------------------------- */
+    function updateHamburgerState() {
+        const isOpen = isMobile()
+            ? sidebar.classList.contains('active')   // Mobile uses .active
+            : !sidebar.classList.contains('hidden'); // Desktop uses .hidden
+
+        document.querySelectorAll('.sidebar-toggle').forEach(btn => {
+            btn.classList.toggle('btn-light', isOpen);
+        });
+    }
+
+    /* ----------------------------
+       Initialize sidebar
+    ---------------------------- */
     function initializeSidebar() {
         sidebar.style.transition = 'none';
-        
+
+        const savedState = localStorage.getItem('sidebarState');
+
         if (isMobile()) {
-            // Always hidden by default on mobile
-            sidebar.classList.remove('hidden');
+            // Always closed on mobile
             sidebar.classList.remove('active');
             body.classList.remove('sidebar-active');
         } else {
-            // Desktop state saved in localStorage
-            const savedState = localStorage.getItem('sidebarState');
+            // Desktop state persisted
             if (savedState === 'closed') {
                 sidebar.classList.add('hidden');
                 mainContent?.classList.add('no-squeeze');
@@ -34,58 +48,79 @@ document.addEventListener('DOMContentLoaded', function () {
 
         setTimeout(() => {
             sidebar.style.transition = 'all 0.3s ease';
+            updateHamburgerState();
         }, 50);
     }
 
-    // Toggle sidebar visibility
+    /* ----------------------------
+       Toggle sidebar
+    ---------------------------- */
     function toggleSidebar() {
         if (isMobile()) {
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
-        } else {
-            sidebar.classList.toggle('hidden');
-            mainContent?.classList.toggle('no-squeeze');
-            localStorage.setItem(
-                'sidebarState',
-                sidebar.classList.contains('hidden') ? 'closed' : 'open'
-            );
+
+            updateHamburgerState();
+            return;
         }
+
+        // Desktop
+        sidebar.classList.toggle('hidden');
+        mainContent?.classList.toggle('no-squeeze');
+
+        const isOpen = !sidebar.classList.contains('hidden');
+        localStorage.setItem('sidebarState', isOpen ? 'open' : 'closed');
+
+        updateHamburgerState();
     }
 
-    // Initialize state
-    initializeSidebar();
+    /* ----------------------------
+       Event delegation for toggles
+    ---------------------------- */
+    document.addEventListener('click', function (e) {
+        const toggleBtn = e.target.closest('.sidebar-toggle');
+        if (!toggleBtn) return;
 
-    // Bind toggle events (for both buttons)
-    sidebarToggles.forEach(btn => {
-        btn.addEventListener('click', e => {
-            e.preventDefault();
-            toggleSidebar();
-        });
+        e.preventDefault();
+        toggleSidebar();
     });
 
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', e => {
+    /* ----------------------------
+       Close sidebar when clicking outside (mobile)
+    ---------------------------- */
+    document.addEventListener('click', function (e) {
         if (
             isMobile() &&
             sidebar.classList.contains('active') &&
             !sidebar.contains(e.target) &&
             !e.target.closest('.sidebar-toggle')
         ) {
-            toggleSidebar();
+            sidebar.classList.remove('active');
+            body.classList.remove('sidebar-active');
+            updateHamburgerState();
         }
     });
 
-    // Close sidebar when clicking a link (mobile only)
+    /* ----------------------------
+       Close sidebar when clicking links (mobile)
+    ---------------------------- */
     sidebar.querySelectorAll('.list-group-item').forEach(link => {
         link.addEventListener('click', () => {
             if (isMobile() && sidebar.classList.contains('active')) {
-                toggleSidebar();
+                sidebar.classList.remove('active');
+                body.classList.remove('sidebar-active');
+                updateHamburgerState();
             }
         });
     });
 
-    // Handle window resize
+    /* ----------------------------
+       Handle window resize
+    ---------------------------- */
     window.addEventListener('resize', initializeSidebar);
+
+    // Initialize on page load
+    initializeSidebar();
 });
 
 function initializeTooltips() {

@@ -208,3 +208,7 @@
 *::-webkit-scrollbar-thumb:hover {
     background: rgba(var(--bs-secondary-rgb), 0.8);
 }
+
+.sidebar-toggle:not(.btn-light):hover {
+    background-color: var(--bs-light);
+}
