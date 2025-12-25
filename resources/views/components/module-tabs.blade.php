@@ -4,9 +4,19 @@
     
     // Configuration
     $viewMode = $viewMode ?? 'desktop';
-    $maxVisible = $viewMode === 'mobile' 
-        ? ConfProvider::from(Module::USER_INFE)->mobile_bottom_tabs
-        : ConfProvider::from(Module::USER_INFE)->module_tabs;
+    $navStyle = ConfProvider::from(Module::USER_INFE)->nav_style ?? null;
+
+    if ($viewMode === 'mobile') {
+        $maxVisible = ConfProvider::from(Module::USER_INFE)->mobile_bottom_tabs;
+    } else {
+        // Desktop / Vertical
+        if ($navStyle === 'minibar') {
+            // Show ALL modules, no dropdown
+            $maxVisible = $installedModules->count();
+        } else {
+            $maxVisible = ConfProvider::from(Module::USER_INFE)->module_tabs;
+        }
+    }
     
     // Mobile featured tab configuration
     $featuredTabName = ConfProvider::from(Module::USER_INFE)->mobile_featured_tab;
