@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const link = document.createElement('a');
             link.className = 'list-group-item dropdown-item ps-3 pe-2 py-1 d-flex align-items-center';
             link.href = item.url || '#';
-            link.innerHTML = `<i class="${item.icon} me-2"></i><span>${item.label}</span>`;
+            link.innerHTML = `<i class="fa-fw ${item.icon} me-2"></i><span>${item.label}</span>`;
             sidebar.appendChild(link);
         });
     }

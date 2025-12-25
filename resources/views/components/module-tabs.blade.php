@@ -104,7 +104,7 @@
             @endphp
 
             <a href="{{ $menu[0]['url'] ?? '#' }}" 
-               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} d-flex flex-column align-items-center text-center text-decoration-none text-primary"
+               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} d-flex flex-column align-items-center justify-content-center text-decoration-none text-primary"
                data-view-mode="{{ $viewMode }}"
                data-menu='@json($menu)'
                data-name="{{ ucfirst($module->name) }}"
@@ -114,7 +114,7 @@
                title="{{ ucfirst($module->name) }}">
                 
                 <div class="module-tab-icon-wrapper {{ $isFeatured ? 'module-tab-icon-featured' : '' }}">
-                    <i class="{{ $module->getMeta('module_icon') }} module-tab-icon"></i>
+                    <i class="fa-fw {{ $module->getMeta('module_icon') ?: 'fas fa-cubes' }} module-tab-icon"></i>
                 </div>
                 
                 <small class="module-tab-label {{ $isFeatured ? 'module-tab-label-featured' : '' }}">
