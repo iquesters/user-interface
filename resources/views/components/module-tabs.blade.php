@@ -4,23 +4,23 @@
     
     // Configuration
     $viewMode = $viewMode ?? 'desktop';
-    $navStyle = ConfProvider::from(Module::USER_INFE)->nav_style ?? null;
+    $navStyle = ConfProvider::from(Module::USER_INFE)->large_screen_nav_style ?? null;
 
     if ($viewMode === 'mobile') {
-        $maxVisible = ConfProvider::from(Module::USER_INFE)->mobile_bottom_tabs;
+        $maxVisible = ConfProvider::from(Module::USER_INFE)->small_screen_bottom_tabs;
     } else {
         // Desktop / Vertical
         if ($navStyle === 'minibar') {
             // Show ALL modules, no dropdown
             $maxVisible = $installedModules->count();
         } else {
-            $maxVisible = ConfProvider::from(Module::USER_INFE)->module_tabs;
+            $maxVisible = ConfProvider::from(Module::USER_INFE)->large_screen_module_tabs;
         }
     }
     
     // Mobile featured tab configuration
-    $featuredTabName = ConfProvider::from(Module::USER_INFE)->mobile_featured_tab;
-    $featuredPosition = ConfProvider::from(Module::USER_INFE)->mobile_featured_position ?? 'center';
+    $featuredTabName = ConfProvider::from(Module::USER_INFE)->small_screen_featured_tab;
+    $featuredPosition = ConfProvider::from(Module::USER_INFE)->small_screen_featured_position ?? 'center';
     
     // Process modules
     $visibleModules = $installedModules->take($maxVisible);

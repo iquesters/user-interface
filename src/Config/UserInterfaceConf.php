@@ -14,11 +14,11 @@ class UserInterfaceConf extends BaseConf
     protected string $logo;
     protected string $app_name;
     protected string $app_description;
-    protected int $module_tabs;
-    protected int $mobile_bottom_tabs;
-    protected string $mobile_featured_tab;
-    protected string $mobile_featured_position;
-    protected string $nav_style;
+    protected string $large_screen_nav_style;
+    protected int $large_screen_module_tabs;
+    protected int $small_screen_bottom_tabs;
+    protected string $small_screen_featured_tab;
+    protected string $small_screen_featured_position;
 
 
     protected function prepareDefault(BaseConf $default_values)
@@ -28,12 +28,11 @@ class UserInterfaceConf extends BaseConf
         $default_values->logo = 'img/logo.png';
         $default_values->app_name = 'Iquesters';
         $default_values->app_description = 'Iquesters Application';
-        $default_values->module_tabs = 7;
-        $default_values->mobile_bottom_tabs = 4;
-        $default_values->mobile_featured_tab = '';
-        $default_values->mobile_featured_position = 'center';
-        $default_values->nav_style = 'minibar';
-
+        $default_values->large_screen_nav_style = 'minibar';
+        $default_values->large_screen_module_tabs = 7;
+        $default_values->small_screen_bottom_tabs = 4;
+        $default_values->small_screen_featured_tab = '';
+        $default_values->small_screen_featured_position = 'center';
     }
 
 }

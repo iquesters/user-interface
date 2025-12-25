@@ -33,7 +33,7 @@
         {{-- @include('userinterface::layouts.common.mobile-navbar') --}}
 
         <!-- Display minibar nav bar based of configuration -->
-        @if (ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar')
+        @if (ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar')
             @include('userinterface::layouts.common.minibar')
         @endif
 

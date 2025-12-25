@@ -44,16 +44,16 @@
 @endphp
 
 <div class="d-flex gap-2 align-items-center"
-     style="{{ ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar' ? 'padding-right: 5px;' : '' }}">
+     style="{{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'padding-right: 5px;' : '' }}">
     <ul class="navbar-nav flex-row align-items-center ms-auto">
         <li class="nav-item navbar-dropdown dropdown-user dropdown ms-2">
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">
                 <div class="avatar avatar-online">
-                    {{-- @include('usermanagement::utils.image', ['options' => $options]) --}}
-                    <img src="{{ $userAvatar }}" 
+                    @include('usermanagement::utils.image', ['options' => $options])
+                    {{-- <img src="{{ $userAvatar }}"
                          alt="User Avatar" 
                          class="avatar h-auto rounded-circle" 
-                         style="width: 40px !important; height: 40px !important;">
+                         style="width: 40px !important; height: 40px !important;"> --}}
                 </div>
             </a>
 
@@ -64,11 +64,11 @@
                     <div class="d-flex align-items-center">
                         <!-- Profile Image Column -->
                         <div class="me-3 position-relative">
-                            {{-- @include('usermanagement::utils.image', ['options' => $options]) --}}
-                            <img src="{{ $userAvatar }}" 
+                            @include('usermanagement::utils.image', ['options' => $options])
+                            {{-- <img src="{{ $userAvatar }}" 
                                  alt="User Avatar" 
                                  class="rounded-circle" 
-                                 style="width: 50px; height: 50px;">
+                                 style="width: 50px; height: 50px;"> --}}
                             <button type="button" 
                                     class="btn btn-sm btn-primary rounded-circle position-absolute bottom-0 end-0 p-0" 
                                     style="width: 20px; height: 20px; transform: translate(25%, 25%);" 

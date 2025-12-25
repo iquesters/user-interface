@@ -3,7 +3,7 @@
     use Iquesters\Foundation\Enums\Module;
 @endphp
 
-<aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
+<aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
     <div class="sidebar-body">
         <div class="list-group list-group-flush" id="sidebarMenu">
             <div class="list-group-item dropdown-item ps-3 pe-2 py-1 d-flex justify-content-between align-items-center">

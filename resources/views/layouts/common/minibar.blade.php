@@ -8,7 +8,7 @@
         <div class="minibar-nav">
             <ul class="minibar-header">
                 <li class="h-100 w-100 d-flex justify-content-center align-items-center">
-                    @if(ConfProvider::from(Module::USER_INFE)->nav_style === 'minibar')
+                    @if(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar')
                         @include('userinterface::components.hamburger', [
                             'classes' => ''
                         ])
