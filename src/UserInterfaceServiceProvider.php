@@ -13,6 +13,7 @@ use Iquesters\UserInterface\Config\UserInterfaceConf;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Schema;
 use Iquesters\Foundation\Models\Module;
+use Iquesters\Foundation\Models\Navigation;
 use Iquesters\UserManagement\UserManagementServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
@@ -218,17 +219,114 @@ class UserInterfaceServiceProvider extends ServiceProvider
     /**
      * Share installed modules with all views.
      */
+    // protected function shareInstalledModules(): void
+    // {
+    //     View::composer('*', function ($view) {
+    //         $modules = collect();
+            
+    //         if (Schema::hasTable('modules') && Auth::check()) {
+    //             $user = Auth::user();
+    //             $modules = Module::getForUser($user);
+    //         }
+
+    //         $view->with('installedModules', $modules);
+    //     });
+    // }
     protected function shareInstalledModules(): void
     {
         View::composer('*', function ($view) {
+
             $modules = collect();
-            
-            if (Schema::hasTable('modules') && Auth::check()) {
-                $user = Auth::user();
-                $modules = Module::getForUser($user);
+
+            /**
+             * Safety checks
+             */
+            if (
+                !Auth::check() ||
+                !Schema::hasTable('modules') ||
+                !Schema::hasTable('navigations') ||
+                !Schema::hasTable('navigation_metas')
+            ) {
+                $view->with('installedModules', $modules);
+                return;
             }
 
-            $view->with('installedModules', $modules);
+            try {
+                $user = Auth::user();
+
+                /**
+                 * Fully-qualified package models
+                 */
+                $moduleModel = Module::class;
+                $navigationModel = Navigation::class;
+
+                /**
+                 * STEP 1: Get user-accessible modules
+                 */
+                $modules = $moduleModel::getForUser($user)->values();
+
+                if ($modules->isEmpty()) {
+                    $view->with('installedModules', collect());
+                    return;
+                }
+
+                $moduleIds = $modules->pluck('id')->toArray();
+
+                /**
+                 * STEP 2: Fetch primary navigation order
+                 */
+                $navigation = $navigationModel::where(
+                    'name',
+                    'primary_navigation'
+                )->first();
+
+                $savedOrder = [];
+
+                if ($navigation) {
+                    $savedOrder = json_decode(
+                        $navigation->getMeta('navigation_order') ?? '[]',
+                        true
+                    );
+                }
+
+                $savedOrder = is_array($savedOrder) ? $savedOrder : [];
+
+                /**
+                 * STEP 3: Clean invalid / old module IDs
+                 */
+                $savedOrder = array_values(
+                    array_intersect($savedOrder, $moduleIds)
+                );
+
+                /**
+                 * STEP 4: Append new modules
+                 */
+                $newModules = array_diff($moduleIds, $savedOrder);
+                $finalOrder = array_merge($savedOrder, $newModules);
+
+                /**
+                 * STEP 5: Build ordered module collection
+                 */
+                $orderedModules = collect($finalOrder)
+                    ->map(fn ($id) => $modules->firstWhere('id', $id))
+                    ->filter()
+                    ->values();
+
+                /**
+                 * STEP 6: Share globally
+                 */
+                $view->with('installedModules', $orderedModules);
+
+            } catch (\Throwable $e) {
+                /**
+                 * Fail silently to avoid breaking views
+                 */
+                logger()->warning('Navigation shareInstalledModules failed', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                $view->with('installedModules', collect());
+            }
         });
     }
     
