@@ -4,9 +4,6 @@
     use Carbon\Carbon;
     
     $user = Auth::user();
-    // $userAvatar = $user->getMeta('logo')
-    //     ? route('profile-image')
-    //     : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
 
     $profilePath  = $user->getMeta('profile_picture_path');
     $profileFile  = $user->getMeta('profile_picture');
@@ -32,11 +29,11 @@
 
     $options = (object)array(
         'img' => (object)array(
-            'id' => 'image',
+            'id' => 'profileAvatar',
             'src' => $userAvatar,
             'alt' => 'Image',
             'width' => '40px',
-            'class' => 'rounded',
+            'class' => 'rounded-circle',
             'container_class' => '',
             'aspect_ratio' => ''
         ),
@@ -50,44 +47,30 @@
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">
                 <div class="avatar avatar-online">
                     @include('usermanagement::utils.image', ['options' => $options])
-                    {{-- <img src="{{ $userAvatar }}"
-                         alt="User Avatar" 
-                         class="avatar h-auto rounded-circle" 
-                         style="width: 40px !important; height: 40px !important;"> --}}
                 </div>
             </a>
 
-            <ul class="dropdown-menu dropdown-menu-end shadow-md rounded-4 p-3 profile-dropdown bg-light" id="profileDropdown">
+            <ul class="dropdown-menu dropdown-menu-end shadow-md rounded-4 p-3 bg-primary-subtle profile-dropdown" id="profileDropdown">
                 <button type="button" class="btn-close position-absolute top-0 end-0 m-2" data-bs-dismiss="dropdown" style="transform: scale(0.75);" aria-label="Close"></button>
                 
-                <li class="p-2 text-center mt-2">
-                    <div class="d-flex align-items-center">
+                <li class="px-2 pt-2 text-center mt-2">
+                    <div class="d-flex align-items-start">
                         <!-- Profile Image Column -->
                         <div class="me-3 position-relative">
                             @include('usermanagement::utils.image', ['options' => $options])
-                            {{-- <img src="{{ $userAvatar }}" 
-                                 alt="User Avatar" 
-                                 class="rounded-circle" 
-                                 style="width: 50px; height: 50px;"> --}}
-                            <button type="button" 
-                                    class="btn btn-sm btn-primary rounded-circle position-absolute bottom-0 end-0 p-0" 
-                                    style="width: 20px; height: 20px; transform: translate(25%, 25%);" 
-                                    data-bs-toggle="modal" 
-                                    data-bs-target="#profilePictureModal">
-                                <i class="fa-solid fa-pen fa-2xs"></i>
-                            </button>
                         </div>
 
                         <!-- Profile Details Column -->
                         <div class="text-start">
-                            <h6 class="mb-0 fw-semibold">{{ $user->name ?? 'Unknown' }}</h6>
-                            <small class="d-block">{{ $user->email ?? 'Unknown' }}</small>
-                            
-                            <small title="User Role">
-                                {{ implode(', ', array_map('ucwords', $user->roles?->pluck('name')->toArray() ?? ['Unknown'])) }}
-                            </small>
-                            <br>
+                            <h6 class="mb-1 fw-semibold">{{ $user->name ?? 'Unknown' }}</h6>
+                            <small class="d-block mb-0">{{ $user->email ?? 'Unknown' }}</small>
                             <small>
+                                <small class="d-block mb-0" title="User Theme">
+                                    Theme: {{ $user->getMeta('theme') ?? 'Application Default' }}
+                                </small>
+                                <small class="d-block mb-0" title="User Role">
+                                    Role(s): {{ implode(', ', array_map('ucwords', $user->roles?->pluck('name')->toArray() ?? ['Unknown'])) }}
+                                </small>
                                 <small title="Last Login">Last Login: {{ $lastLoginFormatted }}</small>
                             </small>
                         </div>
@@ -98,22 +81,22 @@
 
                 @if(Route::has('myprofile'))
                 <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('myprofile') }}">
-                        <i class="fa-solid fa-fw fa-user-circle me-2"></i> My Profile
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary" href="{{ route('myprofile') }}">
+                        <i class="fas fa-fw fa-user-circle"></i> My Profile
                     </a>
                 </li>
                 @endif
 
                 @if(Route::has('settings'))
                 <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="{{ route('settings') }}">
-                        <i class="fa fa-cog me-2"></i> Settings
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary" href="{{ route('settings') }}">
+                        <i class="fa fa-fw fa-cog"></i> Settings
                     </a>
                 </li>
                 @endif
                 <li>
-                    <a class="dropdown-item d-flex align-items-center py-1 text-muted" href="#">
-                        <i class="fas fa-fw fa-question-circle me-2"></i> Help
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary" href="#">
+                        <i class="fas fa-fw fa-question-circle"></i> Help
                     </a>
                 </li>
 
@@ -123,17 +106,17 @@
                     <li>
                         <form method="POST" action="{{ route('logout') }}" class="mb-0">
                             @csrf
-                            <button type="submit" class="dropdown-item d-flex align-items-center py-1 text-muted">
-                                <i class="fa-solid fa-fw fa-sign-out-alt me-2"></i> Logout
+                            <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary">
+                                <i class="fas fa-fw fa-sign-out-alt"></i> Logout
                             </button>
                         </form>
                     </li>
                 @endif
 
                 <small class="d-flex align-items-center justify-content-center mt-2">
-                    <a class="small me-1 text-muted" href="#">Privacy</a>
+                    <a class="small me-1" href="#">Privacy</a>
                     <small>|</small>
-                    <a class="small ms-1 text-muted" href="#">Terms & Conditions</a>
+                    <a class="small ms-1" href="#">Terms & Conditions</a>
                 </small>
             </ul>
         </li>

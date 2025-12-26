@@ -35,7 +35,6 @@
   width: 300px;
   right: 3px !important;
   top: 5px !important;
-  background-color: #f8f9fa;
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
 }
 
@@ -211,4 +210,8 @@
 
 .sidebar-toggle:not(.btn-light):hover {
     background-color: var(--bs-light);
+}
+
+.dropdown-menu {
+  --bs-dropdown-link-hover-bg: var(--bs-secondary-bg-subtle) !important;
 }
