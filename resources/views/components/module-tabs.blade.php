@@ -48,23 +48,93 @@
     }
     
     // Generate menu helper
-    $generateMenu = function($module) {
-        return collect(json_decode($module->getMeta("module_sidebar_menu"), true))
-            ->map(function($item) {
+    use Iquesters\Foundation\Models\Navigation;
+    use Illuminate\Support\Facades\Route;
+
+    $generateMenu = function ($module) {
+
+        /**
+         * STEP 1: Load raw submenu from module meta
+         */
+        $submenuItems = json_decode(
+            $module->getMeta('module_sidebar_menu') ?? '[]',
+            true
+        );
+
+        if (!is_array($submenuItems) || empty($submenuItems)) {
+            return collect();
+        }
+
+        /**
+         * STEP 2: Extract submenu route keys
+         */
+        $routes = collect($submenuItems)
+            ->pluck('route')
+            ->filter()
+            ->values()
+            ->toArray();
+
+        /**
+         * STEP 3: Load navigation order (same pattern as modules)
+         */
+        $navigation = Navigation::where(
+            'name',
+            $module->name . '_sub_menu'
+        )->first();
+
+        $savedOrder = [];
+
+        if ($navigation) {
+            $savedOrder = json_decode(
+                $navigation->getMeta('navigation_order') ?? '[]',
+                true
+            );
+        }
+
+        $savedOrder = is_array($savedOrder) ? $savedOrder : [];
+
+        /**
+         * STEP 4: Clean invalid routes
+         */
+        $savedOrder = array_values(array_intersect($savedOrder, $routes));
+
+        /**
+         * STEP 5: Append newly added submenu items
+         */
+        $newRoutes  = array_diff($routes, $savedOrder);
+        $finalOrder = array_merge($savedOrder, $newRoutes);
+
+        /**
+         * STEP 6: Build ordered sidebar menu
+         */
+        return collect($finalOrder)
+            ->map(function ($route) use ($submenuItems) {
+
+                $item = collect($submenuItems)
+                    ->firstWhere('route', $route);
+
+                if (!$item) {
+                    return null;
+                }
+
                 $params = $item['params'] ?? [];
+
                 foreach ($params as $key => $value) {
                     if ($value === null) {
                         $params[$key] = request()->route($key);
                     }
                 }
+
                 return [
-                    "icon"  => $item["icon"],
-                    "label" => $item["label"],
-                    "url"   => \Illuminate\Support\Facades\Route::has($item["route"])
-                        ? route($item["route"], $params)
-                        : "#",
+                    'icon'  => $item['icon'] ?? null,
+                    'label' => $item['label'] ?? null,
+                    'url'   => Route::has($route)
+                        ? route($route, $params)
+                        : '#',
                 ];
-            });
+            })
+            ->filter()
+            ->values();
     };
     
     // View mode configurations
