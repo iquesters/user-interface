@@ -66,16 +66,19 @@
         }
 
         /**
-         * STEP 2: Extract submenu route keys
+         * STEP 2: Normalize submenu items (unique key)
          */
-        $routes = collect($submenuItems)
-            ->pluck('route')
-            ->filter()
-            ->values()
-            ->toArray();
+        $submenu = collect($submenuItems)
+            ->map(function ($item) {
+                return array_merge($item, [
+                    '_key' => $item['route']
+                        . '::'
+                        . ($item['default-table-schema-uid'] ?? 'none'),
+                ]);
+            });
 
         /**
-         * STEP 3: Load navigation order (same pattern as modules)
+         * STEP 3: Load saved order
          */
         $navigation = Navigation::where(
             'name',
@@ -94,47 +97,52 @@
         $savedOrder = is_array($savedOrder) ? $savedOrder : [];
 
         /**
-         * STEP 4: Clean invalid routes
+         * STEP 4: Clean invalid keys
          */
-        $savedOrder = array_values(array_intersect($savedOrder, $routes));
+        $existingKeys = $submenu->pluck('_key')->toArray();
+        $savedOrder   = array_values(array_intersect($savedOrder, $existingKeys));
 
         /**
-         * STEP 5: Append newly added submenu items
+         * STEP 5: Append new submenu items
          */
-        $newRoutes  = array_diff($routes, $savedOrder);
-        $finalOrder = array_merge($savedOrder, $newRoutes);
+        $newKeys   = array_diff($existingKeys, $savedOrder);
+        $finalKeys = array_merge($savedOrder, $newKeys);
 
         /**
-         * STEP 6: Build ordered sidebar menu
+         * STEP 6: Build sidebar menu (CORRECT)
          */
-        return collect($finalOrder)
-            ->map(function ($route) use ($submenuItems) {
+        return collect($finalKeys)
+            ->map(function ($key) use ($submenu) {
 
-                $item = collect($submenuItems)
-                    ->firstWhere('route', $route);
-
+                $item = $submenu->firstWhere('_key', $key);
                 if (!$item) {
                     return null;
                 }
 
                 $params = $item['params'] ?? [];
 
-                foreach ($params as $key => $value) {
-                    if ($value === null) {
-                        $params[$key] = request()->route($key);
+                if (!empty($item['default-table-schema-uid'])) {
+                    $params['default_table_schema_uid']
+                        = $item['default-table-schema-uid'];
+                }
+
+                foreach ($params as $k => $v) {
+                    if ($v === null) {
+                        $params[$k] = request()->route($k);
                     }
                 }
 
                 return [
                     'icon'  => $item['icon'] ?? null,
                     'label' => $item['label'] ?? null,
-                    'url'   => Route::has($route)
-                        ? route($route, $params)
+                    'url'   => Route::has($item['route'])
+                        ? route($item['route'], $params)
                         : '#',
                 ];
             })
             ->filter()
             ->values();
+
     };
     
     // View mode configurations

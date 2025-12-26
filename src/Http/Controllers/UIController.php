@@ -5,6 +5,7 @@ namespace Iquesters\UserInterface\Http\Controllers;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
 use Iquesters\Foundation\Models\MasterData;
+use Illuminate\Http\Request;
 
 class UIController extends Controller
 {
@@ -39,16 +40,35 @@ class UIController extends Controller
     }
 
     // Currently, entity_uid is optional for View routes but will be used in the future.
-    public function edit($form_schema_id, $entity_uid= null)
+    public function edit(Request $request, $form_schema_id, $entity_uid= null)
     {
         try {
             Log::info("In UIController edit method", [
                 'form_schema_id' => $form_schema_id,
                 'entity_uid' => $entity_uid
             ]);
-        return view('userinterface::ui.form.edit', compact('form_schema_id', 'entity_uid'));
+            Log::debug("Request", [
+                'request' => $request->all()
+            ]);
+            if ($request->boolean('ajax')) {
+            return response()->json([
+                'html' => view('userinterface::components.form', [
+                    'id' => $form_schema_id,
+                    'entity_uid' => $entity_uid,
+                ])->render()
+            ]);
+        }
+
+            // if ($request->boolean('ajax')) {
+            //     return view('userinterface::ui.form.edit-form-only', compact('form_schema_id', 'entity_uid'));
+            // }
+            return view('userinterface::ui.form.edit', compact('form_schema_id', 'entity_uid'));
         } catch (\Throwable $th) {
-            //throw $th;
+                Log::error('UIController@edit failed', [
+                'exception' => $th,
+            ]);
+
+            throw $th;
         }
     }
 

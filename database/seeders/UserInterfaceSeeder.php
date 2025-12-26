@@ -10,40 +10,156 @@ class UserInterfaceSeeder extends BaseSeeder
     protected string $moduleName = 'user-interface';
     protected string $description = 'user-interface module';
     protected array $metas = [
-        'module_icon' => 'fas fa-puzzle-piece',
-        'module_sidebar_menu' => [
-            [
-                "icon" => "fas fa-list-check",
-                "label" => "Forms",
-                "route" => "form.list",
-            ],
-            [
-                "icon" => "fas fa-table",
-                "label" => "Tables",
-                "route" => "table.list",
-            ],
-            [
-                "icon" => "fas fa-database",
-                "label" => "Entities",
-                "route" => "entities.index",
-            ],
-            [
-                "icon" => "fas fa-cubes",
-                "label" => "Modules",
-                "route" => "modules.assign-to-role",
-            ],
-            [
-                "icon" => "fas fa-list-ul",
-                "label" => "All Masterdatas",
-                "route" => "master-data.index",
-            ],
-            [
-                "icon" => "fas fa-building-columns",
-                "label" => "All Organisations",
-                "route" => "organisations.index",
+    'module_icon' => 'fas fa-puzzle-piece',
+    'module_sidebar_menu' => [
+
+        /*
+        |-------------------------------------------------
+        | Forms
+        |-------------------------------------------------
+        */
+        [
+            "icon" => "fas fa-list-check",
+            "label" => "Forms",
+            "route" => "ui.list",
+            "table_schema" => [
+                "slug" => "form-schema-table",
+                "name" => "Form Schemas",
+                "description" => "Datatable schema for form schemas",
+                "schema" => [
+                    "entity" => "form_schemas",
+                    "dt-options" => [
+                        "columns" => [
+                            ["data" => "id", "title" => "ID", "visible" => true],
+                            [
+                                "data" => "name",
+                                "title" => "Form Name",
+                                "visible" => true,
+                                "link" => true,
+                                "form-schema-uid" => "form-schema-details"
+                            ],
+                            ["data" => "slug", "title" => "Slug", "visible" => true],
+                            ["data" => "description", "title" => "Description", "visible" => true],
+                        ],
+                        "options" => [
+                            "pageLength" => 10,
+                            "order" => [[0, "desc"]],
+                            "responsive" => true
+                        ]
+                    ],
+                    "default_view_mode" => "inbox"
+                ]
             ]
-        ]
-    ];
+        ],
+
+        /*
+        |-------------------------------------------------
+        | Tables
+        |-------------------------------------------------
+        */
+        [
+            "icon" => "fas fa-table",
+            "label" => "Tables",
+            "route" => "ui.list",
+            "table_schema" => [
+                "slug" => "table-schema-table",
+                "name" => "Table Schemas",
+                "description" => "Datatable schema for table schemas",
+                "schema" => [
+                    "entity" => "table_schemas",
+                    "dt-options" => [
+                        "columns" => [
+                            ["data" => "id", "title" => "ID", "visible" => true],
+                            [
+                                "data" => "name",
+                                "title" => "Table Name",
+                                "visible" => true,
+                                "link" => true,
+                                "form-schema-uid" => "table-schema-details"
+                            ],
+                            ["data" => "slug", "title" => "Slug", "visible" => true],
+                            ["data" => "description", "title" => "Description", "visible" => true],
+                        ],
+                        "options" => [
+                            "pageLength" => 10,
+                            "order" => [[0, "desc"]],
+                            "responsive" => true
+                        ]
+                    ],
+                    "default_view_mode" => "inbox"
+                ]
+            ]
+        ],
+
+        /*
+        |-------------------------------------------------
+        | Navigation
+        |-------------------------------------------------
+        */
+        [
+            "icon" => "fas fa-bars-staggered",
+            "label" => "Navigation",
+            "route" => "ui.list",
+            "table_schema" => [
+                "slug" => "navigation-table",
+                "name" => "Navigations",
+                "description" => "Datatable schema for navigations",
+                "schema" => [
+                    "entity" => "navigations",
+                    "dt-options" => [
+                        "columns" => [
+                            ["data" => "id", "title" => "ID", "visible" => true],
+                            [
+                                "data" => "name",
+                                "title" => "Navigation Name",
+                                "visible" => true,
+                                "link" => true,
+                                "form-schema-uid" => "navigation-details"
+                            ],
+                            [
+                                "data" => "meta.navigation_order",
+                                "title" => "Order",
+                                "visible" => true
+                            ],
+                        ],
+                        "options" => [
+                            "pageLength" => 10,
+                            "order" => [[0, "desc"]],
+                            "responsive" => true
+                        ]
+                    ],
+                    "default_view_mode" => "inbox"
+                ]
+            ]
+        ],
+
+        /*
+        |-------------------------------------------------
+        | Others (no table schema)
+        |-------------------------------------------------
+        */
+        [
+            "icon" => "fas fa-database",
+            "label" => "Entities",
+            "route" => "entities.index",
+        ],
+        [
+            "icon" => "fas fa-cubes",
+            "label" => "Modules",
+            "route" => "modules.assign-to-role",
+        ],
+        [
+            "icon" => "fas fa-list-ul",
+            "label" => "All Masterdatas",
+            "route" => "master-data.index",
+        ],
+        [
+            "icon" => "fas fa-building-columns",
+            "label" => "All Organisations",
+            "route" => "organisations.index",
+        ],
+    ],
+];
 
     protected array $permissions = [
         'view-master_data',

@@ -49,8 +49,8 @@ const STYLE_CLASS = {
     JUSTIFY_CONTENT_BETWEEN : 'justify-content-between',
     MB_0 : 'mb-0',
     MT_1:"mt-1",
-    ALERT:'alert', 
-    ALERT_DANGER:'alert-danger', 
+    MT_2: 'mt-2',
+    MT_3: 'mt-3',
     TEXT_CENTER:'text-center',
     DISABLED:"disabled",
     COL_3:"col-3",
@@ -75,5 +75,12 @@ const STYLE_CLASS = {
     DEFAULT_ACTION_ELEMENT_COLOR : 'secondary',
 
     SUPPORTED_ACTION_ELEMENT_VARIANTS : ['outline', 'link'],
-    DEFAULT_ACTION_ELEMENT_VARIANT : 'outline'
+    DEFAULT_ACTION_ELEMENT_VARIANT : 'outline',
+
+
+    ALERT: 'alert',
+    ALERT_WARNING: 'alert-warning',
+    ALERT_DANGER:'alert-danger',
+    ALERT_INFO:'alert-info',
+    ALERT_SUCCESS:'alert-success',
 }

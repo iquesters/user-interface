@@ -1,8 +1,9 @@
 /**
- * table.js — Enhanced Lazy Loading DataTables with Smart Caching
+ * table.js — Enhanced Lazy Loading DataTables with Smart Caching & Inbox View
  * ✅ Intelligent cache reuse across page size changes
  * ✅ Predictive prefetching
  * ✅ Memory-efficient batch management
+ * ✅ Gmail-style inbox view with resizable panels (NO IFRAME)
  */
 
 // ---------------------------
@@ -13,22 +14,28 @@ const API_SCHEMA_URL = '/api/auth/table/';
 const API_ENTITY_URL = '/api/entity/';
 const TOKEN_WAIT_TIMEOUT = 5000;
 const CHECK_INTERVAL = 100;
-const PREFETCH_THRESHOLD = 0.7; // Prefetch when 70% through cached data
+const PREFETCH_THRESHOLD = 0.7;
 const DEFAULT_DT_CONFIG = {
-    processing: false,      // Disable "Processing..." indicator (we use custom loader)
-    serverSide: true,       // Enable server-side processing for large datasets
-    searching: true,        // Enable search box
-    ordering: true,         // Enable column sorting
-    responsive: true,       // Make table responsive on mobile
-    autoWidth: true,        // Auto-calculate column widths
-    destroy: true,          // Allow reinitialization
-    pagingType: "full_numbers", // Show first, previous, numbers, next, last buttons
-    lengthMenu: [10, 25, 50, 100], // Page size options
+    processing: false,
+    serverSide: true,
+    searching: true,
+    ordering: true,
+    responsive: true,
+    autoWidth: true,
+    destroy: true,
+    pagingType: "full_numbers",
+    lengthMenu: [10, 25, 50, 100],
     language: {
         searchPlaceholder: "Search records...",
-        search: "",         // Remove "Search:" label (we use placeholder)
+        search: "",
     },
 };
+
+// View mode constants
+const VIEW_MODE_TABLE = 'table';
+const VIEW_MODE_INBOX = 'inbox';
+const MIN_PANEL_WIDTH = 250;
+const DEFAULT_LEFT_PANEL_WIDTH = 40; // percentage
 
 // ---------------------------
 // 🔐 SANCTUM TOKEN HELPERS
@@ -60,38 +67,27 @@ class EntityCache {
         this.entity = entity;
         this.pageSize = initialPageSize;
         this.total = 0;
-        this.cache = new Map(); // Map<startIndex, data[]>
-        this.prefetchPromises = new Map(); // Track in-flight requests
+        this.cache = new Map();
+        this.prefetchPromises = new Map();
     }
 
-    /**
-     * Store data at a specific offset
-     */
     set(offset, data, total) {
         if (total !== undefined) this.total = total;
-        
         data.forEach((row, idx) => {
             this.cache.set(offset + idx, row);
         });
-        
         console.log(`📦 Cached ${data.length} rows starting at offset ${offset} (total cached: ${this.cache.size})`);
     }
 
-    /**
-     * Get data range from cache
-     */
     get(start, length) {
         const result = [];
         for (let i = start; i < start + length; i++) {
-            if (!this.cache.has(i)) return null; // Cache miss
+            if (!this.cache.has(i)) return null;
             result.push(this.cache.get(i));
         }
         return result;
     }
 
-    /**
-     * Check if a range is fully cached
-     */
     hasRange(start, length) {
         for (let i = start; i < start + length; i++) {
             if (!this.cache.has(i)) return false;
@@ -99,12 +95,8 @@ class EntityCache {
         return true;
     }
 
-    /**
-     * Get the highest contiguous cached offset
-     */
     getMaxCachedOffset() {
         if (this.cache.size === 0) return 0;
-        
         let max = 0;
         while (this.cache.has(max)) {
             max++;
@@ -112,21 +104,13 @@ class EntityCache {
         return max;
     }
 
-    /**
-     * Check if we should prefetch based on current position
-     */
     shouldPrefetch(currentStart, currentLength) {
         const cachedUpTo = this.getMaxCachedOffset();
         const requestEnd = currentStart + currentLength;
         const distanceToEnd = cachedUpTo - requestEnd;
-        
-        // Prefetch if we're within threshold of cached boundary
         return distanceToEnd < (currentLength * PREFETCH_THRESHOLD) && cachedUpTo < this.total;
     }
 
-    /**
-     * Clear cache (useful for refresh/search)
-     */
     clear() {
         this.cache.clear();
         this.prefetchPromises.clear();
@@ -134,7 +118,8 @@ class EntityCache {
     }
 }
 
-const entityCaches = new Map(); // Map<entityName, EntityCache>
+const entityCaches = new Map();
+const inboxViewStates = new Map(); // Track active row selection per entity
 
 // ---------------------------
 // 🚀 ENTRY POINT
@@ -166,6 +151,7 @@ async function initShozTable(tableElement) {
     const entity = schema.entity;
     const dtSchemaConfig = schema["dt-options"] || {};
     const entriesPerPage = schema.entries_per_page || 10;
+    const viewMode = schema.default_view_mode || VIEW_MODE_TABLE;
 
     if (!entity || !dtSchemaConfig.columns)
         return showErrorMessage(tableElement, "Invalid schema or missing entity");
@@ -174,7 +160,7 @@ async function initShozTable(tableElement) {
     const cache = new EntityCache(entity, entriesPerPage);
     entityCaches.set(entity, cache);
 
-    // Smart initial fetch: load 2x the page size for better UX
+    // Smart initial fetch
     const initialFetchSize = Math.min(entriesPerPage * 2, 100);
     console.log(`🔄 Fetching initial ${initialFetchSize} records for ${entity}`);
     showTableLoader(tableElement);
@@ -192,7 +178,12 @@ async function initShozTable(tableElement) {
         getUserPersonalization(entity)
     );
 
-    renderLazyDataTable(tableElement, cache, mergedConfig, entity);
+    // Render based on view mode
+    if (viewMode === VIEW_MODE_INBOX) {
+        renderInboxView(tableElement, cache, mergedConfig, entity, schema);
+    } else {
+        renderLazyDataTable(tableElement, cache, mergedConfig, entity);
+    }
 }
 
 // ---------------------------
@@ -227,6 +218,65 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
         return { success: false, error: err.message };
     }
 }
+async function fetchFormContent(formSchemaUid, entityUid) {
+    try {
+        const url = `/edit/${formSchemaUid}/${entityUid}?ajax=true`;
+
+        const res = await fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (res.status === 401) return handleUnauthorized();
+
+        const contentType = res.headers.get('content-type') || '';
+
+        // ✅ JSON response
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            return {
+                success: true,
+                html: json.html
+            };
+        }
+
+        // ✅ HTML response
+        const html = await res.text();
+        return { success: true, html };
+
+    } catch (err) {
+        console.error("Form content fetch failed:", err);
+        return { success: false, error: err.message };
+    }
+}
+
+// async function fetchFormContent(formSchemaUid, entityUid) {
+//     try {
+//         // const token = getSanctumToken();
+//         const url = `/edit/${formSchemaUid}/${entityUid}?ajax=true`;
+//         // const res = await fetch(url, {
+//         //     headers: { 
+//         //         Authorization: `Bearer ${token}`,
+//         //         'X-Requested-With': 'XMLHttpRequest'
+//         //     },
+//         // });
+//         const res = await fetch(url);
+        
+//         if (res.status === 401) return handleUnauthorized();
+        
+//         const contentType = res.headers.get('content-type');
+//         if (contentType && contentType.includes('application/json')) {
+//             return await res.json();
+//         }
+        
+//         const html = await res.text();
+//         return { success: true, html };
+//     } catch (err) {
+//         console.error("Form content fetch failed:", err);
+//         return { success: false, error: err.message };
+//     }
+// }
 
 // ---------------------------
 // 🧠 CONFIG MERGE LOGIC
@@ -248,26 +298,278 @@ function mergeColumns(defaultCols, schemaCols, userCols) {
     }));
 }
 
-// ---------------------------
-// 🧩 USER PERSONALIZATION
-// ---------------------------
-/**
- * TODO: User personalization not yet implemented
- * This function will eventually load user-specific DataTable preferences such as:
- * - Saved column visibility settings
- * - Custom column order
- * - Preferred page size
- * - Saved filters/search terms
- * 
- * Possible implementation:
- * return JSON.parse(localStorage.getItem(`dt-user-${entityName}`)) || {};
- */
 function getUserPersonalization(entityName) {
-    return {}; // Empty for now - user preferences not yet implemented
+    //get from localdata, if not available get from sessiondata(session data saved from DB during login)
+    return {};
+}
+// changeTableViewMode{
+
+// }
+// ---------------------------
+// 📧 INBOX VIEW RENDERING
+// ---------------------------
+function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
+    const { columns = [] } = dtConfig;
+    const rootFormSchemaUid = dtConfig["form-schema-uid"] || schema["form-schema-uid"] || "";
+    
+    // Create inbox container
+    const container = document.createElement('div');
+    container.className = 'inbox-view-container';
+    container.style.cssText = 'display: flex; height: 600px; border: 1px solid #ddd; position: relative;';
+    
+    // Left panel (list view)
+    const leftPanel = document.createElement('div');
+    leftPanel.className = 'inbox-left-panel';
+    leftPanel.style.cssText = `width: ${DEFAULT_LEFT_PANEL_WIDTH}%; overflow: auto; border-right: 1px solid #ddd;`;
+    
+    // Resizer
+    const resizer = document.createElement('div');
+    resizer.className = 'inbox-resizer';
+    resizer.style.cssText = 'width: 5px; cursor: col-resize; background: #e0e0e0; user-select: none;';
+    resizer.title = 'Drag to resize';
+    
+    // Right panel (detail view)
+    const rightPanel = document.createElement('div');
+    rightPanel.className = 'inbox-right-panel';
+    rightPanel.style.cssText = `flex: 1; overflow: auto; padding: 20px; background: #f9f9f9;`;
+    rightPanel.innerHTML = '<div class="text-center text-muted py-5">Select an item to view details</div>';
+    
+    container.appendChild(leftPanel);
+    container.appendChild(resizer);
+    container.appendChild(rightPanel);
+    
+    // Replace table with inbox container
+    tableElement.parentNode.insertBefore(container, tableElement);
+    tableElement.style.display = 'none';
+    
+    // Create DataTable in left panel
+    const listTable = document.createElement('table');
+    listTable.className = 'table table-hover inbox-list-table';
+    listTable.style.cssText = 'margin: 0; cursor: pointer;';
+    leftPanel.appendChild(listTable);
+    
+    // Setup list columns (priority fields only)
+    const priorityColumns = getPriorityColumns(columns);
+    listTable.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
+    const theadRow = listTable.querySelector("thead tr");
+    priorityColumns.forEach(col => {
+        const th = document.createElement("th");
+        th.textContent = col.title || col.data;
+        theadRow.appendChild(th);
+    });
+    
+    const resolvedColumns = priorityColumns.map(col => ({
+        data: null,
+        title: col.title,
+        render: (row) => renderInboxListCell(col, row),
+    }));
+    
+    // Initialize DataTable
+    const dt = $(listTable).DataTable({
+        ...dtConfig,
+        pageLength: cache.pageSize,
+        columns: resolvedColumns,
+        select: {
+            style: 'single',
+            className: 'bg-primary bg-opacity-10'
+        },
+        ajax: async (dataTablesParams, callback) =>
+            handleAjaxFetch(dataTablesParams, callback, cache, entityName, listTable),
+    });
+    
+    // Handle row selection
+    $(listTable).on('click', 'tbody tr', function() {
+        const data = dt.row(this).data();
+        if (data) {
+            loadDetailView(rightPanel, data, columns, rootFormSchemaUid);
+            $(this).addClass('table-active').siblings().removeClass('table-active');
+        }
+    });
+    
+    // Setup resizer
+    setupResizer(resizer, leftPanel, rightPanel, container);
+    
+    console.log(`✅ Inbox view ready for: ${entityName}`);
+}
+
+function getPriorityColumns(columns) {
+    // Return columns that should appear in the list view
+    // Prioritize: id, status, name, email, and other visible non-meta fields
+    const priorityOrder = ['id', 'status', 'name', 'email', 'title', 'subject'];
+    
+    return columns
+        .filter(c => c.visible !== false)
+        .filter(c => !c.data?.startsWith?.('meta.')) // Exclude meta fields from list
+        .sort((a, b) => {
+            const aIdx = priorityOrder.indexOf(a.data);
+            const bIdx = priorityOrder.indexOf(b.data);
+            if (aIdx === -1 && bIdx === -1) return 0;
+            if (aIdx === -1) return 1;
+            if (bIdx === -1) return -1;
+            return aIdx - bIdx;
+        })
+        .slice(0, 4); // Show max 4 columns in list
+}
+
+function renderInboxListCell(col, row) {
+    let val = "";
+    if (col.data?.includes?.(".")) {
+        val = col.data.split(".").reduce((acc, key) => acc?.[key], row) ?? "";
+    } else {
+        val = row[col.data] ?? "";
+    }
+    
+    // Truncate long text in list view
+    if (typeof val === 'string' && val.length > 50) {
+        val = val.substring(0, 47) + '...';
+    }
+    
+    return `<span class="inbox-list-cell">${val}</span>`;
+}
+
+// async function loadDetailView(rightPanel, rowData, allColumns, formSchemaUid) {
+//     // Show loading spinner
+//     rightPanel.innerHTML = `
+//         <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+//             <div class="text-center">
+//                 <div class="spinner-border text-primary mb-2" role="status"></div>
+//                 <div class="text-muted">Loading details...</div>
+//             </div>
+//         </div>
+//     `;
+    
+//     try {
+//         // Fetch the form content directly
+//         const result = await fetchFormContent(formSchemaUid, rowData.uid);
+        
+//         if (result.success && result.html) {
+//             // Create container for the form content
+//             const detailContainer = document.createElement('div');
+//             detailContainer.className = 'inbox-detail-view';
+//             detailContainer.style.cssText = 'height: 100%; overflow-y: auto;';
+//             detailContainer.innerHTML = result.html;
+            
+//             // Clear and append
+//             rightPanel.innerHTML = '';
+//             rightPanel.appendChild(detailContainer);
+            
+//             // Re-initialize any scripts that might be in the loaded content
+//             initializeDetailViewScripts(detailContainer);
+            
+//             console.log(`✅ Detail view loaded for UID: ${rowData.uid}`);
+//         } else {
+//             showDetailError(rightPanel, result.error || 'Failed to load details');
+//         }
+//     } catch (error) {
+//         console.error('Error loading detail view:', error);
+//         showDetailError(rightPanel, error.message);
+//     }
+// }
+async function loadDetailView(rightPanel, rowData, allColumns, formSchemaUid) {
+    rightPanel.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <div class="text-muted">Loading details...</div>
+            </div>
+        </div>
+    `;
+
+    try {
+        const result = await fetchFormContent(formSchemaUid, rowData.uid);
+
+        if (result.success && result.html) {
+            rightPanel.innerHTML = result.html;
+
+            // ✅ THIS IS THE FIX (REQUIRED)
+            const form = rightPanel.querySelector('.shoz-form');
+            if (form) {
+                setupForm(form);           // ← THIS was missing
+                setupCoreFormElement();    // ← THIS too
+            }
+
+        } else {
+            showDetailError(rightPanel, result.error || 'Failed to load details');
+        }
+    } catch (error) {
+        console.error('Error loading detail view:', error);
+        showDetailError(rightPanel, error.message);
+    }
+}
+
+
+function initializeDetailViewScripts(container) {
+    // Re-run any scripts in the loaded content
+    const scripts = container.querySelectorAll('script');
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        Array.from(oldScript.attributes).forEach(attr => {
+            newScript.setAttribute(attr.name, attr.value);
+        });
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+    
+    // Trigger custom event for any listeners
+    const event = new CustomEvent('inboxDetailLoaded', { 
+        bubbles: true,
+        detail: { container }
+    });
+    container.dispatchEvent(event);
+}
+
+function showDetailError(rightPanel, message) {
+    rightPanel.innerHTML = `
+        <div class="alert alert-danger m-3">
+            <h5>Error Loading Details</h5>
+            <p>${message}</p>
+            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">
+                Reload Page
+            </button>
+        </div>
+    `;
+}
+
+function setupResizer(resizer, leftPanel, rightPanel, container) {
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    
+    resizer.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = leftPanel.offsetWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        
+        const delta = e.clientX - startX;
+        const newWidth = startWidth + delta;
+        const containerWidth = container.offsetWidth;
+        const minWidth = MIN_PANEL_WIDTH;
+        const maxWidth = containerWidth - MIN_PANEL_WIDTH - 5;
+        
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+            const percentage = (newWidth / containerWidth) * 100;
+            leftPanel.style.width = `${percentage}%`;
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
 }
 
 // ---------------------------
-// 🧱 DATATABLE RENDERING
+// 🧱 STANDARD TABLE RENDERING
 // ---------------------------
 function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     const { columns = [] } = dtConfig;
@@ -302,9 +604,6 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     console.log(`✅ DataTable ready for: ${entityName}`);
 }
 
-// ---------------------------
-// 🧮 DATATABLE CELL RENDER
-// ---------------------------
 function renderCell(col, row, rootFormSchemaUid) {
     let val = "";
     if (col.data?.startsWith?.("meta.")) {
@@ -334,13 +633,11 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
 
     console.log(`📄 Request: page ${page} (offset=${start}, length=${length})`);
 
-    // Update cache page size if changed
     if (cache.pageSize !== length) {
         console.log(`🔄 Page size changed: ${cache.pageSize} → ${length}`);
         cache.pageSize = length;
     }
 
-    // ✅ Try to serve from cache first
     if (cache.hasRange(start, length)) {
         const cachedData = cache.get(start, length);
         console.log(`✨ Serving from cache (${start}-${start + length})`);
@@ -352,7 +649,6 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
             data: cachedData,
         });
 
-        // Smart prefetch: load next batch if getting close to cache boundary
         if (cache.shouldPrefetch(start, length)) {
             prefetchNextBatch(cache, entityName, start, length);
         }
@@ -360,7 +656,6 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
         return;
     }
 
-    // ✅ Cache miss - fetch from API
     console.log(`🌐 Cache miss - fetching from API`);
     showTableLoader(tableElement);
 
@@ -376,7 +671,6 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
             data: result.data,
         });
 
-        // Prefetch adjacent data for smoother navigation
         if (cache.shouldPrefetch(start, length)) {
             prefetchNextBatch(cache, entityName, start, length);
         }
@@ -398,15 +692,8 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength)
     const nextOffset = cache.getMaxCachedOffset();
     const prefetchKey = `${entityName}-${nextOffset}`;
 
-    // Avoid duplicate prefetch requests
-    if (cache.prefetchPromises.has(prefetchKey)) {
-        return;
-    }
-
-    // Don't prefetch if we already have all data
-    if (nextOffset >= cache.total) {
-        return;
-    }
+    if (cache.prefetchPromises.has(prefetchKey)) return;
+    if (nextOffset >= cache.total) return;
 
     console.log(`🔮 Prefetching next batch at offset ${nextOffset}`);
     
@@ -446,7 +733,6 @@ function showTableLoader(tableElement) {
 function handleUnauthorized() {
     console.error('Authentication required - redirecting to login');
     localStorage.removeItem('auth_token');
-    // window.location.href = '/login?error=token_expired';
 }
 
 function showAuthWarning() {

@@ -77,4 +77,6 @@ Table Schemas
         </table>
     </div>
 </div>
-@endsection
+
+<table id="users-table" class="shoz-table"></table>
+@endsection 

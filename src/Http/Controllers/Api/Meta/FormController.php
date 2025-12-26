@@ -17,10 +17,10 @@ class FormController extends Controller
     {
         Log::info("No Auth: Fetching form schema for slug: " . $slug);
         // As application is not ready so we decided not to use uid
-        return $this->getFormSchema($slug);
+        // return $this->getFormSchema($slug);
 
         // Now we have decdided to use by slug
-        // return $this->getFormSchemaBySlug($slug);
+        return $this->getFormSchemaBySlug($slug);
     }
 
     /**
@@ -28,7 +28,7 @@ class FormController extends Controller
      */
     public function getAuthFormSchema($slug)
     {
-        return $this->getFormSchema($slug);
+        return $this->getFormSchemaBySlug($slug);
     }
 
     /**
@@ -43,7 +43,7 @@ class FormController extends Controller
         ]);
 
         if ($slug) {
-            $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
+            $form = FormSchema::where(['slug' => $slug, 'status' => 2])->first();
             if (isset($form)) {
                 $response->{'message'} = "Form schema found";
                 $response->{'data'} = json_decode($form->schema);

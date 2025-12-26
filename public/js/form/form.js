@@ -14,6 +14,8 @@ async function setupForm(formElement) {
 
     console.log("formMeta>>>>>>>>>>>", formMeta)
     if (!formMeta) {
+        
+        handleSchemaNotFound(formElement);
         // break the code
         return;
     }
@@ -205,6 +207,27 @@ async function setupForm(formElement) {
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 }
+
+function handleSchemaNotFound(formElement) {
+    console.error("Form schema not found for:", formElement.id);
+
+    // Clear form content
+    formElement.innerHTML = "";
+
+    // Create alert
+    const alertDiv = document.createElement("div");
+    alertDiv.classList.add(
+        STYLE_CLASS.ALERT,
+        STYLE_CLASS.ALERT_DANGER,
+        STYLE_CLASS.TEXT_CENTER,
+        STYLE_CLASS.MT_3
+    );
+
+    alertDiv.textContent = "Form schema not found. Please contact administrator.";
+
+    formElement.appendChild(alertDiv);
+}
+
 
 /**
  * 
