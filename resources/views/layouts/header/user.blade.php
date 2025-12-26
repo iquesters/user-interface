@@ -46,7 +46,7 @@
         <li class="nav-item navbar-dropdown dropdown-user dropdown ms-2">
             <a class="nav-link p-0" href="javascript:void(0);" data-bs-toggle="dropdown" id="userDropdown">
                 <div class="avatar avatar-online">
-                    @include('usermanagement::utils.image', ['options' => $options])
+                    @include('userinterface::utils.image', ['options' => $options])
                 </div>
             </a>
 
@@ -57,7 +57,7 @@
                     <div class="d-flex align-items-start">
                         <!-- Profile Image Column -->
                         <div class="me-3 position-relative">
-                            @include('usermanagement::utils.image', ['options' => $options])
+                            @include('userinterface::utils.image', ['options' => $options])
                         </div>
 
                         <!-- Profile Details Column -->
