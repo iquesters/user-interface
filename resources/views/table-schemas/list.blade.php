@@ -78,5 +78,5 @@ Table Schemas
     </div>
 </div>
 
-<table id="users-table" class="shoz-table"></table>
+<table id="users-table" class="lab-table"></table>
 @endsection 

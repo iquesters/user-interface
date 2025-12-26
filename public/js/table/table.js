@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         await waitForToken();
         console.log('🔐 Sanctum token detected');
-        document.querySelectorAll(".shoz-table").forEach(initShozTable);
+        document.querySelectorAll(".lab-table").forEach(initLabTable);
     } catch (err) {
         console.warn('⚠️ Token missing:', err.message);
         showAuthWarning();
@@ -139,7 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ---------------------------
 // ⚙️ INIT SINGLE TABLE
 // ---------------------------
-async function initShozTable(tableElement) {
+async function initLabTable(tableElement) {
     const slug = tableElement.id;
     if (!slug) return console.warn("❌ Missing table id");
 
@@ -736,7 +736,7 @@ function handleUnauthorized() {
 }
 
 function showAuthWarning() {
-    document.querySelectorAll(".shoz-table").forEach(t => {
+    document.querySelectorAll(".lab-table").forEach(t => {
         t.innerHTML = `
         <tr>
             <td colspan="10" class="text-center py-4">
