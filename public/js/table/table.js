@@ -221,7 +221,7 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
 async function fetchFormContent(formSchemaUid, entityUid) {
     try {
         const url = `/edit/${formSchemaUid}/${entityUid}?ajax=true`;
-
+        // ?component=component-name&component=true
         const res = await fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -310,7 +310,7 @@ function getUserPersonalization(entityName) {
 // ---------------------------
 function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     const { columns = [] } = dtConfig;
-    const rootFormSchemaUid = dtConfig["form-schema-uid"] || schema["form-schema-uid"] || "";
+    const rootFormSchemaUid = dtConfig["form-schema-uid"] || schema["form-schema-uid"] || null;
     
     // Create inbox container
     const container = document.createElement('div');
@@ -329,14 +329,14 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     resizer.title = 'Drag to resize';
     
     // Right panel (detail view)
-    const rightPanel = document.createElement('div');
-    rightPanel.className = 'inbox-right-panel';
-    rightPanel.style.cssText = `flex: 1; overflow: auto; padding: 20px; background: #f9f9f9;`;
-    rightPanel.innerHTML = '<div class="text-center text-muted py-5">Select an item to view details</div>';
+    const rightPanelEle = document.createElement('div');
+    rightPanelEle.className = 'inbox-right-panel';
+    rightPanelEle.style.cssText = `flex: 1; overflow: auto; padding: 20px; background: #f9f9f9;`;
+    rightPanelEle.innerHTML = '<div class="text-center text-muted py-5">Select an item to view details</div>';
     
     container.appendChild(leftPanel);
     container.appendChild(resizer);
-    container.appendChild(rightPanel);
+    container.appendChild(rightPanelEle);
     
     // Replace table with inbox container
     tableElement.parentNode.insertBefore(container, tableElement);
@@ -381,7 +381,9 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     $(listTable).on('click', 'tbody tr', function() {
         const data = dt.row(this).data();
         if (data) {
-            loadDetailView(rightPanel, data, columns, rootFormSchemaUid);
+                loadDetailComponent(rightPanelEle, schema, data);
+                // loadDetailFormView(rightPanel, data, columns, rootFormSchemaUid);
+
             $(this).addClass('table-active').siblings().removeClass('table-active');
         }
     });
@@ -465,7 +467,7 @@ function renderInboxListCell(col, row) {
 //         showDetailError(rightPanel, error.message);
 //     }
 // }
-async function loadDetailView(rightPanel, rowData, allColumns, formSchemaUid) {
+async function loadDetailFormView(rightPanel, rowData, allColumns, formSchemaUid) {
     rightPanel.innerHTML = `
         <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
             <div class="text-center">
@@ -497,6 +499,167 @@ async function loadDetailView(rightPanel, rowData, allColumns, formSchemaUid) {
     }
 }
 
+// async function loadDetailComponent(rightPanelEle, schema, data) {
+//     // Show loading spinner
+//     rightPanelEle.innerHTML = getLoaderComponentHTML();
+//     // redeclear new api route and controller function
+//     if(schema["details-component"]) {
+//         // Fetch the component HTML with component name as schema["details-component"]
+//     } else if(schema["form-schema-uid"]) {
+//         // Fetch the component HTML with hardcoded component name as userinterface::components.form
+//     }else {
+//         rightPanelEle.innerHTML = '<div class="alert alert-warning">No detail component or form schema defined.</div>';
+//         // or may be some default fall back which we will decide later.
+//     }
+    
+// }
+
+// moved in ui utils
+function getLoaderComponentHTML()
+{
+    return `
+        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <div class="text-muted">Loading details...</div>
+            </div>
+        </div>
+    `;
+
+}
+
+async function loadDetailComponent(rightPanelEle, schema, data) {
+    // Show loading spinner
+    rightPanelEle.innerHTML = getLoaderComponentHTML();
+    
+    try {
+        let result;
+        
+        // Priority 1: Custom details component
+        if (schema["details-component"]) {
+            console.log(`📋 Loading custom component: ${schema["details-component"]}`);
+            result = await fetchHtmlComponent(
+                schema["form-schema-uid"] || schema["details-component"], 
+                data.uid, 
+                schema["details-component"]
+            );
+        } 
+        // Priority 2: Form schema UID (fallback to form component)
+        else if (schema["form-schema-uid"]) {
+            console.log(`📝 Loading form component for UID: ${data.uid}`);
+            result = await fetchHtmlComponent(
+                schema["form-schema-uid"], 
+                data.uid, 
+                'userinterface::components.form'
+            );
+        } 
+        // Priority 3: No configuration found
+        else {
+            rightPanelEle.innerHTML = `
+                <div class="alert alert-warning m-3">
+                    <h5>⚠️ Configuration Missing</h5>
+                    <p>No detail component or form schema defined in table configuration.</p>
+                    <small class="text-muted">Define either <code>details-component</code> or <code>form-schema-uid</code> in schema.</small>
+                </div>
+            `;
+            return;
+        }
+        
+        // Handle successful response
+        if (result.success && result.html) {
+            rightPanelEle.innerHTML = result.html;
+            
+            // Initialize forms if present
+            const form = rightPanelEle.querySelector('.shoz-form');
+            if (form) {
+                setupForm(form);
+                setupCoreFormElement();
+            }
+            
+            // Re-initialize scripts in loaded content
+            initializeDetailViewScripts(rightPanelEle);
+            
+            console.log(`✅ Detail component loaded successfully for UID: ${data.uid}`);
+        } else {
+            showDetailError(rightPanelEle, result.error || 'Failed to load component content');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading detail component:', error);
+        showDetailError(rightPanelEle, error.message);
+    }
+}
+
+
+async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.form') {
+    try {
+        const token = getSanctumToken();
+        
+        // Build URL: /api/{form_schema_id}/{entity_uid}?component={componentName}
+        const urlParts = ['/api/hola', formSchemaId];
+        if (entityUid) {
+            urlParts.push(entityUid);
+        }
+        
+        const url = `${urlParts.join('/')}?component=${encodeURIComponent(componentName)}`;
+        
+        console.log(`Fetching component: ${url}`);
+        
+        const res = await fetch(url, {
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+            }
+        });
+        console.log('response of fetching new api', res);
+        
+        if (res.status === 401) {
+            return handleUnauthorized();
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const contentType = res.headers.get('content-type') || '';
+        
+        // Handle JSON response
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            
+            // Check if response has html property
+            if (json.html) {
+                return {
+                    success: true,
+                    html: json.html
+                };
+            }
+            
+            // Handle error responses
+            if (json.error || json.message) {
+                return {
+                    success: false,
+                    error: json.error || json.message
+                };
+            }
+            
+            return {
+                success: false,
+                error: 'Invalid response format'
+            };
+        }
+        
+        // Handle HTML response (fallback)
+        const html = await res.text();
+        return { success: true, html };
+        
+    } catch (err) {
+        console.error("HTML component fetch failed:", err);
+        return { 
+            success: false, 
+            error: err.message || 'Failed to fetch component'
+        };
+    }
+}
 
 function initializeDetailViewScripts(container) {
     // Re-run any scripts in the loaded content

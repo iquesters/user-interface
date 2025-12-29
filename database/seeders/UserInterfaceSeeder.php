@@ -141,7 +141,38 @@ class UserInterfaceSeeder extends BaseSeeder
         [
             "icon" => "fas fa-database",
             "label" => "Entities",
-            "route" => "entities.index",
+            "route" => "ui.list",
+            "table_schema" => [
+                "slug" => "entity-table",
+                "name" => "Entities",
+                "description" => "Datatable schema for entities",
+                "schema" => [
+                    "entity" => "entities",
+                    "dt-options" => [
+                        "columns" => [
+                            ["data" => "id", "title" => "ID", "visible" => true],
+                            [
+                                "data" => "entity_name",
+                                "title" => "Entity Name",
+                                "visible" => true,
+                                "link" => true,
+                                "form-schema-uid" => "entity-details"
+                            ],
+                            [
+                                "data" => "status",
+                                "title" => "Status",
+                                "visible" => true
+                            ],
+                        ],
+                        "options" => [
+                            "pageLength" => 10,
+                            "order" => [[0, "desc"]],
+                            "responsive" => true
+                        ]
+                    ],
+                    "default_view_mode" => "inbox"
+                ]
+            ]
         ],
         [
             "icon" => "fas fa-cubes",
@@ -172,6 +203,12 @@ class UserInterfaceSeeder extends BaseSeeder
         'delete-organisations'
     ];
     
+    protected array $entities = [
+        'table_schemas' => [
+            'fields' => [],
+            'meta_fields' =>[]
+        ]
+    ];
     /**
      * Implement abstract method from BaseSeeder
      */

@@ -71,6 +71,64 @@ class UIController extends Controller
             throw $th;
         }
     }
+    
+    public function getHtmlComponent(Request $request, $form_schema_id, $entity_uid = null)
+    {
+        try {
+            Log::info("In UIController getHtmlComponent method", [
+                'form_schema_id' => $form_schema_id,
+                'entity_uid' => $entity_uid,
+                'request' => $request->all(),
+                'component' => $request->input('component'), // ← Add this for debugging
+            ]);
+            
+            // Get component name from request, default to form component
+            $componentName = $request->input('component', 'userinterface::components.form');
+            
+            // Validate component name is not empty
+            if (empty($componentName)) {
+                Log::warning('Component name is empty, using default form component');
+                $componentName = 'userinterface::components.form';
+            }
+            
+            Log::info("Rendering component: {$componentName}");
+            
+            // Check if view exists before rendering
+            if (!view()->exists($componentName)) {
+                Log::error("View does not exist: {$componentName}");
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => "Component view '{$componentName}' not found"
+                ], 404);
+            }
+            
+            // Render the view
+            $html = view($componentName, [
+                'id' => $form_schema_id,
+                'entity_uid' => $entity_uid,
+            ])->render();
+            
+            return response()->json([
+                'success' => true,
+                'html' => $html
+            ]);
+            
+        } catch (\Throwable $th) {
+            Log::error('UIController@getHtmlComponent failed', [
+                'form_schema_id' => $form_schema_id,
+                'entity_uid' => $entity_uid,
+                'component' => $request->input('component'),
+                'exception' => $th->getMessage(),
+                'trace' => $th->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $th->getMessage()
+            ], 500);
+        }
+    }
 
     public function delete()
     {
