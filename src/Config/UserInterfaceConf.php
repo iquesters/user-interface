@@ -36,9 +36,6 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_featured_tab = '';
         $default_values->small_screen_featured_position = 'center';
         
-        // $api_conf = new ApiConf();
-        // $default_values->api_conf = $api_conf;
-        
         $default_values->api_conf = new ApiConf();
         $default_values->api_conf->prefix = 'user-interface'; // Must be auto generated from module enum - the vendor name  
         $default_values->api_conf->prepareDefault($default_values->api_conf);
