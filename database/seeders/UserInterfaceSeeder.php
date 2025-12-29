@@ -135,7 +135,7 @@ class UserInterfaceSeeder extends BaseSeeder
 
         /*
         |-------------------------------------------------
-        | Others (no table schema)
+        | Entities
         |-------------------------------------------------
         */
         [
@@ -174,6 +174,11 @@ class UserInterfaceSeeder extends BaseSeeder
                 ]
             ]
         ],
+        /*
+        |-------------------------------------------------
+        | Others (no table schema)
+        |-------------------------------------------------
+        */
         [
             "icon" => "fas fa-cubes",
             "label" => "Modules",

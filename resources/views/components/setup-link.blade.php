@@ -46,6 +46,8 @@
                     box-shadow: 0 3px 6px rgba(99,102,241,0.3); transition: all 0.2s;">
                 🚀 Get Started
             </a>
+        @else
+            <div class="alert alert-danger p-2"> Install iquesters/user-management package</div>
         @endif
     </div>
 @endif
