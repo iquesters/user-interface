@@ -142,10 +142,21 @@ document.addEventListener('DOMContentLoaded', initializeTooltips);
 
 document.addEventListener('DOMContentLoaded', function () {
     const adminBar = document.getElementById('super-admin-navbar');
-    const header = document.querySelector('header.sticky-top');
+    const mainHeader = document.querySelector('header.sticky-top');
+    const entityHeader = document.querySelector('.entity-sticky-top');
 
-    if (adminBar && header) {
-        const height = adminBar.offsetHeight;
-        header.style.top = height + 'px';
+    let offset = 0;
+
+    if (adminBar) {
+        offset += adminBar.offsetHeight;
+    }
+
+    if (mainHeader) {
+        mainHeader.style.top = offset + 'px';
+        offset += mainHeader.offsetHeight;
+    }
+
+    if (entityHeader) {
+        entityHeader.style.top = offset + 'px';
     }
 });

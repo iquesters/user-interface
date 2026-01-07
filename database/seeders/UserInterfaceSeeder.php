@@ -132,63 +132,11 @@ class UserInterfaceSeeder extends BaseSeeder
                 ]
             ]
         ],
-
-        /*
-        |-------------------------------------------------
-        | Entities
-        |-------------------------------------------------
-        */
-        [
-            "icon" => "fas fa-database",
-            "label" => "Entities",
-            "route" => "ui.list",
-            "table_schema" => [
-                "slug" => "entity-table",
-                "name" => "Entities",
-                "description" => "Datatable schema for entities",
-                "schema" => [
-                    "entity" => "entities",
-                    "dt-options" => [
-                        "columns" => [
-                            ["data" => "id", "title" => "ID", "visible" => true],
-                            [
-                                "data" => "entity_name",
-                                "title" => "Entity Name",
-                                "visible" => true,
-                                "link" => true,
-                                "form-schema-uid" => "entity-details"
-                            ],
-                            [
-                                "data" => "status",
-                                "title" => "Status",
-                                "visible" => true
-                            ],
-                        ],
-                        "options" => [
-                            "pageLength" => 10,
-                            "order" => [[0, "desc"]],
-                            "responsive" => true
-                        ]
-                    ],
-                    "default_view_mode" => "inbox"
-                ]
-            ]
-        ],
         /*
         |-------------------------------------------------
         | Others (no table schema)
         |-------------------------------------------------
         */
-        [
-            "icon" => "fas fa-cubes",
-            "label" => "Modules",
-            "route" => "modules.assign-to-role",
-        ],
-        [
-            "icon" => "fas fa-list-ul",
-            "label" => "All Masterdatas",
-            "route" => "master-data.index",
-        ],
         [
             "icon" => "fas fa-building-columns",
             "label" => "All Organisations",

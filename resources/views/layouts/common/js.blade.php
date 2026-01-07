@@ -40,6 +40,7 @@
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/production-performance.js') }}"></script>
 
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/recaptcha.js') }}"></script>
+<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/entity-utils.js') }}"></script>
 
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/containers.js') }}"></script>
 <script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/data-providers.js') }}"></script>
