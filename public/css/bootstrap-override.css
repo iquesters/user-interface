@@ -52,3 +52,8 @@
     border: 1px solid var(--bs-danger);
     color: var(--bs-danger);
 }
+
+.copy-icon {
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
