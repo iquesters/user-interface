@@ -1,12 +1,10 @@
-@props([
-    'title',
-    'description',
-    'icon' => null,
-    'type' => null,   // integration | provider
-    'key' => null,    // woocommerce | whatsapp | etc
-])
-
 @php
+    $title       = $title ?? '';
+    $description = $description ?? '';
+    $icon        = $icon ?? null;
+    $type        = $type ?? null;   // integration | provider
+    $key         = $key ?? null;    // woocommerce | whatsapp | etc
+
     $enabledIntegrations = ['woocommerce'];
     $enabledProviders    = ['whatsapp'];
 
@@ -27,13 +25,10 @@
 
             {{-- HEADER --}}
             <h6 class="fw-semibold d-flex align-items-center gap-2 mb-2">
-
                 @if($icon)
                     <span class="fs-5">{!! $icon !!}</span>
                 @endif
-
                 <span>{{ $title }}</span>
-
             </h6>
 
             {{-- DESCRIPTION --}}
@@ -42,23 +37,43 @@
             </p>
 
             {{-- ACTION --}}
-            @if(trim($slot))
-                <div class="mt-auto">
-                    @if($enabled)
-                        {{ $slot }}
-                    @else
-                        <button
-                            class="btn btn-sm btn-outline-secondary"
-                            disabled
-                            data-bs-toggle="tooltip"
-                            title="Coming soon"
+            <div class="mt-auto">
+                @if($enabled)
+
+                    @if($type === 'integration' && isset($application))
+                        <a
+                            href="{{ route('integration.create', [
+                                'supported_integration_id' => $application->id
+                            ]) }}"
+                            class="btn btn-sm btn-outline-primary"
                         >
-                            <i class="fa fa-clock me-1"></i>
-                            {{ trim(strip_tags($slot)) }}
-                        </button>
+                            <i class="fa fa-plus me-1"></i> Integration
+                        </a>
                     @endif
-                </div>
-            @endif
+
+                    @if($type === 'provider' && isset($provider))
+                        <a
+                            href="{{ route('channels.create', [
+                                'provider_id' => $provider->id
+                            ]) }}"
+                            class="btn btn-sm btn-outline-primary"
+                        >
+                            <i class="fa fa-plus me-1"></i> Channel
+                        </a>
+                    @endif
+
+                @else
+                    <button
+                        class="btn btn-sm btn-outline-secondary"
+                        disabled
+                        data-bs-toggle="tooltip"
+                        title="Coming soon"
+                    >
+                        <i class="fa fa-clock me-1"></i>
+                        {{ $type === 'provider' ? 'Channel' : 'Integration' }}
+                    </button>
+                @endif
+            </div>
 
         </div>
     </div>
