@@ -15,12 +15,16 @@
         <meta name="sanctum-token" content="{{ Iquesters\UserManagement\Helpers\LoginHelper::get_sanctum_token(auth()->user()) }}">
     @endauth
 
-    <title>
+    {{-- <title>
         @hasSection('title')
             @yield('title') -
         @endif
         {{ config('app.name', 'iquesters') }}
-    </title>
+    </title> --}}
+    <meta name="description" content="@yield('meta-description', \Iquesters\Foundation\Helpers\MetaHelper::description())">
+
+    <!-- Title -->
+    <title>@yield('page-title', config('app.name', 'Iquesters'))</title>
 
     <link rel="icon" type="image/x-icon" href="{{ route('userinterface.asset', ['path' => 'img/favicon.png']) }}">
 
