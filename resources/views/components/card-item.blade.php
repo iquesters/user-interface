@@ -43,7 +43,7 @@
                     @if($type === 'integration' && isset($application))
                         <a
                             href="{{ route('integration.create', [
-                                'supported_integration_id' => $application->id
+                                'supported_integration_id' => $application->uid
                             ]) }}"
                             class="btn btn-sm btn-outline-primary"
                         >
@@ -54,7 +54,7 @@
                     @if($type === 'provider' && isset($provider))
                         <a
                             href="{{ route('channels.create', [
-                                'provider_id' => $provider->id
+                                'provider_id' => $provider->uid
                             ]) }}"
                             class="btn btn-sm btn-outline-primary"
                         >
