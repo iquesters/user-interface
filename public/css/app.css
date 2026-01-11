@@ -215,3 +215,7 @@
 .dropdown-menu {
   --bs-dropdown-link-hover-bg: var(--bs-secondary-bg-subtle) !important;
 }
+
+code {
+  overflow-wrap: anywhere;
+}
