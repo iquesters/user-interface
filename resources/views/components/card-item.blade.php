@@ -5,7 +5,7 @@
     $type        = $type ?? null;   // integration | provider
     $key         = $key ?? null;    // woocommerce | whatsapp | etc
 
-    $enabledIntegrations = ['woocommerce'];
+    $enabledIntegrations = ['woocommerce','gautams-chatbot'];
     $enabledProviders    = ['whatsapp'];
 
     $enabled = false;
