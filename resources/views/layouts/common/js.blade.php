@@ -21,6 +21,16 @@
             });
         });
     });
+
+    // -----------------------------
+    // Global variables for JS
+    // -----------------------------
+
+    // Store the Laravel route URL to send the timezone to
+    window.TIMEZONE_STORE_URL = "{{ route('timezone.store') }}";
+
+    // Store the CSRF token from Laravel for secure POST requests
+    window.CSRF_TOKEN = "{{ csrf_token() }}";
 </script>
 
 <!-- jQuery -->

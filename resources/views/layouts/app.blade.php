@@ -47,11 +47,12 @@
                 <div class="ui-content animate-all" id="mainContent">
                     @include('userinterface::layouts.common.alert')
                     {{-- @auth --}}
-                    {{-- Tabs (optional) --}}
-                    @includeWhen(isset($tabs) && is_array($tabs), 'userinterface::layouts.common.tabs')
-
-                    <div class="row row-cols-1 p-2 g-2">
+                    
+                    <div class="row row-cols-1 p-1 g-2">
                         <div class="col col-md-12">
+                            {{-- Tabs (optional) --}}
+                            @includeWhen(isset($tabs) && is_array($tabs), 'userinterface::layouts.common.tabs')
+
                             {{-- @stack('content') --}}
                             @yield('content')
                         </div>
