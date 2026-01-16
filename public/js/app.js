@@ -160,3 +160,45 @@ document.addEventListener('DOMContentLoaded', function () {
         entityHeader.style.top = offset + 'px';
     }
 });
+
+function copyText(elementId, icon) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text);
+
+    icon.classList.remove('fa-copy');
+    icon.classList.add('fa-check', 'text-success');
+
+    setTimeout(() => {
+        icon.classList.remove('fa-check', 'text-success');
+        icon.classList.add('fa-copy');
+    }, 1200);
+}
+
+// -----------------------------
+// Immediately Invoked Function Expression (IIFE)
+// This code runs as soon as the page loads
+// -----------------------------
+(function () {
+
+    // Check if the timezone has already been sent in this browser session
+    if (!localStorage.getItem('timezone_sent')) {
+
+        // Get the device/browser timezone from the user's system settings
+        // Example output: "Asia/Kolkata", "America/New_York"
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        // Send the timezone to the Laravel backend using a POST request
+        fetch(window.TIMEZONE_STORE_URL, {
+            method: "POST", // HTTP method
+            headers: {
+                "Content-Type": "application/json", // We are sending JSON data
+                "X-CSRF-TOKEN": window.CSRF_TOKEN     // Include CSRF token for security
+            },
+            body: JSON.stringify({ timezone }) // Convert timezone to JSON
+        }).then(() => {
+            // After successfully sending, mark it as sent in localStorage
+            // This ensures we don't send the timezone on every page load
+            localStorage.setItem('timezone_sent', '1');
+        });
+    }
+})();
