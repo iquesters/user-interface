@@ -50,6 +50,11 @@
                     
                     <div class="row row-cols-1 p-1 g-2">
                         <div class="col col-md-12">
+                            <div class="position-sticky p-2 bg-white ps-3 breadcrumbs">
+                            @if(Breadcrumbs::exists())
+                            {{ Breadcrumbs::render() }}
+                            @endif
+                        </div>
                             {{-- Tabs (optional) --}}
                             @includeWhen(isset($tabs) && is_array($tabs), 'userinterface::layouts.common.tabs')
 
