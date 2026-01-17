@@ -20,17 +20,18 @@ Route::get('ping', function () {
     ]);
 });
 
-Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
+Route::middleware(['api'])->group(function () {
+    Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
     ->name('noauth.form');
-
+});
 /*
 |--------------------------------------------------------------------------
 | Protected APIs - Sanctum tokens ONLY
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
+Route::middleware(['api','auth:sanctum'])->group(function () {
+    Route::get('api/auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
         ->name('auth.table');
 
     Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
@@ -38,9 +39,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
 
-    Route::get('entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
+    Route::get('api/entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
 
-    Route::get('hola/{form_schema_id}/{entity_uid?}', [UIController::class, 'getHtmlComponent']);
+    Route::get('api/hola/{form_schema_id}/{entity_uid?}', [UIController::class, 'getHtmlComponent']);
 });
 
 
