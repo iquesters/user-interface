@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
 use Iquesters\UserManagement\Models\UserMeta;
 use Illuminate\Support\Facades\Log;
+use Diglactic\Breadcrumbs\Breadcrumbs;
+use Illuminate\Support\Facades\File;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
@@ -39,6 +41,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        // ✅ LOAD BREADCRUMBS
+        if (class_exists(Breadcrumbs::class)) {
+            require __DIR__.'/../routes/breadcrumbs.php';
+        }
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'userinterface');
         
@@ -446,6 +452,26 @@ class UserInterfaceServiceProvider extends ServiceProvider
             Log::error('Failed to get user theme', ['error' => $e->getMessage()]);
             return 'default';
         }
+    }
+    
+    public static function getAllJsFiles(): array
+    {
+        $basePath = __DIR__ . '/../public/js';
+
+        if (!File::exists($basePath)) {
+            return [];
+        }
+
+        return collect(File::allFiles($basePath))
+            ->filter(fn ($file) => $file->getExtension() === 'js')
+            ->sortBy(fn ($file) => $file->getRelativePathname()) // stable order
+            ->map(fn ($file) => 'js/' . str_replace(
+                DIRECTORY_SEPARATOR,
+                '/',
+                $file->getRelativePathname()
+            ))
+            ->values()
+            ->toArray();
     }
 
 }

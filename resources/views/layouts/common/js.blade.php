@@ -45,33 +45,9 @@
 <!-- JSON Editor -->
 <script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js"></script>
 
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl() }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/custom-element.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/production-performance.js') }}"></script>
+@foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getAllJsFiles() as $js)
+    <script src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($js) }}"></script>
+@endforeach
 
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/recaptcha.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/entity-utils.js') }}"></script>
-
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/containers.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/data-providers.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/form.js') }}"></script>
-
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/form-block-builder.js') }}"></script>
-
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/constant/input-type-constant.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/constant/style-class-constant.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/constant/html-tag-constant.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/constant/attribute-constant.js') }}"></script>
-
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/form-constant.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/input-field-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/select-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/datalist-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/textarea-validation.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/form/validation/customValidationMessage.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/table/table.js') }}"></script>
-<script src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('js/modal.js') }}"></script>
-
-<script src="{{ Iquesters\UserManagement\UserManagementServiceProvider::getJsUrl('js/password-validation.js') }}"></script>
 <!-- Dynamic JavaScript inclusion ENDS -->
 @stack('scripts')
