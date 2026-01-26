@@ -49,5 +49,53 @@
     <script src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($js) }}"></script>
 @endforeach
 
+
+<!-- Reverb WebSocket Client -->
+    <script>
+        // Configuration from PHP to JavaScript
+        window.REVERB_CONFIG = {
+            host: '{{ env("REVERB_HOST", "127.0.0.1") }}',
+            port: '{{ env("REVERB_PORT", 6001) }}',
+            scheme: '{{ env("REVERB_SCHEME", "http") }}',
+            appKey: '{{ env("REVERB_APP_KEY", "reverb_key") }}',
+            appId: '{{ env("REVERB_APP_ID", "1") }}',
+            userId: '{{ auth()->id() ?? "anonymous" }}'
+        };
+        
+        console.log('⚙️ Reverb Configuration:', window.REVERB_CONFIG);
+    </script>
+
+     <!-- Initialize Reverb -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Reverb client
+            window.reverb = new ReverbClient(window.REVERB_CONFIG);
+            
+            // Connect to Reverb
+            console.log('🚀 Initializing Reverb connection...');
+            window.reverb.connect();
+            
+            // Handle connection events
+            window.reverb.on('connected', function() {
+                console.log('✅ Reverb client is connected');
+                // You can subscribe to channels here if needed
+            });
+            
+            window.reverb.on('disconnected', function(data) {
+                console.log('🔌 Reverb client disconnected:', data);
+            });
+            
+            window.reverb.on('error', function(error) {
+                console.error('❌ Reverb error:', error);
+            });
+            
+            // Disconnect when page unloads
+            window.addEventListener('beforeunload', function() {
+                if (window.reverb) {
+                    window.reverb.disconnect();
+                }
+            });
+        });
+    </script>
 <!-- Dynamic JavaScript inclusion ENDS -->
 @stack('scripts')
