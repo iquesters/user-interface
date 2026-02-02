@@ -13,22 +13,11 @@
 <!-- JSON Editor -->
 <link href="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.css" rel="stylesheet">
 
-{{-- Theme Render Logic --}}
-@php
-    $theme = Iquesters\UserInterface\UserInterfaceServiceProvider::getCurrentTheme() ?? 'default';
-@endphp
-{{-- Load user-specific theme --}}
-<link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/theme/' . $theme . '/bootstrap.min.css') }}" rel="stylesheet">
-{{-- <link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/theme/' . $theme . '/bootstrap.min.css?v=' . filemtime(public_path('css/theme/' . $theme . '/bootstrap.min.css'))) }}" rel="stylesheet"> --}}
-
-<link href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/bootstrap-override.css') }}" rel="stylesheet">
-
-<!-- app.css -->
-<link rel="stylesheet" type="text/css" media="screen" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl() }}">
-<link rel="stylesheet" type="text/css" media="screen and (min-width:  576px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-sm.css') }}">
-<link rel="stylesheet" type="text/css" media="screen and (min-width:  768px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-md.css') }}">
-<link rel="stylesheet" type="text/css" media="screen and (min-width:  992px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-lg.css') }}">
-<link rel="stylesheet" type="text/css" media="screen and (min-width: 1200px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-xl.css') }}">
-<link rel="stylesheet" type="text/css" media="screen and (min-width: 1400px)" href="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl('css/app-xxl.css') }}">
+<!-- All package CSS assets (including theme and bootstrap-override) -->
+@foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getCssAssets() as $asset)
+    <link rel="stylesheet"
+          media="{{ $asset['media'] }}"
+          href="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getCssUrl($asset['path']) }}">
+@endforeach
 
 @stack('styles')

@@ -45,8 +45,11 @@
 <!-- JSON Editor -->
 <script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js"></script>
 
-@foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getAllJsFiles() as $js)
-    <script src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($js) }}"></script>
+@foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getJsAssets() as $asset)
+    <script
+        src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($asset['path']) }}"
+        @if(str_contains($asset['path'], '.defer.')) defer @endif
+    ></script>
 @endforeach
 
 

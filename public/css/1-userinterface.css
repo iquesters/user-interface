@@ -230,3 +230,8 @@ code {
 ol.breadcrumb {
     margin-bottom: 0;
 }
+
+.copy-icon {
+    cursor: pointer;
+    transition: color 0.2s ease;
+}

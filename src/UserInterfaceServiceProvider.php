@@ -215,10 +215,14 @@ class UserInterfaceServiceProvider extends ServiceProvider
                 ? 'public, max-age=31536000'
                 : 'no-cache';
 
+            $lastModified = filemtime($filePath);
+
             return response()->file($filePath, [
-                'Content-Type' => $mimeType,
-                'Cache-Control' => $cacheControl,
+                'Content-Type'  => $mimeType,
+                'Cache-Control' => 'public, max-age=31536000, immutable',
+                'Last-Modified' => gmdate('D, d M Y H:i:s', $lastModified) . ' GMT',
             ]);
+
         })->where('path', '.*')->name('userinterface.asset');
     }
     
@@ -375,14 +379,14 @@ class UserInterfaceServiceProvider extends ServiceProvider
      */
     public static function getAssetVersion(string $file): string
     {
-        $path = base_path('packages/Iquesters/UserInterface/public/' . $file);
+        $path = __DIR__ . '/../public/' . ltrim($file, '/');
 
         if (file_exists($path)) {
+            clearstatcache(true, $path);
             return (string) filemtime($path);
         }
 
-        // fallback version if file not found
-        return (string) time();
+        return '1'; // stable fallback (NEVER time())
     }
 
 
@@ -391,7 +395,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
      */
     public static function getCssUrl(string $file = 'css/app.css',bool $defaultcache = true): string
     {
-        return route('userinterface.asset', ['path' => $file]);
+        return route('userinterface.asset', [
+            'path' => $file,
+            'v'    => self::getAssetVersion($file),
+        ]);
         // $params = ['path' => $file];
 
         // if ($defaultcache) {
@@ -406,7 +413,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
      */
     public static function getJsUrl(string $file = 'js/app.js',bool $defaultcache = true): string
     {
-        return route('userinterface.asset', ['path' => $file]);
+        return route('userinterface.asset', [
+            'path' => $file,
+            'v'    => self::getAssetVersion($file),
+        ]);
         // $params = ['path' => $file];
 
         // if ($defaultcache) {
@@ -454,24 +464,79 @@ class UserInterfaceServiceProvider extends ServiceProvider
         }
     }
     
-    public static function getAllJsFiles(): array
-    {
-        $basePath = __DIR__ . '/../public/js';
+    protected static function discoverAssets(
+        string $type,          // css | js
+        array $options = []
+    ): array {
+        $basePath = __DIR__ . '/../public/' . $type;
 
         if (!File::exists($basePath)) {
             return [];
         }
 
         return collect(File::allFiles($basePath))
-            ->filter(fn ($file) => $file->getExtension() === 'js')
-            ->sortBy(fn ($file) => $file->getRelativePathname()) // stable order
-            ->map(fn ($file) => 'js/' . str_replace(
-                DIRECTORY_SEPARATOR,
-                '/',
-                $file->getRelativePathname()
-            ))
+            ->filter(fn ($file) => $file->getExtension() === $type)
+            ->when(
+                $options['exclude'] ?? false,
+                fn ($q) => $q->reject(
+                    fn ($file) => str_starts_with(
+                        $file->getRelativePathname(),
+                        $options['exclude']
+                    )
+                )
+            )
+            ->sortBy(fn ($file) => $file->getRelativePathname())
+            ->map(function ($file) use ($type, $options) {
+
+                $relativePath = $type . '/' . str_replace(
+                    DIRECTORY_SEPARATOR,
+                    '/',
+                    $file->getRelativePathname()
+                );
+
+                return [
+                    'type'  => $type,
+                    'path'  => $relativePath,
+                    'media' => $type === 'css'
+                        ? self::resolveCssMedia($file->getFilename())
+                        : null,
+                ];
+            })
             ->values()
             ->toArray();
+    }
+    
+    protected static function resolveCssMedia(string $filename): string
+    {
+        return match (true) {
+            str_contains($filename, '-sm.css')   => 'screen and (min-width: 576px)',
+            str_contains($filename, '-md.css')   => 'screen and (min-width: 768px)',
+            str_contains($filename, '-lg.css')   => 'screen and (min-width: 992px)',
+            str_contains($filename, '-xl.css')   => 'screen and (min-width: 1200px)',
+            str_contains($filename, '-xxl.css')  => 'screen and (min-width: 1400px)',
+            str_contains($filename, 'print.css') => 'print',
+            default                              => 'screen',
+        };
+    }
+    public static function getJsAssets(): array
+    {
+        return self::discoverAssets('js');
+    }
+
+    public static function getCssAssets(): array
+    {
+        $theme = self::getCurrentTheme() ?? 'default';
+
+        // Step 1: Include theme CSS dynamically
+        $themeCss = [
+            ['type' => 'css', 'path' => "css/theme/$theme/bootstrap.min.css", 'media' => 'screen'],
+            // ['type' => 'css', 'path' => "css/bootstrap-override.css", 'media' => 'screen'],
+        ];
+
+        // Step 2: Include other CSS dynamically
+        $otherCss = self::discoverAssets('css', ['exclude' => 'theme']);
+
+        return array_merge($themeCss, $otherCss);
     }
 
 }
