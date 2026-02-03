@@ -1,6 +1,7 @@
 /**
  * table.js — Enhanced Lazy Loading DataTables with API Client Integration
- * ✅ Uses centralized API client
+ * ✅ Uses centralized API client with response_schema support
+ * ✅ Handles ui_context for client-side actions
  * ✅ Consistent request/response handling
  * ✅ Better error handling
  * ✅ Improved code organization
@@ -151,7 +152,7 @@ async function initLabTable(tableElement) {
         return showErrorMessage(tableElement, initialData.message || "Failed to load data");
     }
 
-    cache.set(0, initialData.data, initialData.meta?.pagination?.total || initialData.data.length);
+    cache.set(0, initialData.data, initialData.total);
 
     // Merge configs
     const mergedConfig = mergeDataTableConfigs(
@@ -169,7 +170,7 @@ async function initLabTable(tableElement) {
 }
 
 // ---------------------------
-// 🌐 API HELPERS (Using API Client)
+// 🌐 API HELPERS (Using API Client with response_schema)
 // ---------------------------
 async function fetchEntityData(entity, offset = 0, length = 50) {
     const response = await apiClient.get(`/api/entity/${entity}`, {
@@ -186,7 +187,8 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
         };
     }
 
-    // Extract data and total from response
+    // Data is now in response.data (extracted from response_schema.data by api-client)
+    // Meta information is in response.meta
     return {
         success: true,
         data: response.data || [],
@@ -214,6 +216,11 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
         };
     }
 
+    // Handle ui_context for redirects, modals, etc.
+    if (response.ui_context) {
+        handleUIContext(response.ui_context);
+    }
+
     // Handle different response types
     if (response.data?.html) {
         return {
@@ -226,6 +233,37 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
         success: true,
         html: response.data || ''
     };
+}
+
+/**
+ * Handle UI context from API responses
+ * @param {Object} uiContext
+ */
+function handleUIContext(uiContext) {
+    if (!uiContext) return;
+
+    // Handle redirect
+    if (uiContext.redirect) {
+        console.log('🔄 Redirecting to:', uiContext.redirect);
+        window.location.href = uiContext.redirect;
+        return;
+    }
+
+    // Handle page refresh
+    if (uiContext.refresh) {
+        console.log('🔄 Refreshing page');
+        window.location.reload();
+        return;
+    }
+
+    // Handle close action (for modals, panels, etc.)
+    if (uiContext.close) {
+        console.log('❌ Closing current view');
+        // Dispatch event for application to handle
+        window.dispatchEvent(new CustomEvent('ui-close'));
+    }
+
+    // Toast notifications are handled by api-client
 }
 
 // ---------------------------

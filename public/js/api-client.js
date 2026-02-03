@@ -1,5 +1,8 @@
 /**
  * api-client.js — Centralized API Communication Layer
+ * ✅ Handles new response_schema structure
+ * ✅ Processes ui_context for client-side actions
+ * ✅ Supports 3xx redirect handling
  * ✅ Consistent request/response structure
  * ✅ Automatic error handling
  * ✅ Token management
@@ -16,6 +19,7 @@ const API_CONFIG = {
     retryAttempts: 2,
     retryDelay: 1000,
     tokenMetaSelector: 'meta[name="sanctum-token"]',
+    followRedirects: true, // Auto-follow 3xx redirects
 };
 
 // ---------------------------
@@ -31,29 +35,44 @@ const API_CONFIG = {
  * @property {Object} [headers] - Additional headers
  * @property {boolean} [skipAuth] - Skip authentication token
  * @property {number} [timeout] - Request timeout override
+ * @property {boolean} [followRedirects] - Follow 3xx redirects
  */
 
 /**
- * Standard API Response Structure (from backend)
- * @typedef {Object} ApiResponse
+ * Backend API Response Structure
+ * @typedef {Object} BackendApiResponse
  * @property {boolean} success - Request success status
  * @property {number} status - HTTP status code
  * @property {string} message - Response message
- * @property {*} [data] - Response data
- * @property {Object} [errors] - Error details
- * @property {Object} [meta] - Metadata (pagination, etc.)
+ * @property {Object} response_schema - Response schema object
+ * @property {*} response_schema.data - Response data
+ * @property {Array|null} response_schema.errors - Error details
+ * @property {Object|null} response_schema.meta - Metadata (pagination, etc.)
+ * @property {Object|null} response_schema.links - Related links
+ * @property {Object} ui_context - UI context object
+ * @property {string|null} ui_context.component - Component to render
+ * @property {string|null} ui_context.action - Action to perform
+ * @property {string|null} ui_context.redirect - Redirect URL
+ * @property {Object|null} ui_context.toast - Toast notification config
+ * @property {Object|null} ui_context.modal - Modal config
+ * @property {boolean} ui_context.refresh - Whether to refresh page
+ * @property {boolean} ui_context.close - Whether to close current view
+ * @property {Object|null} ui_context.custom - Custom UI context
  * @property {string} timestamp - Response timestamp
+ * @property {string|null} request_id - Request ID for tracking
  */
 
 /**
  * Client Response Structure (returned to caller)
  * @typedef {Object} ClientResponse
  * @property {boolean} success - Request success status
- * @property {*} [data] - Response data
- * @property {string} [message] - Response message
- * @property {number} [status] - HTTP status code
- * @property {Object} [errors] - Error details
- * @property {Object} [meta] - Metadata
+ * @property {*} data - Response data (from response_schema.data)
+ * @property {string} message - Response message
+ * @property {number} status - HTTP status code
+ * @property {Array|null} errors - Error details
+ * @property {Object|null} meta - Metadata
+ * @property {Object|null} links - Related links
+ * @property {Object} ui_context - UI context for client-side actions
  * @property {Error} [error] - Error object (for failures)
  */
 
@@ -201,28 +220,27 @@ class ApiClient {
     }
 
     /**
-     * Parse response
+     * Parse response with new response_schema structure
      * @private
      * @param {Response} response
+     * @param {ApiRequest} request
      * @returns {Promise<ClientResponse>}
      */
-    async _parseResponse(response) {
+    async _parseResponse(response, request) {
         const contentType = response.headers.get('content-type') || '';
 
         try {
             // Handle JSON responses
             if (contentType.includes('application/json')) {
-                const data = await response.json();
+                const json = await response.json();
 
-                // Backend should return standardized format
-                return {
-                    success: data.success || false,
-                    data: data.data,
-                    message: data.message || '',
-                    status: data.status || response.status,
-                    errors: data.errors,
-                    meta: data.meta,
-                };
+                // Check if response follows new schema
+                if (json.response_schema !== undefined) {
+                    return this._parseStandardResponse(json, response);
+                }
+
+                // Legacy response format
+                return this._parseLegacyResponse(json, response);
             }
 
             // Handle HTML responses
@@ -233,6 +251,10 @@ class ApiClient {
                     data: { html },
                     message: response.ok ? 'Content loaded' : 'Request failed',
                     status: response.status,
+                    errors: null,
+                    meta: null,
+                    links: null,
+                    ui_context: {},
                 };
             }
 
@@ -243,16 +265,143 @@ class ApiClient {
                 data: text,
                 message: response.ok ? 'Request successful' : 'Request failed',
                 status: response.status,
+                errors: null,
+                meta: null,
+                links: null,
+                ui_context: {},
             };
 
         } catch (error) {
             console.error('❌ Response parsing error:', error);
             return {
                 success: false,
+                data: null,
                 message: 'Failed to parse response',
                 status: response.status,
+                errors: [{ message: error.message }],
+                meta: null,
+                links: null,
+                ui_context: {},
                 error: error,
             };
+        }
+    }
+
+    /**
+     * Parse standard response_schema format
+     * @private
+     * @param {BackendApiResponse} json
+     * @param {Response} response
+     * @returns {ClientResponse}
+     */
+    _parseStandardResponse(json, response) {
+        const clientResponse = {
+            success: json.success || false,
+            data: json.response_schema?.data || null,
+            message: json.message || '',
+            status: json.status || response.status,
+            errors: json.response_schema?.errors || null,
+            meta: json.response_schema?.meta || null,
+            links: json.response_schema?.links || null,
+            ui_context: json.ui_context || {},
+        };
+
+        // Process UI context
+        this._processUIContext(clientResponse.ui_context);
+
+        return clientResponse;
+    }
+
+    /**
+     * Parse legacy response format
+     * @private
+     * @param {Object} json
+     * @param {Response} response
+     * @returns {ClientResponse}
+     */
+    _parseLegacyResponse(json, response) {
+        return {
+            success: json.success || response.ok,
+            data: json.data || json,
+            message: json.message || '',
+            status: json.status || response.status,
+            errors: json.errors || null,
+            meta: json.meta || null,
+            links: json.links || null,
+            ui_context: {},
+        };
+    }
+
+    /**
+     * Process UI context and trigger client-side actions
+     * @private
+     * @param {Object} uiContext
+     */
+    _processUIContext(uiContext) {
+        if (!uiContext || typeof uiContext !== 'object') {
+            return;
+        }
+
+        // Handle redirect
+        if (uiContext.redirect) {
+            console.log('🔄 UI Context: Redirect to', uiContext.redirect);
+            // Note: Actual redirect should be handled by caller
+        }
+
+        // Handle toast notification
+        if (uiContext.toast) {
+            console.log('📢 UI Context: Toast notification', uiContext.toast);
+            this._showToast(uiContext.toast);
+        }
+
+        // Handle modal
+        if (uiContext.modal) {
+            console.log('📋 UI Context: Modal', uiContext.modal);
+            // Note: Modal handling should be implemented by application
+        }
+
+        // Handle page refresh
+        if (uiContext.refresh) {
+            console.log('🔄 UI Context: Page refresh requested');
+            // Note: Actual refresh should be handled by caller
+        }
+
+        // Handle close action
+        if (uiContext.close) {
+            console.log('❌ UI Context: Close requested');
+            // Note: Close action should be handled by caller
+        }
+
+        // Handle custom actions
+        if (uiContext.custom) {
+            console.log('⚙️ UI Context: Custom action', uiContext.custom);
+            // Dispatch custom event
+            window.dispatchEvent(new CustomEvent('api-ui-context', {
+                detail: uiContext.custom
+            }));
+        }
+    }
+
+    /**
+     * Show toast notification (if toast library available)
+     * @private
+     * @param {Object} toastConfig
+     */
+    _showToast(toastConfig) {
+        // Example integration with common toast libraries
+        if (typeof Toastify !== 'undefined') {
+            Toastify({
+                text: toastConfig.message || '',
+                duration: toastConfig.duration || 3000,
+                gravity: toastConfig.position || 'top',
+                position: 'right',
+                backgroundColor: toastConfig.type === 'error' ? '#dc3545' : '#28a745',
+            }).showToast();
+        } else if (typeof toastr !== 'undefined') {
+            const type = toastConfig.type || 'info';
+            toastr[type](toastConfig.message || '');
+        } else {
+            console.log('Toast:', toastConfig);
         }
     }
 
@@ -260,16 +409,15 @@ class ApiClient {
      * Handle HTTP errors
      * @private
      * @param {Response} response
+     * @param {ApiRequest} request
      * @returns {Promise<ClientResponse>}
      */
-    async _handleError(response) {
-        const parsed = await this._parseResponse(response);
+    async _handleError(response, request) {
+        const parsed = await this._parseResponse(response, request);
 
         const errorResponse = {
+            ...parsed,
             success: false,
-            status: response.status,
-            message: parsed.message || this._getErrorMessageByStatus(response.status),
-            errors: parsed.errors,
             error: new Error(parsed.message || `HTTP ${response.status}`),
         };
 
@@ -281,7 +429,55 @@ class ApiClient {
             this._handleUnauthorized();
         }
 
+        // Handle 3xx redirects
+        if (response.status >= 300 && response.status < 400) {
+            return this._handleRedirect(response, request, errorResponse);
+        }
+
         return errorResponse;
+    }
+
+    /**
+     * Handle redirect responses (3xx)
+     * @private
+     * @param {Response} response
+     * @param {ApiRequest} request
+     * @param {ClientResponse} parsedResponse
+     * @returns {Promise<ClientResponse>}
+     */
+    async _handleRedirect(response, request, parsedResponse) {
+        const redirectUrl = response.headers.get('Location') || parsedResponse.data?.redirect_url;
+
+        if (!redirectUrl) {
+            console.warn('⚠️ Redirect response without Location header');
+            return parsedResponse;
+        }
+
+        console.log(`🔄 Redirect [${response.status}]: ${redirectUrl}`);
+
+        // Auto-follow redirects if configured
+        if (request.followRedirects !== false && this.config.followRedirects) {
+            console.log('🔄 Following redirect...');
+            
+            // Preserve method for 307/308, use GET for others
+            const newMethod = (response.status === 307 || response.status === 308) 
+                ? request.method 
+                : 'GET';
+
+            return this._executeRequest({
+                ...request,
+                method: newMethod,
+                endpoint: redirectUrl,
+                followRedirects: false, // Prevent infinite redirects
+            });
+        }
+
+        // Return redirect info to caller
+        return {
+            ...parsedResponse,
+            success: true,
+            message: parsedResponse.message || 'Redirect required',
+        };
     }
 
     /**
@@ -292,12 +488,25 @@ class ApiClient {
      */
     _getErrorMessageByStatus(status) {
         const messages = {
+            // 3xx Redirects
+            301: 'Resource moved permanently',
+            302: 'Resource found at new location',
+            303: 'See other resource',
+            304: 'Resource not modified',
+            307: 'Temporary redirect',
+            308: 'Permanent redirect',
+            
+            // 4xx Client Errors
             400: 'Bad request',
             401: 'Unauthorized - Please log in',
             403: 'Forbidden - Access denied',
             404: 'Resource not found',
+            405: 'Method not allowed',
+            409: 'Conflict',
             422: 'Validation failed',
             429: 'Too many requests',
+            
+            // 5xx Server Errors
             500: 'Internal server error',
             503: 'Service unavailable',
         };
@@ -313,8 +522,8 @@ class ApiClient {
         console.error('🔒 Unauthorized access - clearing token');
         localStorage.removeItem('auth_token');
         
-        // Optionally redirect to login
-        // window.location.href = '/login';
+        // Dispatch event for application to handle
+        window.dispatchEvent(new CustomEvent('api-unauthorized'));
     }
 
     /**
@@ -338,6 +547,7 @@ class ApiClient {
                 method: modifiedRequest.method,
                 headers: headers,
                 credentials: 'same-origin',
+                redirect: 'manual', // Handle redirects manually
             };
 
             // Add body for non-GET requests
@@ -363,11 +573,22 @@ class ApiClient {
             const modifiedResponse = await this._executeResponseInterceptors(response, modifiedRequest);
 
             // Handle response
-            if (!modifiedResponse.ok) {
-                return await this._handleError(modifiedResponse);
+            if (!modifiedResponse.ok && modifiedResponse.status < 300) {
+                return await this._handleError(modifiedResponse, modifiedRequest);
             }
 
-            const parsed = await this._parseResponse(modifiedResponse);
+            // Handle 3xx redirects
+            if (modifiedResponse.status >= 300 && modifiedResponse.status < 400) {
+                return await this._handleRedirect(modifiedResponse, modifiedRequest, 
+                    await this._parseResponse(modifiedResponse, modifiedRequest));
+            }
+
+            // Handle error responses
+            if (!modifiedResponse.ok) {
+                return await this._handleError(modifiedResponse, modifiedRequest);
+            }
+
+            const parsed = await this._parseResponse(modifiedResponse, modifiedRequest);
             console.log(`✅ API Success [${modifiedResponse.status}]:`, parsed);
 
             return parsed;
@@ -384,8 +605,13 @@ class ApiClient {
 
             return {
                 success: false,
+                data: null,
                 message: error.message || 'Request failed',
                 status: 0,
+                errors: [{ message: error.message }],
+                meta: null,
+                links: null,
+                ui_context: {},
                 error: error,
             };
         }
