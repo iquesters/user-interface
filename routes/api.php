@@ -29,17 +29,32 @@ Route::middleware(['api'])->group(function () {
 | Protected APIs - Sanctum tokens ONLY
 |--------------------------------------------------------------------------
 */
+Route::prefix('api')
+    ->middleware([
+        'api',
+        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
+        'auth:sanctum',
+        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+    ])
+    ->group(function () {
+        Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
+        ->name('auth.table');
+
+        Route::get('entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData'])
+            ->name('api.entity.data');
+});
+
 
 Route::middleware(['api','auth:sanctum'])->group(function () {
-    Route::get('api/auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
-        ->name('auth.table');
+    // Route::get('api/auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
+    //     ->name('auth.table');
 
     Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
         ->name('auth.form');
 
     Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
 
-    Route::get('api/entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
+    // Route::get('api/entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
 
     Route::get('api/hola/{form_schema_id}/{entity_uid?}', [UIController::class, 'getHtmlComponent']);
 });

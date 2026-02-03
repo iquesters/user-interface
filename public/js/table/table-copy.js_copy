@@ -1,14 +1,19 @@
 /**
- * table.js — Enhanced Lazy Loading DataTables with API Client Integration
- * ✅ Uses centralized API client
- * ✅ Consistent request/response handling
- * ✅ Better error handling
- * ✅ Improved code organization
+ * table.js — Enhanced Lazy Loading DataTables with Smart Caching & Inbox View
+ * ✅ Intelligent cache reuse across page size changes
+ * ✅ Predictive prefetching
+ * ✅ Memory-efficient batch management
+ * ✅ Gmail-style inbox view with resizable panels (NO IFRAME)
  */
 
 // ---------------------------
 // 🧩 CONSTANTS
 // ---------------------------
+const SANCTUM_META_SELECTOR = 'meta[name="sanctum-token"]';
+const API_SCHEMA_URL = '/api/auth/table/';
+const API_ENTITY_URL = '/api/entity/';
+const TOKEN_WAIT_TIMEOUT = 5000;
+const CHECK_INTERVAL = 100;
 const PREFETCH_THRESHOLD = 0.7;
 const DEFAULT_DT_CONFIG = {
     processing: false,
@@ -30,7 +35,29 @@ const DEFAULT_DT_CONFIG = {
 const VIEW_MODE_TABLE = 'table';
 const VIEW_MODE_INBOX = 'inbox';
 const MIN_PANEL_WIDTH = 250;
-const DEFAULT_LEFT_PANEL_WIDTH = 40;
+const DEFAULT_LEFT_PANEL_WIDTH = 40; // percentage
+
+// ---------------------------
+// 🔐 SANCTUM TOKEN HELPERS
+// ---------------------------
+const getSanctumToken = () => {
+    const tokenMeta = document.querySelector(SANCTUM_META_SELECTOR);
+    return tokenMeta ? tokenMeta.getAttribute('content') : '';
+};
+
+const waitForToken = (maxWaitTime = TOKEN_WAIT_TIMEOUT) => {
+    return new Promise((resolve, reject) => {
+        const start = Date.now();
+        const check = () => {
+            const token = getSanctumToken();
+            if (token) return resolve(token);
+            if (Date.now() - start > maxWaitTime)
+                return reject(new Error('Sanctum token not found after waiting'));
+            setTimeout(check, CHECK_INTERVAL);
+        };
+        check();
+    });
+};
 
 // ---------------------------
 // 📦 ENHANCED ENTITY CACHE
@@ -92,22 +119,21 @@ class EntityCache {
 }
 
 const entityCaches = new Map();
-const inboxViewStates = new Map();
+const inboxViewStates = new Map(); // Track active row selection per entity
 
 // ---------------------------
 // 🚀 ENTRY POINT
 // ---------------------------
 document.addEventListener("DOMContentLoaded", async () => {
     console.log('📄 DOM Ready - Initializing tables');
-    
-    // Wait for API client to be available
-    if (typeof apiClient === 'undefined') {
-        console.error('❌ API Client not loaded');
+    try {
+        await waitForToken();
+        console.log('🔐 Sanctum token detected');
+        document.querySelectorAll(".lab-table").forEach(initLabTable);
+    } catch (err) {
+        console.warn('⚠️ Token missing:', err.message);
         showAuthWarning();
-        return;
     }
-
-    document.querySelectorAll(".lab-table").forEach(initLabTable);
 });
 
 // ---------------------------
@@ -117,14 +143,9 @@ async function initLabTable(tableElement) {
     const slug = tableElement.id;
     if (!slug) return console.warn("❌ Missing table id");
 
-    console.log(`📋 Initializing table: ${slug}`);
-    
-    // Fetch schema using API client
-    const schemaResponse = await apiClient.get(`/api/auth/table/${slug}`);
-    
-    if (!schemaResponse.success || !schemaResponse.data) {
-        return showErrorMessage(tableElement, schemaResponse.message || "Table Schema not found");
-    }
+    console.log(`📋 Fetching schema for: ${slug}`);
+    const schemaResponse = await fetchTableSchema(slug);
+    if (!schemaResponse?.data) return showErrorMessage(tableElement, "Table Schema not found");
 
     const schema = schemaResponse.data;
     const entity = schema.entity;
@@ -132,9 +153,8 @@ async function initLabTable(tableElement) {
     const entriesPerPage = schema.entries_per_page || 10;
     const viewMode = schema.default_view_mode || VIEW_MODE_TABLE;
 
-    if (!entity || !dtSchemaConfig.columns) {
+    if (!entity || !dtSchemaConfig.columns)
         return showErrorMessage(tableElement, "Invalid schema or missing entity");
-    }
 
     // Initialize cache
     const cache = new EntityCache(entity, entriesPerPage);
@@ -146,12 +166,10 @@ async function initLabTable(tableElement) {
     showTableLoader(tableElement);
 
     const initialData = await fetchEntityData(entity, 0, initialFetchSize);
-    
-    if (!initialData.success || !initialData.data) {
-        return showErrorMessage(tableElement, initialData.message || "Failed to load data");
-    }
+    if (!initialData.success || !initialData.data)
+        return showErrorMessage(tableElement, initialData.error || "Failed to load data");
 
-    cache.set(0, initialData.data, initialData.meta?.pagination?.total || initialData.data.length);
+    cache.set(0, initialData.data, initialData.total);
 
     // Merge configs
     const mergedConfig = mergeDataTableConfigs(
@@ -169,64 +187,96 @@ async function initLabTable(tableElement) {
 }
 
 // ---------------------------
-// 🌐 API HELPERS (Using API Client)
+// 🌐 FETCH HELPERS
 // ---------------------------
+async function fetchTableSchema(slug) {
+    try {
+        const token = getSanctumToken();
+        const res = await fetch(`${API_SCHEMA_URL}${slug}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) return handleUnauthorized();
+        return await res.json();
+    } catch (err) {
+        console.error("Schema fetch failed:", err);
+        return null;
+    }
+}
+
 async function fetchEntityData(entity, offset = 0, length = 50) {
-    const response = await apiClient.get(`/api/entity/${entity}`, {
-        offset,
-        length
-    });
-
-    if (!response.success) {
-        console.error('Failed to fetch entity data:', response.message);
-        return {
-            success: false,
-            message: response.message,
-            error: response.error
-        };
+    try {
+        const token = getSanctumToken();
+        const url = `${API_ENTITY_URL}${entity}?offset=${offset}&length=${length}`;
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) return handleUnauthorized();
+        const data = await res.json();
+        return { success: true, ...data };
+    } catch (err) {
+        console.error("Entity fetch failed:", err);
+        return { success: false, error: err.message };
     }
+}
+async function fetchFormContent(formSchemaUid, entityUid) {
+    try {
+        const url = `/edit/${formSchemaUid}/${entityUid}?ajax=true`;
+        // ?component=component-name&component=true
+        const res = await fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
 
-    // Extract data and total from response
-    return {
-        success: true,
-        data: response.data || [],
-        total: response.meta?.pagination?.total || response.data?.length || 0,
-        meta: response.meta
-    };
+        if (res.status === 401) return handleUnauthorized();
+
+        const contentType = res.headers.get('content-type') || '';
+
+        // ✅ JSON response
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            return {
+                success: true,
+                html: json.html
+            };
+        }
+
+        // ✅ HTML response
+        const html = await res.text();
+        return { success: true, html };
+
+    } catch (err) {
+        console.error("Form content fetch failed:", err);
+        return { success: false, error: err.message };
+    }
 }
 
-async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.form') {
-    const urlParts = ['/hola', formSchemaId];
-    if (entityUid) {
-        urlParts.push(entityUid);
-    }
-
-    const endpoint = urlParts.join('/');
-    
-    const response = await apiClient.get(endpoint, {
-        component: componentName
-    });
-
-    if (!response.success) {
-        return {
-            success: false,
-            error: response.message || 'Failed to fetch component'
-        };
-    }
-
-    // Handle different response types
-    if (response.data?.html) {
-        return {
-            success: true,
-            html: response.data.html
-        };
-    }
-
-    return {
-        success: true,
-        html: response.data || ''
-    };
-}
+// async function fetchFormContent(formSchemaUid, entityUid) {
+//     try {
+//         // const token = getSanctumToken();
+//         const url = `/edit/${formSchemaUid}/${entityUid}?ajax=true`;
+//         // const res = await fetch(url, {
+//         //     headers: { 
+//         //         Authorization: `Bearer ${token}`,
+//         //         'X-Requested-With': 'XMLHttpRequest'
+//         //     },
+//         // });
+//         const res = await fetch(url);
+        
+//         if (res.status === 401) return handleUnauthorized();
+        
+//         const contentType = res.headers.get('content-type');
+//         if (contentType && contentType.includes('application/json')) {
+//             return await res.json();
+//         }
+        
+//         const html = await res.text();
+//         return { success: true, html };
+//     } catch (err) {
+//         console.error("Form content fetch failed:", err);
+//         return { success: false, error: err.message };
+//     }
+// }
 
 // ---------------------------
 // 🧠 CONFIG MERGE LOGIC
@@ -249,14 +299,18 @@ function mergeColumns(defaultCols, schemaCols, userCols) {
 }
 
 function getUserPersonalization(entityName) {
+    //get from localdata, if not available get from sessiondata(session data saved from DB during login)
     return {};
 }
+// changeTableViewMode{
 
+// }
 // ---------------------------
 // 📧 INBOX VIEW RENDERING
 // ---------------------------
 function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     const { columns = [] } = dtConfig;
+    const rootFormSchemaUid = dtConfig["form-schema-uid"] || schema["form-schema-uid"] || null;
     
     // Create inbox container
     const container = document.createElement('div');
@@ -294,7 +348,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     listTable.style.cssText = 'margin: 0; cursor: pointer;';
     leftPanel.appendChild(listTable);
     
-    // Setup list columns
+    // Setup list columns (priority fields only)
     const priorityColumns = getPriorityColumns(columns);
     listTable.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
     const theadRow = listTable.querySelector("thead tr");
@@ -327,23 +381,27 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     $(listTable).on('click', 'tbody tr', function() {
         const data = dt.row(this).data();
         if (data) {
-            loadDetailComponent(rightPanelEle, schema, data);
+                loadDetailComponent(rightPanelEle, schema, data);
+                // loadDetailFormView(rightPanel, data, columns, rootFormSchemaUid);
+
             $(this).addClass('table-active').siblings().removeClass('table-active');
         }
     });
     
     // Setup resizer
-    setupResizer(resizer, leftPanel, rightPanelEle, container);
+    setupResizer(resizer, leftPanel, rightPanel, container);
     
     console.log(`✅ Inbox view ready for: ${entityName}`);
 }
 
 function getPriorityColumns(columns) {
+    // Return columns that should appear in the list view
+    // Prioritize: id, status, name, email, and other visible non-meta fields
     const priorityOrder = ['id', 'status', 'name', 'email', 'title', 'subject'];
     
     return columns
         .filter(c => c.visible !== false)
-        .filter(c => !c.data?.startsWith?.('meta.'))
+        .filter(c => !c.data?.startsWith?.('meta.')) // Exclude meta fields from list
         .sort((a, b) => {
             const aIdx = priorityOrder.indexOf(a.data);
             const bIdx = priorityOrder.indexOf(b.data);
@@ -352,7 +410,7 @@ function getPriorityColumns(columns) {
             if (bIdx === -1) return -1;
             return aIdx - bIdx;
         })
-        .slice(0, 4);
+        .slice(0, 4); // Show max 4 columns in list
 }
 
 function renderInboxListCell(col, row) {
@@ -363,6 +421,7 @@ function renderInboxListCell(col, row) {
         val = row[col.data] ?? "";
     }
     
+    // Truncate long text in list view
     if (typeof val === 'string' && val.length > 50) {
         val = val.substring(0, 47) + '...';
     }
@@ -370,7 +429,94 @@ function renderInboxListCell(col, row) {
     return `<span class="inbox-list-cell">${val}</span>`;
 }
 
-function getLoaderComponentHTML() {
+// async function loadDetailView(rightPanel, rowData, allColumns, formSchemaUid) {
+//     // Show loading spinner
+//     rightPanel.innerHTML = `
+//         <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+//             <div class="text-center">
+//                 <div class="spinner-border text-primary mb-2" role="status"></div>
+//                 <div class="text-muted">Loading details...</div>
+//             </div>
+//         </div>
+//     `;
+    
+//     try {
+//         // Fetch the form content directly
+//         const result = await fetchFormContent(formSchemaUid, rowData.uid);
+        
+//         if (result.success && result.html) {
+//             // Create container for the form content
+//             const detailContainer = document.createElement('div');
+//             detailContainer.className = 'inbox-detail-view';
+//             detailContainer.style.cssText = 'height: 100%; overflow-y: auto;';
+//             detailContainer.innerHTML = result.html;
+            
+//             // Clear and append
+//             rightPanel.innerHTML = '';
+//             rightPanel.appendChild(detailContainer);
+            
+//             // Re-initialize any scripts that might be in the loaded content
+//             initializeDetailViewScripts(detailContainer);
+            
+//             console.log(`✅ Detail view loaded for UID: ${rowData.uid}`);
+//         } else {
+//             showDetailError(rightPanel, result.error || 'Failed to load details');
+//         }
+//     } catch (error) {
+//         console.error('Error loading detail view:', error);
+//         showDetailError(rightPanel, error.message);
+//     }
+// }
+async function loadDetailFormView(rightPanel, rowData, allColumns, formSchemaUid) {
+    rightPanel.innerHTML = `
+        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-2" role="status"></div>
+                <div class="text-muted">Loading details...</div>
+            </div>
+        </div>
+    `;
+
+    try {
+        const result = await fetchFormContent(formSchemaUid, rowData.uid);
+
+        if (result.success && result.html) {
+            rightPanel.innerHTML = result.html;
+
+            // ✅ THIS IS THE FIX (REQUIRED)
+            const form = rightPanel.querySelector('.shoz-form');
+            if (form) {
+                setupForm(form);           // ← THIS was missing
+                setupCoreFormElement();    // ← THIS too
+            }
+
+        } else {
+            showDetailError(rightPanel, result.error || 'Failed to load details');
+        }
+    } catch (error) {
+        console.error('Error loading detail view:', error);
+        showDetailError(rightPanel, error.message);
+    }
+}
+
+// async function loadDetailComponent(rightPanelEle, schema, data) {
+//     // Show loading spinner
+//     rightPanelEle.innerHTML = getLoaderComponentHTML();
+//     // redeclear new api route and controller function
+//     if(schema["details-component"]) {
+//         // Fetch the component HTML with component name as schema["details-component"]
+//     } else if(schema["form-schema-uid"]) {
+//         // Fetch the component HTML with hardcoded component name as userinterface::components.form
+//     }else {
+//         rightPanelEle.innerHTML = '<div class="alert alert-warning">No detail component or form schema defined.</div>';
+//         // or may be some default fall back which we will decide later.
+//     }
+    
+// }
+
+// moved in ui utils
+function getLoaderComponentHTML()
+{
     return `
         <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
             <div class="text-center">
@@ -379,9 +525,11 @@ function getLoaderComponentHTML() {
             </div>
         </div>
     `;
+
 }
 
 async function loadDetailComponent(rightPanelEle, schema, data) {
+    // Show loading spinner
     rightPanelEle.innerHTML = getLoaderComponentHTML();
     
     try {
@@ -396,7 +544,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                 schema["details-component"]
             );
         } 
-        // Priority 2: Form schema UID
+        // Priority 2: Form schema UID (fallback to form component)
         else if (schema["form-schema-uid"]) {
             console.log(`📝 Loading form component for UID: ${data.uid}`);
             result = await fetchHtmlComponent(
@@ -423,14 +571,12 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
             
             // Initialize forms if present
             const form = rightPanelEle.querySelector('.shoz-form');
-            if (form && typeof setupForm === 'function') {
+            if (form) {
                 setupForm(form);
-            }
-            if (typeof setupCoreFormElement === 'function') {
                 setupCoreFormElement();
             }
             
-            // Re-initialize scripts
+            // Re-initialize scripts in loaded content
             initializeDetailViewScripts(rightPanelEle);
             
             console.log(`✅ Detail component loaded successfully for UID: ${data.uid}`);
@@ -444,7 +590,79 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     }
 }
 
+
+async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.form') {
+    try {
+        const token = getSanctumToken();
+        
+        // Build URL: /api/{form_schema_id}/{entity_uid}?component={componentName}
+        const urlParts = ['/api/hola', formSchemaId];
+        if (entityUid) {
+            urlParts.push(entityUid);
+        }
+        
+        const url = `${urlParts.join('/')}?component=${encodeURIComponent(componentName)}`;
+        
+        console.log(`Fetching component: ${url}`);
+        
+        const res = await fetch(url, {
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+            }
+        });
+        console.log('response of fetching new api', res);
+        
+        if (res.status === 401) {
+            return handleUnauthorized();
+        }
+        
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const contentType = res.headers.get('content-type') || '';
+        
+        // Handle JSON response
+        if (contentType.includes('application/json')) {
+            const json = await res.json();
+            
+            // Check if response has html property
+            if (json.html) {
+                return {
+                    success: true,
+                    html: json.html
+                };
+            }
+            
+            // Handle error responses
+            if (json.error || json.message) {
+                return {
+                    success: false,
+                    error: json.error || json.message
+                };
+            }
+            
+            return {
+                success: false,
+                error: 'Invalid response format'
+            };
+        }
+        
+        // Handle HTML response (fallback)
+        const html = await res.text();
+        return { success: true, html };
+        
+    } catch (err) {
+        console.error("HTML component fetch failed:", err);
+        return { 
+            success: false, 
+            error: err.message || 'Failed to fetch component'
+        };
+    }
+}
+
 function initializeDetailViewScripts(container) {
+    // Re-run any scripts in the loaded content
     const scripts = container.querySelectorAll('script');
     scripts.forEach(oldScript => {
         const newScript = document.createElement('script');
@@ -455,6 +673,7 @@ function initializeDetailViewScripts(container) {
         oldScript.parentNode.replaceChild(newScript, oldScript);
     });
     
+    // Trigger custom event for any listeners
     const event = new CustomEvent('inboxDetailLoaded', { 
         bubbles: true,
         detail: { container }
@@ -582,7 +801,6 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
         cache.pageSize = length;
     }
 
-    // Check cache first
     if (cache.hasRange(start, length)) {
         const cachedData = cache.get(start, length);
         console.log(`✨ Serving from cache (${start}-${start + length})`);
@@ -601,7 +819,6 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
         return;
     }
 
-    // Fetch from API
     console.log(`🌐 Cache miss - fetching from API`);
     showTableLoader(tableElement);
 
@@ -627,7 +844,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
             recordsFiltered: 0,
             data: [],
         });
-        showErrorMessage(tableElement, result.message || "Failed to load data");
+        showErrorMessage(tableElement, result.error || "Failed to load data");
     }
 }
 
@@ -657,7 +874,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength)
 }
 
 // ---------------------------
-// 🌀 UI HELPERS
+// 🌀 TABLE LOADER
 // ---------------------------
 function showTableLoader(tableElement) {
     const tbody = tableElement.querySelector("tbody");
@@ -671,6 +888,14 @@ function showTableLoader(tableElement) {
                 </div>
             </td>
         </tr>`;
+}
+
+// ---------------------------
+// ⚠️ AUTH & ERROR HANDLING
+// ---------------------------
+function handleUnauthorized() {
+    console.error('Authentication required - redirecting to login');
+    localStorage.removeItem('auth_token');
 }
 
 function showAuthWarning() {
