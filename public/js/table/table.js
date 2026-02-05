@@ -333,33 +333,32 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     leftPanel.appendChild(listTable);
     
     // Setup list columns
-    const priorityColumns = getPriorityColumns(columns);
-    listTable.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
-    const theadRow = listTable.querySelector("thead tr");
-    priorityColumns.forEach(col => {
-        const th = document.createElement("th");
-        th.textContent = col.title || col.data;
-        theadRow.appendChild(th);
-    });
-    
-    const resolvedColumns = priorityColumns.map(col => ({
+    listTable.innerHTML = `
+        <thead>
+            <tr><th></th></tr>
+        </thead>
+        <tbody></tbody>
+    `;
+
+    const resolvedColumns = [{
         data: null,
-        title: col.title,
-        render: (row) => renderInboxListCell(col, row),
-    }));
+        render: (row) => renderInboxRow(row, columns)
+    }];
     
     // Initialize DataTable
     const dt = $(listTable).DataTable({
         ...dtConfig,
+        responsive: false, // ⛔ disable responsive
         pageLength: cache.pageSize,
         columns: resolvedColumns,
         select: {
             style: 'single',
             className: 'bg-primary bg-opacity-10'
         },
-        ajax: async (dataTablesParams, callback) =>
-            handleAjaxFetch(dataTablesParams, callback, cache, entityName, listTable),
+        ajax: (params, callback) =>
+            handleAjaxFetch(params, callback, cache, entityName, listTable),
     });
+
     
     // Handle row selection
     $(listTable).on('click', 'tbody tr', function() {
@@ -375,6 +374,53 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     
     console.log(`✅ Inbox view ready for: ${entityName}`);
 }
+
+/**
+ * Render inbox row with "Label: Value" in one line (Bootstrap only)
+ */
+function renderInboxRow(row, columns) {
+    const visibleColumns = columns.filter(
+        col =>
+            col.visible !== false &&
+            col.data &&
+            !col.data.startsWith('meta.')
+    );
+
+    return `
+        <div class="d-flex flex-column gap-1 p-2">
+            ${visibleColumns
+                .map(col => {
+                    let value = '';
+
+                    if (col.data.includes('.')) {
+                        value = col.data
+                            .split('.')
+                            .reduce((acc, key) => acc?.[key], row) ?? '';
+                    } else {
+                        value = row[col.data] ?? '';
+                    }
+
+                    if (value === '' || value === null || value === undefined) {
+                        return '';
+                    }
+
+                    return `
+                        <div class="d-flex align-items-center gap-1 text-truncate">
+                            <span class="fw-semibold text-muted">
+                                ${col.title || col.data}
+                            </span>
+                            <span class="text-muted">:</span>
+                            <span class="flex-grow-1 text-truncate">
+                                ${value}
+                            </span>
+                        </div>
+                    `;
+                })
+                .join('')}
+        </div>
+    `;
+}
+
 
 function getPriorityColumns(columns) {
     const priorityOrder = ['id', 'status', 'name', 'email', 'title', 'subject'];
