@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
 use Iquesters\Foundation\Models\MasterData;
 use Illuminate\Http\Request;
+use Iquesters\UserInterface\Models\TableSchema;
 
 class UIController extends Controller
 {
@@ -20,9 +21,14 @@ class UIController extends Controller
             Log::info("In UIController list method", [
                 'table_schema_id' => $table_schema_id
             ]);
-            return view('userinterface::ui.list', compact('table_schema_id'));
+            $table_schema = TableSchema::where('uid', $table_schema_id)->first();
+            return view('userinterface::ui.list', compact('table_schema'));
         } catch (\Throwable $th) {
-            //throw $th;
+            Log::error("Error in list method", [
+                'error' => $th->getMessage()
+            ]);
+
+            return back()->with('error', 'Something went wrong.');
         }
     }
 

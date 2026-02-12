@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
+use Iquesters\Foundation\System\Http\ApiResponse;
 
 class DynamicEntityController extends Controller
 {
@@ -80,16 +81,25 @@ class DynamicEntityController extends Controller
                 });
             }
 
-            return response()->json([
-                'success' => true,
-                'entity' => $entity,
-                'meta_table' => $metaTable ?? 'none',
-                'offset' => (int)$offset,
-                'length' => (int)$length,
-                'total' => $totalCount,
-                'count' => $data->count(),
-                'data' => $data,
-            ]);
+            // return response()->json([
+            //     'success' => true,
+            //     'entity' => $entity,
+            //     'meta_table' => $metaTable ?? 'none',
+            //     'offset' => (int)$offset,
+            //     'length' => (int)$length,
+            //     'total' => $totalCount,
+            //     'count' => $data->count(),
+            //     'data' => $data,
+            // ]);
+            $page = floor($offset / $length) + 1;
+
+return ApiResponse::paginated(
+    $data,
+    $totalCount,
+    $length,
+    $page,
+    'Request successful'
+);
 
         } catch (Throwable $e) {
             Log::error('Entity Data API Error', [
