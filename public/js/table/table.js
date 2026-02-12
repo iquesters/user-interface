@@ -369,6 +369,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     const dt = $(listTable).DataTable({
         ...dtConfig,
         responsive: false, // ⛔ disable responsive
+        autoWidth: false, // ⛔ disable auto width
         pageLength: cache.pageSize,
         columns: resolvedColumns,
         select: {
@@ -424,13 +425,17 @@ function renderInboxRow(row, columns) {
                         return '';
                     }
 
+                    // Convert objects/arrays to string
+                    if (typeof value === 'object') {
+                        value = JSON.stringify(value);
+                    }
+
                     return `
-                        <div class="d-flex align-items-center gap-1 text-truncate">
-                            <span class="fw-semibold text-muted">
-                                ${col.title || col.data}
+                        <div style="display: flex; align-items: start; gap: 4px; overflow: hidden;">
+                            <span class="fw-semibold text-muted" style="white-space: nowrap; flex-shrink: 0;">
+                                ${col.title || col.data}:
                             </span>
-                            <span class="text-muted">:</span>
-                            <span class="flex-grow-1 text-truncate">
+                            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0;" title="${String(value).replace(/"/g, '&quot;')}">
                                 ${value}
                             </span>
                         </div>

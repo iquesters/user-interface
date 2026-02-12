@@ -235,3 +235,17 @@ ol.breadcrumb {
     cursor: pointer;
     transition: color 0.2s ease;
 }
+
+.inbox-left-panel .dataTable {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+
+.inbox-left-panel .dataTable col {
+    width: auto !important;
+}
+
+.inbox-left-panel .dataTable td {
+    max-width: 0;
+    overflow: hidden;
+}
