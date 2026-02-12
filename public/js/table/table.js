@@ -352,6 +352,9 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     listTable.innerHTML = `
         <thead>
             <tr>
+                <th class="checkbox-column">
+                    <input type="checkbox" id="select-all-inbox" style="cursor: pointer;">
+                </th>
                 <th class="text-uppercase">
                     ${formattedEntityName}
                 </th>
@@ -360,10 +363,18 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
         <tbody></tbody>
     `;
 
-    const resolvedColumns = [{
-        data: null,
-        render: (row) => renderInboxRow(row, columns)
-    }];
+    const resolvedColumns = [
+        {
+            data: null,
+            orderable: false,
+            className: 'checkbox-column',
+            render: (row) => `<input type="checkbox" class="row-checkbox" data-uid="${row.uid || row.id}" style="cursor: pointer;">`
+        },
+        {
+            data: null,
+            render: (row) => renderInboxRow(row, columns)
+        }
+    ];
     
     // Initialize DataTable
     const dt = $(listTable).DataTable({
@@ -372,6 +383,14 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
         autoWidth: false, // ⛔ disable auto width
         pageLength: cache.pageSize,
         columns: resolvedColumns,
+        columnDefs: [
+            {
+                targets: 0, // First column (checkbox)
+                orderable: false,
+                searchable: false,
+                width: '40px'
+            }
+        ],
         select: {
             style: 'single',
             className: 'bg-primary bg-opacity-10'
@@ -380,9 +399,21 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
             handleAjaxFetch(params, callback, cache, entityName, listTable),
     });
 
-    
+    // Setup resizer
+    setupResizer(resizer, leftPanel, rightPanelEle, container);
+
+    // Setup checkbox handlers
+    setupCheckboxHandlers(listTable, true);
+
+    console.log(`✅ Inbox view ready for: ${entityName}`);
+
     // Handle row selection
-    $(listTable).on('click', 'tbody tr', function() {
+    $(listTable).on('click', 'tbody tr', function(e) {
+        // Don't trigger if clicking checkbox
+        if ($(e.target).hasClass('row-checkbox') || $(e.target).closest('.checkbox-column').length) {
+            return;
+        }
+        
         const data = dt.row(this).data();
         if (data) {
             loadDetailComponent(rightPanelEle, schema, data);
@@ -637,6 +668,14 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     );
     tableElement.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
     const theadRow = tableElement.querySelector("thead tr");
+
+    // Add checkbox column header
+    const checkboxTh = document.createElement("th");
+    checkboxTh.className = "checkbox-column";
+    checkboxTh.innerHTML = '<input type="checkbox" id="select-all-table" style="cursor: pointer;">';
+    theadRow.appendChild(checkboxTh);
+
+    // Add other columns
     columns.forEach(col => {
         if (col.visible !== false) {
             const th = document.createElement("th");
@@ -645,21 +684,43 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         }
     });
 
-    const resolvedColumns = columns
+    const resolvedColumns = [
+    {
+        data: null,
+        orderable: false,  // ✅ Make checkbox column non-sortable
+        searchable: false, // ✅ Exclude from search
+        className: 'checkbox-column',
+        width: '40px',
+        render: (row) => `<input type="checkbox" class="row-checkbox" data-uid="${row.uid || row.id}" style="cursor: pointer;">`
+    },
+    ...columns
         .filter(c => c.visible !== false)
         .map(col => ({
             data: null,
             title: col.title,
+            orderable: col.orderable !== false, // ✅ Respect column's orderable setting
             render: (row) => renderCell(col, row, rootFormSchemaUid),
-        }));
+        }))
+];
 
     $(tableElement).DataTable({
         ...dtConfig,
         pageLength: cache.pageSize,
         columns: resolvedColumns,
+        columnDefs: [
+            {
+                targets: 0, // First column (checkbox)
+                orderable: false,
+                searchable: false,
+                width: '40px'
+            }
+        ],
         ajax: async (dataTablesParams, callback) =>
             handleAjaxFetch(dataTablesParams, callback, cache, entityName, tableElement),
     });
+
+    // Setup checkbox handlers
+    setupCheckboxHandlers(tableElement, false);
 
     console.log(`✅ DataTable ready for: ${entityName}`);
 }
@@ -806,4 +867,54 @@ function showAuthWarning() {
 
 function showErrorMessage(table, msg) {
     table.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">${msg}</td></tr>`;
+}
+
+// ---------------------------
+// ✅ CHECKBOX HANDLERS
+// ---------------------------
+function setupCheckboxHandlers(tableElement, isInboxView = false) {
+    const selectAllId = isInboxView ? 'select-all-inbox' : 'select-all-table';
+    const selectAllCheckbox = document.getElementById(selectAllId);
+    
+    if (!selectAllCheckbox) return;
+    
+    // Select/Deselect all
+    selectAllCheckbox.addEventListener('change', function() {
+        const checkboxes = tableElement.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+        });
+        updateSelectionCount(tableElement);
+    });
+    
+    // Handle individual checkbox changes
+    $(tableElement).on('change', '.row-checkbox', function() {
+        const allCheckboxes = tableElement.querySelectorAll('.row-checkbox');
+        const checkedCount = tableElement.querySelectorAll('.row-checkbox:checked').length;
+        
+        selectAllCheckbox.checked = checkedCount === allCheckboxes.length;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+        
+        updateSelectionCount(tableElement);
+    });
+}
+
+function updateSelectionCount(tableElement) {
+    const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
+    console.log(`📋 Selected rows: ${checkedBoxes.length}`);
+    
+    // Get selected UIDs
+    const selectedUids = Array.from(checkedBoxes).map(cb => cb.dataset.uid);
+    console.log('Selected UIDs:', selectedUids);
+    
+    // You can dispatch a custom event here if you want other parts of your app to react
+    const event = new CustomEvent('rowSelectionChanged', {
+        detail: { count: checkedBoxes.length, uids: selectedUids }
+    });
+    tableElement.dispatchEvent(event);
+}
+
+function getSelectedRows(tableElement) {
+    const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
+    return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }

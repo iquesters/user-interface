@@ -249,3 +249,30 @@ ol.breadcrumb {
     max-width: 0;
     overflow: hidden;
 }
+
+/* Checkbox column styling */
+/* Hide sorting icons on checkbox column */
+.checkbox-column .dt-column-order {
+    display: none !important;
+}
+
+.checkbox-column {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    cursor: default !important;
+}
+
+.inbox-list-table .checkbox-column {
+    padding: 8px !important;
+}
+
+/* Prevent checkbox column from being too wide */
+.dataTable thead .checkbox-column,
+.dataTable tbody .checkbox-column {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+}
