@@ -299,17 +299,23 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     // Create inbox container
     const container = document.createElement('div');
     container.className = 'inbox-view-container';
-    container.style.cssText = 'display: flex; height: 600px; border: 1px solid #ddd; position: relative;';
+    container.style.cssText = 'display: flex; height: 600px; position: relative;';
     
     // Left panel (list view)
     const leftPanel = document.createElement('div');
     leftPanel.className = 'inbox-left-panel';
-    leftPanel.style.cssText = `width: ${DEFAULT_LEFT_PANEL_WIDTH}%; overflow: auto; border-right: 1px solid #ddd;`;
+    leftPanel.style.cssText = `
+        width: ${DEFAULT_LEFT_PANEL_WIDTH}%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        border-right: 1px solid;
+    `;
+
     
     // Resizer
     const resizer = document.createElement('div');
     resizer.className = 'inbox-resizer';
-    resizer.style.cssText = 'width: 5px; cursor: col-resize; background: #e0e0e0; user-select: none;';
+    resizer.style.cssText = 'width: 5px; cursor: col-resize; user-select: none;';
     resizer.title = 'Drag to resize';
     
     // Right panel (detail view)
@@ -328,14 +334,28 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema) {
     
     // Create DataTable in left panel
     const listTable = document.createElement('table');
-    listTable.className = 'table table-hover inbox-list-table';
+    listTable.className = `
+        table 
+        table-striped 
+        table-bordered 
+        table-hover 
+        inbox-list-table
+    `;
     listTable.style.cssText = 'margin: 0; cursor: pointer;';
     leftPanel.appendChild(listTable);
     
-    // Setup list columns
+    // Format entity name nicely
+    const formattedEntityName = entityName
+        .replace(/_/g, " ")          // replace underscores with space
+        .replace(/\b\w/g, c => c.toUpperCase()); // capitalize each word
+
     listTable.innerHTML = `
         <thead>
-            <tr><th></th></tr>
+            <tr>
+                <th class="text-uppercase">
+                    ${formattedEntityName}
+                </th>
+            </tr>
         </thead>
         <tbody></tbody>
     `;
@@ -603,6 +623,13 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     const { columns = [] } = dtConfig;
     const rootFormSchemaUid = dtConfig["form-schema-uid"] || "";
 
+    // ✅ Add Bootstrap styling classes
+    tableElement.classList.add(
+        "table",
+        "table-striped",
+        "table-bordered",
+        "table-hover",
+    );
     tableElement.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
     const theadRow = tableElement.querySelector("thead tr");
     columns.forEach(col => {
