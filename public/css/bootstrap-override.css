@@ -24,6 +24,9 @@
 .bg-danger-subtle {
     background-color:var(--bs-danger-bg-subtle) !important
 }
+.bg-dark-subtle {
+    background-color:var(--bs-dark-bg-subtle) !important
+}
 
 .badge-draft,
 .badge-unknown,

@@ -897,6 +897,14 @@ function setupCheckboxHandlers(tableElement, isInboxView = false) {
         
         updateSelectionCount(tableElement);
     });
+    
+    // Also listen for clicks on the checkbox itself (for when it's clicked directly)
+    $(tableElement).on('click', '.row-checkbox', function(e) {
+        // Small delay to allow the checkbox state to update
+        setTimeout(() => {
+            updateSelectionCount(tableElement);
+        }, 10);
+    });
 }
 
 function updateSelectionCount(tableElement) {
@@ -907,11 +915,20 @@ function updateSelectionCount(tableElement) {
     const selectedUids = Array.from(checkedBoxes).map(cb => cb.dataset.uid);
     console.log('Selected UIDs:', selectedUids);
     
-    // You can dispatch a custom event here if you want other parts of your app to react
+    // Dispatch event on document for bulk actions to catch
     const event = new CustomEvent('rowSelectionChanged', {
-        detail: { count: checkedBoxes.length, uids: selectedUids }
+        detail: { 
+            count: checkedBoxes.length, 
+            uids: selectedUids,
+            tableId: tableElement.id || tableElement.className
+        },
+        bubbles: true,
+        cancelable: true
     });
+    
+    // Dispatch on both the table element AND document for better coverage
     tableElement.dispatchEvent(event);
+    document.dispatchEvent(event);
 }
 
 function getSelectedRows(tableElement) {
