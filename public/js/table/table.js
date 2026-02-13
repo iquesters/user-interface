@@ -522,7 +522,91 @@ function getLoaderComponentHTML() {
 }
 
 async function loadDetailComponent(rightPanelEle, schema, data) {
-    rightPanelEle.innerHTML = getLoaderComponentHTML();
+    // Store the current width/percentage before modifying
+    const currentWidth = rightPanelEle.style.width;
+    const currentFlex = rightPanelEle.style.flex;
+    
+    // Clear the panel and set up flex layout - PRESERVE EXISTING WIDTH
+    rightPanelEle.innerHTML = '';
+    
+    // Apply Bootstrap classes instead of inline styles
+    rightPanelEle.className = rightPanelEle.className
+        .split(' ')
+        .filter(cls => !cls.includes('inbox-') && cls !== 'd-flex' && cls !== 'flex-column')
+        .join(' ');
+    
+    rightPanelEle.classList.add('d-flex', 'flex-column', 'h-100', 'overflow-hidden', 'p-0', 'm-0');
+    
+    // Restore width settings if they existed
+    if (currentWidth) rightPanelEle.style.width = currentWidth;
+    if (currentFlex) rightPanelEle.style.flex = currentFlex;
+    
+    // Create header - using Bootstrap classes
+    const header = document.createElement('div');
+    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 bg-white border-bottom flex-shrink-0';
+    
+    // Title on left
+    const title = document.createElement('h6');
+    title.className = 'mb-0 fw-medium text-primary';
+    
+    // Try to get a meaningful title from the data
+    let titleText = 'Details';
+    if (data) {
+        if (data.title) titleText = data.title;
+        else if (data.name) titleText = data.name;
+        else if (data.subject) titleText = data.subject;
+        else if (data.id || data.uid) titleText = `Item #${data.id || data.uid}`;
+    }
+    title.textContent = titleText;
+    
+    // Cross icon on right - using Bootstrap btn-close
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'btn btn-sm btn-close opacity-50-hover';
+    closeButton.setAttribute('aria-label', 'Close');
+    closeButton.onclick = (e) => {
+        e.stopPropagation();
+        
+        // Clear the right panel content but PRESERVE WIDTH
+        const parentContainer = rightPanelEle.closest('.inbox-view-container');
+        const currentWidth = rightPanelEle.style.width;
+        const currentFlex = rightPanelEle.style.flex;
+        
+        rightPanelEle.innerHTML = '';
+        rightPanelEle.className = rightPanelEle.className
+            .split(' ')
+            .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white')
+            .join(' ');
+        
+        rightPanelEle.classList.add('d-flex', 'flex-column', 'bg-light', 'overflow-hidden', 'p-0', 'm-0');
+        
+        // Restore width settings
+        if (currentWidth) rightPanelEle.style.width = currentWidth;
+        if (currentFlex) rightPanelEle.style.flex = currentFlex;
+        
+        const emptyState = document.createElement('div');
+        emptyState.className = 'd-flex align-items-center justify-content-center h-100 w-100 text-center text-muted';
+        emptyState.innerHTML = 'Select an item to view details';
+        rightPanelEle.appendChild(emptyState);
+        
+        // Remove active class from selected row
+        const activeRow = parentContainer?.querySelector('tr.table-active');
+        if (activeRow) {
+            activeRow.classList.remove('table-active');
+        }
+    };
+    
+    header.appendChild(title);
+    header.appendChild(closeButton);
+    
+    // Content container - using Bootstrap classes
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'inbox-detail-content flex-grow-1 w-100 overflow-auto bg-light p-3';
+    contentContainer.innerHTML = getLoaderComponentHTML();
+    
+    // Assemble the panel
+    rightPanelEle.appendChild(header);
+    rightPanelEle.appendChild(contentContainer);
     
     try {
         let result;
@@ -547,10 +631,10 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         } 
         // Priority 3: No configuration found
         else {
-            rightPanelEle.innerHTML = `
-                <div class="alert alert-warning m-3">
+            contentContainer.innerHTML = `
+                <div class="alert alert-warning m-0 w-100">
                     <h5>⚠️ Configuration Missing</h5>
-                    <p>No detail component or form schema defined in table configuration.</p>
+                    <p class="mb-1">No detail component or form schema defined in table configuration.</p>
                     <small class="text-muted">Define either <code>details-component</code> or <code>form-schema-uid</code> in schema.</small>
                 </div>
             `;
@@ -559,10 +643,19 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         
         // Handle successful response
         if (result.success && result.html) {
-            rightPanelEle.innerHTML = result.html;
+            contentContainer.innerHTML = result.html;
+            
+            // Ensure loaded content respects container width using Bootstrap classes
+            const contentChildren = contentContainer.children;
+            for (let child of contentChildren) {
+                if (child.style) {
+                    child.classList.add('w-100');
+                    child.style.boxSizing = 'border-box'; // Bootstrap doesn't have a class for this
+                }
+            }
             
             // Initialize forms if present
-            const form = rightPanelEle.querySelector('.shoz-form');
+            const form = contentContainer.querySelector('.shoz-form');
             if (form && typeof setupForm === 'function') {
                 setupForm(form);
             }
@@ -571,17 +664,30 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
             }
             
             // Re-initialize scripts
-            initializeDetailViewScripts(rightPanelEle);
+            initializeDetailViewScripts(contentContainer);
             
             console.log(`✅ Detail component loaded successfully for UID: ${data.uid}`);
         } else {
-            showDetailError(rightPanelEle, result.error || 'Failed to load component content');
+            showDetailError(contentContainer, result.error || 'Failed to load component content');
         }
         
     } catch (error) {
         console.error('❌ Error loading detail component:', error);
-        showDetailError(rightPanelEle, error.message);
+        showDetailError(contentContainer, error.message);
     }
+}
+
+// Update showDetailError to use Bootstrap classes
+function showDetailError(container, message) {
+    container.innerHTML = `
+        <div class="alert alert-danger m-0 w-100">
+            <h5>Error Loading Details</h5>
+            <p class="mb-2">${message}</p>
+            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">
+                Reload Page
+            </button>
+        </div>
+    `;
 }
 
 function initializeDetailViewScripts(container) {
