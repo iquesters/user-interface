@@ -188,6 +188,17 @@ class ViewModeManager {
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (toggleBtn) this.updateToggleButton(toggleBtn);
         
+        // Dispatch view mode changed event
+        const event = new CustomEvent('viewModeChanged', {
+            detail: { 
+                entity: this.entity,
+                oldMode: this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE,
+                newMode: this.currentViewMode
+            },
+            bubbles: true
+        });
+        document.dispatchEvent(event);
+        
         // Re-render the table with new view mode
         this.reRenderView();
     }
@@ -392,6 +403,16 @@ async function initLabTable(tableElement) {
     } else {
         renderLazyDataTable(tableElement, cache, mergedConfig, entity);
     }
+
+    // Listen for view mode changes to clear selections
+    document.addEventListener('viewModeChanged', function(e) {
+        if (e.detail && e.detail.entity === entity) {
+            console.log('👁️ View mode changed, clearing selections');
+            if (window.bulkActionsManager) {
+                window.bulkActionsManager.clearAllSelections();
+            }
+        }
+    });
 }
 
 // ---------------------------

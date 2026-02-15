@@ -151,8 +151,14 @@ class BulkActionsManager {
             // Hide select hint
             this.selectHint.classList.add('d-none');
             
-            // Update count
-            this.selectionCountBadge.textContent = count;
+            // Update count - find the number span inside the badge
+            const countSpan = this.selectionCountBadge.querySelector('.selected-count');
+            if (countSpan) {
+                countSpan.textContent = count;
+            } else {
+                // Fallback if structure is different
+                this.selectionCountBadge.textContent = `${count} Selected`;
+            }
         } else {
             // Hide bulk actions, count badge, and clear button
             this.bulkActionsContainer.classList.add('d-none');
@@ -161,6 +167,12 @@ class BulkActionsManager {
             
             // Show select hint
             this.selectHint.classList.remove('d-none');
+            
+            // Reset count for next time
+            const countSpan = this.selectionCountBadge.querySelector('.selected-count');
+            if (countSpan) {
+                countSpan.textContent = '0';
+            }
             
             // Clear selected UIDs
             this.selectedUids.clear();

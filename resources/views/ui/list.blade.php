@@ -21,7 +21,7 @@
 
     {{-- Actions Bar with Refresh, Bulk Actions, Select Hint, and View Toggle --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
-        {{-- Left side: Refresh and Select Hint --}}
+        {{-- Left side: Refresh and Select Hint/Bulk Actions --}}
         <div class="d-flex align-items-center gap-2">
             {{-- Refresh Button (Always visible) --}}
             <button type="button"
@@ -197,15 +197,18 @@
             </div>
         </div>
 
-        {{-- Right side: Selection Count and View Toggle --}}
-        <div class="d-flex align-items-center gap-3">
+        {{-- Right side: Selection Count, Clear Button, and View Toggle --}}
+        <div class="d-flex align-items-center gap-2">
             {{-- Selection Count Badge (Visible when items selected) --}}
-            <span id="selectionCount" class="badge bg-primary rounded-pill d-none">0</span>
+            <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
+                <span class="selected-count">0</span> Selected
+            </span>
 
             {{-- Clear Selection Button (Visible when items selected) --}}
             <button type="button"
                     id="bulkClearSelectionBtn"
-                    class="btn btn-sm btn-link text-decoration-none d-none">
+                    class="btn btn-sm btn-link text-decoration-none p-0 d-none"
+                    style="min-width: 40px;">
                 Clear
             </button>
 
