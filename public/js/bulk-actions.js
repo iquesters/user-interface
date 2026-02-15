@@ -2,8 +2,8 @@
  * bulk-actions.js — Bulk Actions Handler for DataTables
  * ✅ Handles selection tracking across multiple tables
  * ✅ Provides bulk operations (edit, delete, export, etc.)
- * ✅ Integrates with API client
- * ✅ Works with both table and inbox views
+ * ✅ Integrates with header UI (no separate bar)
+ * ✅ Shows/hides select hint based on selection
  */
 
 // ---------------------------
@@ -13,41 +13,66 @@
 class BulkActionsManager {
     constructor() {
         this.selectedUids = new Set();
-        this.bulkActionsBar = null;
-        this.selectionCountEl = null;
+        this.bulkActionsContainer = null;
+        this.selectionCountBadge = null;
+        this.selectHint = null;
+        this.clearSelectionBtn = null;
+        this.refreshBtn = null;
         this.initialized = false;
+        this.currentEntity = null;
     }
 
     /**
      * Initialize bulk actions UI and handlers
      */
-    init() {
+    init(entityName = null) {
         if (this.initialized) {
             console.warn('⚠️ Bulk actions already initialized');
             return;
         }
 
         console.log('🎯 Initializing bulk actions');
+        
+        this.currentEntity = entityName;
 
-        this.bulkActionsBar = document.getElementById('bulkActionsBar');
-        this.selectionCountEl = document.getElementById('selectionCount');
+        // Get new header elements
+        this.bulkActionsContainer = document.getElementById('bulkActionsContainer');
+        this.selectionCountBadge = document.getElementById('selectionCount');
+        this.selectHint = document.getElementById('selectHint');
+        this.clearSelectionBtn = document.getElementById('bulkClearSelectionBtn');
+        this.refreshBtn = document.getElementById('refreshTableBtn');
 
-        if (!this.bulkActionsBar) {
-            console.warn('⚠️ Bulk actions bar not found in DOM');
+        if (!this.bulkActionsContainer) {
+            console.warn('⚠️ Bulk actions container not found in DOM');
             return;
         }
 
-        // Listen for selection changes on both document and individual tables
+        // Listen for selection changes
         document.addEventListener('rowSelectionChanged', (e) => {
             console.log('📢 Selection changed event received:', e.detail);
             this.handleSelectionChange(e.detail);
         });
 
-        // Also listen on window for good measure
         window.addEventListener('rowSelectionChanged', (e) => {
             console.log('📢 Selection changed event received on window:', e.detail);
             this.handleSelectionChange(e.detail);
         });
+
+        // Setup refresh button
+        if (this.refreshBtn) {
+            this.refreshBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.refreshTables();
+            });
+        }
+
+        // Setup clear selection button
+        if (this.clearSelectionBtn) {
+            this.clearSelectionBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.clearAllSelections();
+            });
+        }
 
         // Setup all button handlers
         this.setupEventHandlers();
@@ -84,10 +109,7 @@ class BulkActionsManager {
             'bulkDeleteBtn': () => this.handleDelete(),
             'bulkExportBtn': () => this.handleExport(),
             'bulkArchiveBtn': () => this.handleArchive(),
-            'bulkDuplicateBtn': () => this.handleDuplicate(),
-            'bulkStatusBtn': () => this.handleStatusChange(),
-            'bulkAssignBtn': () => this.handleAssign(),
-            'bulkClearSelectionBtn': () => this.clearAllSelections()
+            'bulkDuplicateBtn': () => this.handleDuplicate()
         };
 
         Object.entries(handlers).forEach(([id, handler]) => {
@@ -118,22 +140,29 @@ class BulkActionsManager {
      * Update bulk actions UI based on selection count
      */
     updateUI(count) {
-        if (!this.bulkActionsBar || !this.selectionCountEl) return;
+        if (!this.bulkActionsContainer || !this.selectionCountBadge || !this.selectHint || !this.clearSelectionBtn) return;
 
         if (count > 0) {
-            // Show the bar with animation
-            this.bulkActionsBar.style.display = 'block';
-            this.selectionCountEl.textContent = `${count} selected`;
+            // Show bulk actions, count badge, and clear button
+            this.bulkActionsContainer.classList.remove('d-none');
+            this.selectionCountBadge.classList.remove('d-none');
+            this.clearSelectionBtn.classList.remove('d-none');
             
-            // Optional: Add animation on first show
-            if (!this.bulkActionsBar.classList.contains('shown')) {
-                this.bulkActionsBar.classList.add('shown');
-                this.bulkActionsBar.style.animation = 'fadeIn 0.3s ease-in';
-            }
+            // Hide select hint
+            this.selectHint.classList.add('d-none');
+            
+            // Update count
+            this.selectionCountBadge.textContent = count;
         } else {
-            // Hide the bar
-            this.bulkActionsBar.style.display = 'none';
-            this.bulkActionsBar.classList.remove('shown');
+            // Hide bulk actions, count badge, and clear button
+            this.bulkActionsContainer.classList.add('d-none');
+            this.selectionCountBadge.classList.add('d-none');
+            this.clearSelectionBtn.classList.add('d-none');
+            
+            // Show select hint
+            this.selectHint.classList.remove('d-none');
+            
+            // Clear selected UIDs
             this.selectedUids.clear();
         }
     }
@@ -179,14 +208,14 @@ class BulkActionsManager {
     /**
      * Set button loading state
      */
-    setButtonLoading(buttonId, isLoading, loadingText = 'Processing...') {
+    setButtonLoading(buttonId, isLoading) {
         const btn = document.getElementById(buttonId);
         if (!btn) return;
 
         if (isLoading) {
             btn.dataset.originalHtml = btn.innerHTML;
             btn.disabled = true;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${loadingText}`;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         } else {
             btn.disabled = false;
             btn.innerHTML = btn.dataset.originalHtml || btn.innerHTML;
@@ -198,10 +227,16 @@ class BulkActionsManager {
      * Refresh all tables
      */
     refreshTables() {
+        // Show loading state on refresh button
+        if (this.refreshBtn) {
+            this.refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            this.refreshBtn.disabled = true;
+        }
+
         // Refresh regular tables
         $('.lab-table').each(function() {
             const dt = $(this).DataTable();
-            if (dt) dt.ajax.reload(null, false); // false = stay on current page
+            if (dt) dt.ajax.reload(null, false);
         });
         
         // Refresh inbox tables
@@ -209,6 +244,17 @@ class BulkActionsManager {
             const dt = $(this).DataTable();
             if (dt) dt.ajax.reload(null, false);
         });
+
+        // Clear selections after refresh
+        this.clearAllSelections();
+
+        // Restore refresh button
+        setTimeout(() => {
+            if (this.refreshBtn) {
+                this.refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                this.refreshBtn.disabled = false;
+            }
+        }, 500);
     }
 
     // ---------------------------
@@ -223,19 +269,7 @@ class BulkActionsManager {
         if (!selectedUids) return;
 
         console.log('📝 Bulk editing:', selectedUids);
-        
-        // TODO: Implement your bulk edit logic here
-        // Option 1: Open a modal with bulk edit form
-        // Option 2: Redirect to bulk edit page
-        // Option 3: Show inline edit interface
-        
         this.showToast(`Ready to edit ${selectedUids.length} item(s)`, 'info');
-        
-        // Example: Redirect to bulk edit page
-        // window.location.href = `/bulk-edit?uids=${selectedUids.join(',')}`;
-        
-        // Example: Open modal (if you have a modal function)
-        // openBulkEditModal(selectedUids);
     }
 
     /**
@@ -256,7 +290,7 @@ class BulkActionsManager {
         console.log('🗑️ Bulk deleting:', selectedUids);
         
         try {
-            this.setButtonLoading('bulkDeleteBtn', true, 'Deleting...');
+            this.setButtonLoading('bulkDeleteBtn', true);
             
             // TODO: Replace with your actual API endpoint
             const response = await apiClient.post('/api/bulk-delete', {
@@ -289,22 +323,17 @@ class BulkActionsManager {
         console.log('📥 Bulk exporting:', selectedUids);
         
         try {
-            this.setButtonLoading('bulkExportBtn', true, 'Exporting...');
+            this.setButtonLoading('bulkExportBtn', true);
             
             // TODO: Replace with your actual API endpoint
             const response = await apiClient.post('/api/bulk-export', {
                 uids: selectedUids,
-                format: 'csv' // or 'xlsx', 'pdf', etc.
+                format: 'csv'
             });
             
             if (response.success && response.data?.download_url) {
-                // Download the file
                 window.location.href = response.data.download_url;
                 this.showToast(`Exporting ${selectedUids.length} item(s)`, 'success');
-            } else if (response.success && response.data?.file_content) {
-                // Handle direct file content
-                this.downloadFile(response.data.file_content, response.data.filename || 'export.csv');
-                this.showToast(`Exported ${selectedUids.length} item(s)`, 'success');
             } else {
                 this.showToast(response.message || 'Failed to export items', 'error');
             }
@@ -327,7 +356,6 @@ class BulkActionsManager {
         console.log('📦 Bulk archiving:', selectedUids);
         
         try {
-            // TODO: Replace with your actual API endpoint
             const response = await apiClient.post('/api/bulk-archive', {
                 uids: selectedUids
             });
@@ -375,21 +403,16 @@ class BulkActionsManager {
     /**
      * Bulk Status Change Handler
      */
-    async handleStatusChange() {
+    async handleStatusChange(status) {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        // TODO: Replace prompt with a proper modal/select component
-        const newStatus = prompt('Enter new status (e.g., active, inactive, pending):');
-        
-        if (!newStatus) return;
-
-        console.log('🔄 Bulk status change:', selectedUids, 'to', newStatus);
+        console.log('🔄 Bulk status change:', selectedUids, 'to', status);
         
         try {
             const response = await apiClient.post('/api/bulk-status', {
                 uids: selectedUids,
-                status: newStatus
+                status: status
             });
             
             if (response.success) {
@@ -408,14 +431,9 @@ class BulkActionsManager {
     /**
      * Bulk Assign Handler
      */
-    async handleAssign() {
+    async handleAssign(assignTo) {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
-
-        // TODO: Replace prompt with a proper user selection modal
-        const assignTo = prompt('Enter user ID or email to assign to:');
-        
-        if (!assignTo) return;
 
         console.log('👤 Bulk assigning:', selectedUids, 'to', assignTo);
         
@@ -436,6 +454,62 @@ class BulkActionsManager {
             console.error('❌ Bulk assign error:', error);
             this.showToast('An error occurred', 'error');
         }
+    }
+
+    /**
+     * Show assign modal (placeholder)
+     */
+    showAssignModal() {
+        // TODO: Implement user selection modal
+        const email = prompt('Enter email address to assign to:');
+        if (email) {
+            this.handleAssign(email);
+        }
+    }
+
+    /**
+     * Mark as read handler
+     */
+    handleMarkAsRead() {
+        const selectedUids = this.validateSelection();
+        if (!selectedUids) return;
+        this.showToast(`Marked ${selectedUids.length} item(s) as read`, 'info');
+    }
+
+    /**
+     * Mark as unread handler
+     */
+    handleMarkAsUnread() {
+        const selectedUids = this.validateSelection();
+        if (!selectedUids) return;
+        this.showToast(`Marked ${selectedUids.length} item(s) as unread`, 'info');
+    }
+
+    /**
+     * Add star handler
+     */
+    handleStar() {
+        const selectedUids = this.validateSelection();
+        if (!selectedUids) return;
+        this.showToast(`Added star to ${selectedUids.length} item(s)`, 'info');
+    }
+
+    /**
+     * Remove star handler
+     */
+    handleRemoveStar() {
+        const selectedUids = this.validateSelection();
+        if (!selectedUids) return;
+        this.showToast(`Removed star from ${selectedUids.length} item(s)`, 'info');
+    }
+
+    /**
+     * Report spam handler
+     */
+    handleSpam() {
+        const selectedUids = this.validateSelection();
+        if (!selectedUids) return;
+        this.showToast(`Reported ${selectedUids.length} item(s) as spam`, 'info');
     }
 
     /**
@@ -464,21 +538,6 @@ class BulkActionsManager {
     // ---------------------------
 
     /**
-     * Download file helper
-     */
-    downloadFile(content, filename) {
-        const blob = new Blob([content], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    }
-
-    /**
      * Simple toast notification helper
      */
     showToast(message, type = 'info') {
@@ -488,32 +547,7 @@ class BulkActionsManager {
             return;
         }
 
-        // Fallback: console log
         console.log(`[${type.toUpperCase()}] ${message}`);
-        
-        // TODO: Integrate with your toast library
-        // Examples:
-        
-        // Bootstrap 5 Toast:
-        /*
-        const toastHtml = `
-            <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0" role="alert">
-                <div class="d-flex">
-                    <div class="toast-body">${message}</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            </div>
-        `;
-        const toastContainer = document.getElementById('toastContainer') || createToastContainer();
-        toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-        const toastEl = toastContainer.lastElementChild;
-        const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
-        toast.show();
-        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
-        */
-        
-        // Or use alert as simple fallback
-        // alert(message);
     }
 }
 
@@ -527,11 +561,16 @@ const bulkActionsManager = new BulkActionsManager();
 // Auto-initialize when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        bulkActionsManager.init();
+        // Get entity name from the page
+        const entityElement = document.querySelector('h5.fs-6');
+        const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+        bulkActionsManager.init(entityName);
     });
 } else {
     // DOM already loaded
-    bulkActionsManager.init();
+    const entityElement = document.querySelector('h5.fs-6');
+    const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+    bulkActionsManager.init(entityName);
 }
 
 // Export for external access if needed

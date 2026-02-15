@@ -2,6 +2,7 @@
 
 @php
     $entity = ucwords(str_replace('_', ' ', $table_schema->schema['entity']));
+    $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
 @endphp
 
 @section('page-title', \Iquesters\Foundation\Helpers\MetaHelper::make([$entity]))
@@ -11,36 +12,34 @@
 )
 
 @section('content')
-    {{-- Header with Title and View Toggle --}}
-    <div class="d-flex justify-content-between align-items-center mb-1">
+    {{-- Title (Always visible) --}}
+    <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fs-6">
             List view of {{ $entity }}
         </h5>
-
-        @php
-            $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
-        @endphp
-
-        <button type="button"
-                class="btn btn-sm btn-outline-secondary"
-                id="toggleViewBtn"
-                title="{{ $defaultView === 'table' ? 'Switch to Split View' : 'Switch to Table View' }}">
-            <i class="fas {{ $defaultView === 'table' ? 'fa-table-columns' : 'fa-table' }}"></i>
-        </button>
     </div>
 
-    {{-- Gmail-style Bulk Actions Bar with Bootstrap --}}
-    <div id="bulkActionsBar" 
-         class="card mb-1 border-0 shadow-sm" 
-         style="display: none; position: sticky; top: 0; z-index: 1000; border-radius: 0;">
+    {{-- Actions Bar with Refresh, Bulk Actions, Select Hint, and View Toggle --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        {{-- Left side: Refresh and Select Hint --}}
+        <div class="d-flex align-items-center gap-2">
+            {{-- Refresh Button (Always visible) --}}
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary text-muted border-0"
+                    id="refreshTableBtn"
+                    title="Refresh">
+                <i class="fas fa-sync-alt"></i>
+            </button>
 
-        <div class="d-flex align-items-center justify-content-between p-2">
-            
-            {{-- Left side - All action buttons in a single group --}}
-            <div class="d-flex align-items-center">
-                
-                {{-- All buttons in Gmail style --}}
-                <div class="btn-group shadow-none gap-2">
+            {{-- Select Hint (Visible when nothing selected) --}}
+            <span id="selectHint" class="text-muted small">
+                <i class="fas fa-info-circle me-1"></i>
+                Select any row for bulk actions
+            </span>
+
+            {{-- Bulk Actions (Visible when items selected) --}}
+            <div id="bulkActionsContainer" class="d-none">
+                <div class="btn-group shadow-none gap-1">
                     {{-- Archive --}}
                     <button type="button" 
                             id="bulkArchiveBtn"
@@ -81,13 +80,13 @@
                         <i class="fas fa-edit"></i>
                     </button>
                     
-                    {{-- Status Dropdown Button --}}
+                    {{-- Status Dropdown --}}
                     <div class="btn-group">
                         <button type="button" 
-                                id="bulkStatusBtn"
                                 class="btn btn-sm btn-outline-secondary text-muted border-0 dropdown-toggle"
                                 data-bs-toggle="dropdown"
-                                aria-expanded="false">
+                                aria-expanded="false"
+                                title="Change Status">
                             <i class="fas fa-tag"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 8px; padding: 8px 0; min-width: 180px;">
@@ -119,14 +118,13 @@
                         </ul>
                     </div>
                     
-                    {{-- Assign Dropdown Button --}}
+                    {{-- Assign Dropdown --}}
                     <div class="btn-group">
-
                         <button type="button" 
-                                id="bulkAssignBtn"
                                 class="btn btn-sm btn-outline-secondary text-muted border-0 dropdown-toggle"
                                 data-bs-toggle="dropdown"
-                                aria-expanded="false">
+                                aria-expanded="false"
+                                title="Assign To">
                             <i class="fas fa-user-tag"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 8px; padding: 8px 0; min-width: 200px;">
@@ -156,9 +154,9 @@
                     <div class="btn-group">
                         <button type="button" 
                                 class="btn btn-sm btn-outline-secondary text-muted border-0 dropdown-toggle"
-                                id="bulkMoreBtn"
                                 data-bs-toggle="dropdown"
-                                aria-expanded="false">
+                                aria-expanded="false"
+                                title="More Actions">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 8px; padding: 8px 0; min-width: 180px;">
@@ -197,16 +195,27 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            {{-- Right side - Selection info and Clear button --}}
-            <div class="d-flex align-items-center gap-2">
-                <span id="selectionCount">0 selected</span>
-                <button type="button"
-                        id="bulkClearSelectionBtn"
-                        class="btn btn-sm btn-link text-decoration-none p-0">
-                    Clear
-                </button>
-            </div>
+        {{-- Right side: Selection Count and View Toggle --}}
+        <div class="d-flex align-items-center gap-3">
+            {{-- Selection Count Badge (Visible when items selected) --}}
+            <span id="selectionCount" class="badge bg-primary rounded-pill d-none">0</span>
+
+            {{-- Clear Selection Button (Visible when items selected) --}}
+            <button type="button"
+                    id="bulkClearSelectionBtn"
+                    class="btn btn-sm btn-link text-decoration-none d-none">
+                Clear
+            </button>
+
+            {{-- View Toggle Button (Always visible) --}}
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary text-muted border-0"
+                    id="toggleViewBtn"
+                    title="{{ $defaultView === 'table' ? 'Switch to Split View' : 'Switch to Table View' }}">
+                <i class="fas {{ $defaultView === 'table' ? 'fa-table-columns' : 'fa-table' }}"></i>
+            </button>
         </div>
     </div>
 
