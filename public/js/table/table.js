@@ -6,6 +6,7 @@
  * ✅ Better error handling
  * ✅ Improved code organization
  * ✅ FIXED: Inbox view rendering error when switching from table view
+ * ✅ FIXED: Sticky DataTables controls (preserving original UI) in inbox view
  */
 
 // ---------------------------
@@ -524,22 +525,22 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Create inbox container with proper Bootstrap classes
     const container = document.createElement('div');
-    container.className = 'inbox-view-container w-100'; // Add w-100 for full width
+    container.className = 'inbox-view-container w-100';
     container.style.cssText = 'display: flex !important; height: 600px; position: relative;';
     
     console.log('📦 Created inbox container');
     
-    // Left panel (list view)
+    // Left panel (list view) - flex container with flex-column
     const leftPanel = document.createElement('div');
     leftPanel.className = 'inbox-left-panel';
     leftPanel.style.cssText = `
         width: ${DEFAULT_LEFT_PANEL_WIDTH}%;
-        overflow-y: auto;
-        overflow-x: hidden;
         border-right: 1px solid #dee2e6;
         background: white;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
     `;
-
     
     // Resizer
     const resizer = document.createElement('div');
@@ -586,22 +587,15 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     console.log('✅ Inbox container inserted into parent');
     console.log('📍 Container is now child of:', container.parentNode?.className);
     
-    // Create DataTable in left panel
+    // Create DataTable
     const listTable = document.createElement('table');
-    listTable.className = `
-        table 
-        table-striped 
-        table-bordered 
-        table-hover 
-        inbox-list-table
-    `;
+    listTable.className = 'table table-striped table-bordered table-hover inbox-list-table';
     listTable.style.cssText = 'margin: 0; cursor: pointer; width: 100%;';
-    leftPanel.appendChild(listTable);
     
     // Format entity name nicely
     const formattedEntityName = entityName
-        .replace(/_/g, " ")          // replace underscores with space
-        .replace(/\b\w/g, c => c.toUpperCase()); // capitalize each word
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, c => c.toUpperCase());
 
     listTable.innerHTML = `
         <thead>
@@ -616,6 +610,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         </thead>
         <tbody></tbody>
     `;
+
+    leftPanel.appendChild(listTable);
 
     const resolvedColumns = [
         {
@@ -635,13 +631,13 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Initialize DataTable
     const dt = $(listTable).DataTable({
         ...dtConfig,
-        responsive: false, // ⛔ disable responsive
-        autoWidth: false, // ⛔ disable auto width
+        responsive: false,
+        autoWidth: false,
         pageLength: cache.pageSize,
         columns: resolvedColumns,
         columnDefs: [
             {
-                targets: 0, // First column (checkbox)
+                targets: 0,
                 orderable: false,
                 searchable: false,
                 width: '40px'
@@ -654,6 +650,11 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         ajax: (params, callback) =>
             handleAjaxFetch(params, callback, cache, entityName, listTable),
     });
+
+    // Apply sticky positioning after DataTable is initialized
+    setTimeout(() => {
+        applyInboxStickyStyles(leftPanel);
+    }, 100);
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);
@@ -681,6 +682,96 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Force a reflow to ensure rendering
     container.offsetHeight;
+}
+
+/**
+ * Apply sticky positioning to DataTables elements in inbox view
+ */
+function applyInboxStickyStyles(leftPanel) {
+    console.log('🎨 Applying sticky styles to inbox DataTable');
+    
+    // Find the DataTables container that was created by DataTables
+    const dtContainer = leftPanel.querySelector('.dt-container');
+    if (!dtContainer) {
+        console.warn('⚠️ DataTables container not found');
+        return;
+    }
+    
+    console.log('✅ Found DataTables container');
+    
+    // Make the dt-container fill the leftPanel and use flexbox
+    dtContainer.style.display = 'flex';
+    dtContainer.style.flexDirection = 'column';
+    dtContainer.style.height = '100%';
+    dtContainer.style.overflow = 'hidden';
+    
+    // Find all direct children of dt-container (layout rows)
+    const layoutRows = Array.from(dtContainer.children).filter(el => 
+        el.classList.contains('dt-layout-row') || el.classList.contains('dt-layout-table')
+    );
+    
+    console.log(`📊 Found ${layoutRows.length} layout elements`);
+    
+    // Identify each row by its content
+    layoutRows.forEach((row, index) => {
+        const hasSearch = row.querySelector('.dt-search, input[type="search"]');
+        const hasLength = row.querySelector('.dt-length, select');
+        const hasTable = row.querySelector('table');
+        const hasPagination = row.querySelector('.dt-paging, .dataTables_paginate');
+        const hasInfo = row.querySelector('.dt-info, .dataTables_info');
+        
+        console.log(`Row ${index}:`, {
+            hasSearch: !!hasSearch,
+            hasLength: !!hasLength,
+            hasTable: !!hasTable,
+            hasPagination: !!hasPagination,
+            hasInfo: !!hasInfo,
+            classes: row.className
+        });
+        
+        // Top row: Contains search or page length controls
+        if ((hasSearch || hasLength) && !hasTable && !hasPagination) {
+            row.style.flexShrink = '0';
+            row.style.position = 'sticky';
+            row.style.top = '0';
+            row.style.zIndex = '11';
+            row.style.backgroundColor = 'white';
+            row.style.paddingBottom = '10px';
+            row.style.borderBottom = '1px solid #dee2e6';
+            console.log(`✅ Styled top controls at row ${index}`);
+        }
+        
+        // Table row: Contains the actual table
+        else if (hasTable) {
+            row.style.flex = '1 1 auto';
+            row.style.overflow = 'auto';
+            row.style.minHeight = '0';
+            row.style.position = 'relative';
+            
+            // Make thead sticky within this scrollable container
+            const thead = row.querySelector('thead');
+            if (thead) {
+                thead.style.position = 'sticky';
+                thead.style.top = '0';
+                thead.style.zIndex = '10';
+            }
+            console.log(`✅ Styled scrollable table at row ${index}`);
+        }
+        
+        // Bottom row: Contains pagination or info
+        else if (hasPagination || hasInfo) {
+            row.style.flexShrink = '0';
+            row.style.position = 'sticky';
+            row.style.bottom = '0';
+            row.style.zIndex = '11';
+            row.style.backgroundColor = 'white';
+            row.style.paddingTop = '10px';
+            row.style.borderTop = '1px solid #dee2e6';
+            console.log(`✅ Styled bottom pagination at row ${index}`);
+        }
+    });
+    
+    console.log('✅ Sticky styles application complete');
 }
 
 /**
@@ -962,18 +1053,6 @@ function initializeDetailViewScripts(container) {
         detail: { container }
     });
     container.dispatchEvent(event);
-}
-
-function showDetailError(rightPanel, message) {
-    rightPanel.innerHTML = `
-        <div class="alert alert-danger m-3">
-            <h5>Error Loading Details</h5>
-            <p>${message}</p>
-            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">
-                Reload Page
-            </button>
-        </div>
-    `;
 }
 
 function setupResizer(resizer, leftPanel, rightPanel, container) {
