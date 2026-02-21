@@ -73,6 +73,7 @@
   overflow-y: auto;
   transition: all 0.35s ease-in-out;
   width: 100%;
+  margin-bottom: 70px;
 }
 
 .minibar {

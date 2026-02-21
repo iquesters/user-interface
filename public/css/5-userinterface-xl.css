@@ -4,4 +4,8 @@
     .screen-width-test {
         background-color: #f0f;
     }
+
+    .ui-main {
+        margin-bottom: 0;
+     }
 }
