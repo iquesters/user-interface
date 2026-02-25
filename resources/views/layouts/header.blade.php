@@ -40,7 +40,9 @@
                     @include('userinterface::utils.image', ['options' => $logoOptions])
                 </a>            
                 @if(config('app.debug'))
-                    <div class="badge badge-deleted">{{ \Illuminate\Support\Str::upper(config('app.env')) }}</div>
+                    <x-userinterface::status status="deleted">
+                        {{ \Illuminate\Support\Str::upper(config('app.env')) }}
+                    </x-userinterface::status>
                 @endif
             </div>
         </div>

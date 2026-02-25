@@ -36,9 +36,9 @@
 
                     <div class="card border-0 shadow-sm rounded-4 p-4">
                         <div>
-                            <span class="badge badge-active mb-3">
+                            <x-userinterface::status status="active" class="mb-3">
                                 Chat-first (recommended)
-                            </span>
+                            </x-userinterface::status>
                         </div>
 
                         <p class="mb-3">
@@ -99,9 +99,9 @@
                     @endif
                     
                     <div>
-                        <span class="badge badge-draft mb-3">
+                        <x-userinterface::status status="draft" class="mb-3">
                             Or use classic method
-                        </span>
+                        </x-userinterface::status>
                     </div>
 
                     {{-- Dynamic Content --}}
