@@ -21,6 +21,11 @@ class FormSchema extends Model
         'updated_by'
     ];
 
+    protected $casts = [
+        'schema' => 'array',
+        'extra_info' => 'array',
+    ];
+    
     protected $table = 'form_schemas';
 
     public function refCreatedBy()

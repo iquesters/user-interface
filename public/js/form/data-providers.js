@@ -11,7 +11,7 @@ async function getFormSchema(formID) {
         .then(response => response.json())
         .catch(err => console.log(err))
     
-    return formSchema?.data;
+    return formSchema?.response_schema?.data ?? formSchema?.data;
 }
 
 /**
@@ -26,5 +26,5 @@ async function getTableSchema(tableID) {
        .then(response => response.json())
        .catch(err => console.log(err))
    
-   return tableSchema?.data;
+   return tableSchema?.response_schema?.data ?? tableSchema?.data;
 }

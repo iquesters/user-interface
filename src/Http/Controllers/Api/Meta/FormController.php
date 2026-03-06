@@ -10,6 +10,15 @@ use Illuminate\Support\Facades\Log;
 
 class FormController extends Controller
 {
+    private function normalizeSchema(mixed $schema): mixed
+    {
+        if (is_string($schema)) {
+            return json_decode($schema);
+        }
+
+        return $schema;
+    }
+
     /**
      * Get form schema without authentication
      */
@@ -44,9 +53,10 @@ class FormController extends Controller
 
         if ($slug) {
             $form = FormSchema::where(['slug' => $slug, 'status' => 2])->first();
+            Log::info("Form schema result: " . json_encode($form));
             if (isset($form)) {
                 $response->{'message'} = "Form schema found";
-                $response->{'data'} = json_decode($form->schema);
+                $response->{'data'} = $this->normalizeSchema($form->schema);
             } else {
                 $response->{'message'} = "Form schema not found";
             }
@@ -72,7 +82,7 @@ class FormController extends Controller
             $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
             if (isset($form)) {
                 $response->{'message'} = "Form schema found";
-                $response->{'data'} = json_decode($form->schema);
+                $response->{'data'} = $this->normalizeSchema($form->schema);
             } else {
                 $response->{'message'} = "Form schema not found";
             }

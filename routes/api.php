@@ -20,10 +20,10 @@ Route::get('ping', function () {
     ]);
 });
 
-Route::middleware(['api'])->group(function () {
-    Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
-    ->name('noauth.form');
-});
+// Route::middleware(['api'])->group(function () {
+//     Route::get('api/noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
+//     ->name('noauth.form');
+// });
 /*
 |--------------------------------------------------------------------------
 | Protected APIs - Sanctum tokens ONLY
@@ -33,15 +33,22 @@ Route::prefix('api')
     ->middleware([
         'api',
         \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
-        'auth:sanctum',
         \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
     ])
     ->group(function () {
-        Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
-        ->name('auth.table');
+        // Public API (No Sanctum)
+        Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
+            ->name('noauth.form');
+        
+        // Protected APIs (Require Sanctum)
+        Route::middleware('auth:sanctum')->group(function () {
 
-        Route::get('entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData'])
-            ->name('api.entity.data');
+            Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
+                ->name('auth.table');
+
+            Route::get('entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData'])
+                ->name('api.entity.data');
+        });
 });
 
 
