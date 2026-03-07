@@ -565,8 +565,13 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Resizer
     const resizer = document.createElement('div');
-    resizer.className = 'inbox-resizer bg-light';
-    resizer.style.cssText = 'width: 5px; cursor: col-resize; user-select: none; background: #e9ecef;';
+    resizer.className = 'inbox-resizer bg-light border-start border-end border-light-subtle';
+    resizer.style.cssText = `
+        width: 2px;
+        cursor: col-resize;
+        user-select: none;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+    `;
     resizer.title = 'Drag to resize';
     
     // Right panel (detail view)
@@ -1080,6 +1085,27 @@ function setupResizer(resizer, leftPanel, rightPanel, container) {
     let isResizing = false;
     let startX = 0;
     let startWidth = 0;
+
+    const setResizerState = (isActive) => {
+        resizer.classList.toggle('bg-info', isActive);
+        resizer.classList.toggle('border-info', isActive);
+        resizer.classList.toggle('bg-light', !isActive);
+        resizer.classList.toggle('border-light-subtle', !isActive);
+    };
+
+    setResizerState(false);
+
+    resizer.addEventListener('mouseenter', () => {
+        if (!isResizing) {
+            setResizerState(true);
+        }
+    });
+
+    resizer.addEventListener('mouseleave', () => {
+        if (!isResizing) {
+            setResizerState(false);
+        }
+    });
     
     resizer.addEventListener('mousedown', (e) => {
         isResizing = true;
@@ -1087,6 +1113,7 @@ function setupResizer(resizer, leftPanel, rightPanel, container) {
         startWidth = leftPanel.offsetWidth;
         document.body.style.cursor = 'col-resize';
         document.body.style.userSelect = 'none';
+        setResizerState(true);
         e.preventDefault();
     });
     
@@ -1110,6 +1137,7 @@ function setupResizer(resizer, leftPanel, rightPanel, container) {
             isResizing = false;
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            setResizerState(resizer.matches(':hover'));
         }
     });
 }
