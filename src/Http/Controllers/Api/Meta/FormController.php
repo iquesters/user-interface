@@ -52,7 +52,7 @@ class FormController extends Controller
         ]);
 
         if ($slug) {
-            $form = FormSchema::where(['slug' => $slug, 'status' => 2])->first();
+            $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
             Log::info("Form schema result: " . json_encode($form));
             if (isset($form)) {
                 $response->{'message'} = "Form schema found";

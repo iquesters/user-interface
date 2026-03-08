@@ -1,5 +1,6 @@
 <?php
 
+use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -19,7 +20,7 @@ return new class extends Migration
             $table->string('description')->nullable(true);
             $table->json('schema')->nullable(false);
             $table->json('extra_info')->nullable(true);
-            $table->tinyInteger('status')->default(0);
+            $table->string('status')->default(EntityStatus::UNKNOWN);
             $table->bigInteger('created_by')->default(0);
             $table->bigInteger('updated_by')->default(0);
             $table->timestamps();

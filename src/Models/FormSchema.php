@@ -24,6 +24,7 @@ class FormSchema extends Model
     protected $casts = [
         'schema' => 'array',
         'extra_info' => 'array',
+        'status' => 'string',
     ];
     
     protected $table = 'form_schemas';
