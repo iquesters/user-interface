@@ -223,5 +223,8 @@
     </div>
 
     {{-- DataTable --}}
-    <table id="{{ $table_schema->uid }}" class="lab-table"></table>
+        <div class="lab-table-shell position-relative">
+        @include('userinterface::ui.inc.list-skeleton')
+        <table id="{{ $table_schema->uid }}" class="lab-table d-none"></table>
+    </div>
 @endsection

@@ -334,6 +334,7 @@ async function initLabTable(tableElement) {
     const schemaResponse = await apiClient.get(`/api/auth/table/${slug}`);
     
     if (!schemaResponse.success || !schemaResponse.data) {
+        removeTableSkeleton(tableElement);
         return showErrorMessage(tableElement, schemaResponse.message || "Table Schema not found");
     }
 
@@ -358,6 +359,7 @@ async function initLabTable(tableElement) {
     }
 
     if (!entity || !dtSchemaConfig.columns) {
+        removeTableSkeleton(tableElement);
         return showErrorMessage(tableElement, "Invalid schema or missing entity");
     }
 
@@ -373,6 +375,7 @@ async function initLabTable(tableElement) {
     const initialData = await fetchEntityData(entity, 0, initialFetchSize);
     
     if (!initialData.success || !initialData.data) {
+        removeTableSkeleton(tableElement);
         return showErrorMessage(tableElement, initialData.message || "Failed to load data");
     }
 
@@ -397,6 +400,7 @@ async function initLabTable(tableElement) {
     // Store manager instance on table element for debugging/access
     tableElement.__viewManager = viewManager;
 
+    removeTableSkeleton(tableElement);
     // Render initial view based on stored preference
     if (viewManager.currentViewMode === VIEW_MODE_INBOX) {
         renderInboxView(tableElement, cache, mergedConfig, entity, schema);
@@ -418,6 +422,17 @@ async function initLabTable(tableElement) {
 // ---------------------------
 // 🌐 API HELPERS (Using API Client with response_schema)
 // ---------------------------
+function removeTableSkeleton(tableElement) {
+    const shell = tableElement.closest('.lab-table-shell');
+    const skeleton = shell?.querySelector('.table-skeleton');
+
+    if (skeleton) {
+        skeleton.remove();
+    }
+
+    tableElement.classList.remove('d-none');
+}
+
 async function fetchEntityData(entity, offset = 0, length = 50) {
     const response = await apiClient.get(`/api/entity/${entity}`, {
         offset,
@@ -1398,6 +1413,7 @@ function showTableLoader(tableElement) {
 
 function showAuthWarning() {
     document.querySelectorAll(".lab-table").forEach(t => {
+        removeTableSkeleton(t);
         t.innerHTML = `
         <tr>
             <td colspan="10" class="text-center py-4">
@@ -1412,6 +1428,7 @@ function showAuthWarning() {
 }
 
 function showErrorMessage(table, msg) {
+    removeTableSkeleton(table);
     table.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">${msg}</td></tr>`;
 }
 
