@@ -761,6 +761,7 @@ function applyInboxStickyStyles(leftPanel) {
             row.style.overflow = 'auto';
             row.style.minHeight = '0';
             row.style.position = 'relative';
+            row.classList.add('border-top', 'border-bottom');
             
             // Make thead sticky within this scrollable container
             const thead = row.querySelector('thead');
@@ -1480,6 +1481,7 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
 
 
 
