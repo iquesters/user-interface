@@ -894,6 +894,85 @@ function getLoaderComponentHTML() {
     `;
 }
 
+function escapeDetailHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatDetailLabel(key) {
+    return String(key)
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+function formatFallbackDetailValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return '<span class="text-muted">-</span>';
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'Yes' : 'No';
+    }
+
+    if (typeof value === 'object') {
+        return `<pre class="mb-0 small text-wrap">${escapeDetailHtml(JSON.stringify(value, null, 2))}</pre>`;
+    }
+
+    return escapeDetailHtml(value);
+}
+
+function renderFallbackDetailComponent(data = {}) {
+    const rows = [];
+    const recordEntries = Object.entries(data).filter(([key]) => key !== 'meta');
+
+    recordEntries.forEach(([key, value]) => {
+        rows.push(`
+            <tr>
+                <th scope="row" class="w-25 text-muted fw-semibold">${escapeDetailHtml(formatDetailLabel(key))}</th>
+                <td>${formatFallbackDetailValue(value)}</td>
+            </tr>
+        `);
+    });
+
+    const metaEntries = Array.isArray(data.meta) ? data.meta : [];
+    metaEntries.forEach((item) => {
+        const metaKey = item?.meta_key || item?.key || 'Meta';
+        const metaValue = item?.meta_value ?? item?.value ?? item;
+
+        rows.push(`
+            <tr>
+                <th scope="row" class="w-25 text-muted fw-semibold">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                <td>${formatFallbackDetailValue(metaValue)}</td>
+            </tr>
+        `);
+    });
+
+    if (rows.length === 0) {
+        rows.push(`
+            <tr>
+                <td colspan="2" class="text-center text-muted py-4">No details available</td>
+            </tr>
+        `);
+    }
+
+    return `
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="mb-0 fw-semibold text-muted">Record Information</h6>
+        </div>
+        <div class="table-responsive border rounded">
+            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+                <tbody>
+                    ${rows.join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data) {
     // Store the current width/percentage before modifying
     const currentWidth = rightPanelEle.style.width;
@@ -974,7 +1053,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Content container - using Bootstrap classes
     const contentContainer = document.createElement('div');
-    contentContainer.className = 'inbox-detail-content flex-grow-1 w-100 overflow-auto bg-light p-3';
+    contentContainer.className = 'inbox-detail-content flex-grow-1 w-100 overflow-auto p-2';
     contentContainer.innerHTML = getLoaderComponentHTML();
     
     // Assemble the panel
@@ -1004,13 +1083,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         } 
         // Priority 3: No configuration found
         else {
-            contentContainer.innerHTML = `
-                <div class="alert alert-warning m-0 w-100">
-                    <h5>⚠️ Configuration Missing</h5>
-                    <p class="mb-1">No detail component or form schema defined in table configuration.</p>
-                    <small class="text-muted">Define either <code>details-component</code> or <code>form-schema-uid</code> in schema.</small>
-                </div>
-            `;
+            contentContainer.innerHTML = renderFallbackDetailComponent(data);
             return;
         }
         
@@ -1425,3 +1498,6 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
+
+
