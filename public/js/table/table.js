@@ -553,15 +553,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Left panel (list view) - flex container with flex-column
     const leftPanel = document.createElement('div');
-    leftPanel.className = 'inbox-left-panel';
-    leftPanel.style.cssText = `
-        width: ${DEFAULT_LEFT_PANEL_WIDTH}%;
-        border-right: 1px solid #dee2e6;
-        background: white;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    `;
+    leftPanel.className = 'inbox-left-panel p-1 d-flex flex-column overflow-hidden border-end';
+    leftPanel.style.width = `${DEFAULT_LEFT_PANEL_WIDTH}%`;
     
     // Resizer
     const resizer = document.createElement('div');
@@ -648,6 +641,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         },
         {
             data: null,
+            orderable: false,
             render: (row) => renderInboxRow(row, columns)
         }
     ];
@@ -757,13 +751,7 @@ function applyInboxStickyStyles(leftPanel) {
         
         // Top row: Contains search or page length controls
         if ((hasSearch || hasLength) && !hasTable && !hasPagination) {
-            row.style.flexShrink = '0';
-            row.style.position = 'sticky';
-            row.style.top = '0';
-            row.style.zIndex = '11';
-            row.style.backgroundColor = 'white';
-            row.style.paddingBottom = '10px';
-            row.style.borderBottom = '1px solid #dee2e6';
+            row.classList.add('flex-shrink-0', 'sticky-top', 'z-3', 'border-bottom');
             console.log(`✅ Styled top controls at row ${index}`);
         }
         
@@ -786,13 +774,7 @@ function applyInboxStickyStyles(leftPanel) {
         
         // Bottom row: Contains pagination or info
         else if (hasPagination || hasInfo) {
-            row.style.flexShrink = '0';
-            row.style.position = 'sticky';
-            row.style.bottom = '0';
-            row.style.zIndex = '11';
-            row.style.backgroundColor = 'white';
-            row.style.paddingTop = '10px';
-            row.style.borderTop = '1px solid #dee2e6';
+            row.classList.add('flex-shrink-0', 'position-sticky', 'bottom-0', 'z-3', 'border-top');
             console.log(`✅ Styled bottom pagination at row ${index}`);
         }
     });
@@ -1498,6 +1480,13 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
+
+
+
+
+
+
 
 
 
