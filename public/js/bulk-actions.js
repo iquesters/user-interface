@@ -239,28 +239,33 @@ class BulkActionsManager {
      * Refresh all tables
      */
     refreshTables() {
-        // Show loading state on refresh button
         if (this.refreshBtn) {
             this.refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             this.refreshBtn.disabled = true;
         }
 
-        // Refresh regular tables
-        $('.lab-table').each(function() {
-            const dt = $(this).DataTable();
-            if (dt) dt.ajax.reload(null, false);
-        });
-        
-        // Refresh inbox tables
-        $('.inbox-list-table').each(function() {
-            const dt = $(this).DataTable();
-            if (dt) dt.ajax.reload(null, false);
+        const reloadTable = (element) => {
+            if (!$.fn.DataTable.isDataTable(element)) {
+                return;
+            }
+
+            if (typeof window.clearLabTableCache === 'function') {
+                window.clearLabTableCache(element);
+            }
+
+            $(element).DataTable().ajax.reload(null, false);
+        };
+
+        document.querySelectorAll('.lab-table').forEach((table) => {
+            reloadTable(table);
         });
 
-        // Clear selections after refresh
+        document.querySelectorAll('.inbox-list-table').forEach((table) => {
+            reloadTable(table);
+        });
+
         this.clearAllSelections();
 
-        // Restore refresh button
         setTimeout(() => {
             if (this.refreshBtn) {
                 this.refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i>';

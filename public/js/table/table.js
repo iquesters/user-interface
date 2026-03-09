@@ -97,6 +97,16 @@ class EntityCache {
 const entityCaches = new Map();
 const inboxViewStates = new Map();
 
+function clearTableCache(tableElement) {
+    const sourceTable = tableElement?.__sourceTable || tableElement;
+    const entity = sourceTable?.__viewManager?.entity;
+    const cache = entity ? entityCaches.get(entity) : null;
+
+    if (cache) {
+        cache.clear();
+    }
+}
+
 // ---------------------------
 // 🎛️ VIEW MODE MANAGER
 // ---------------------------
@@ -611,6 +621,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Create DataTable
     const listTable = document.createElement('table');
+    listTable.__sourceTable = tableElement;
     listTable.className = 'table table-striped table-bordered table-hover inbox-list-table';
     listTable.style.cssText = 'margin: 0; cursor: pointer; width: 100%;';
     
@@ -1362,11 +1373,12 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
 // 🔮 PREDICTIVE PREFETCH
 // ---------------------------
 async function prefetchNextBatch(cache, entityName, currentStart, currentLength) {
-    const nextOffset = cache.getMaxCachedOffset();
+    const nextOffset = currentStart + currentLength;
     const prefetchKey = `${entityName}-${nextOffset}`;
 
     if (cache.prefetchPromises.has(prefetchKey)) return;
     if (nextOffset >= cache.total) return;
+    if (cache.hasRange(nextOffset, currentLength)) return;
 
     console.log(`🔮 Prefetching next batch at offset ${nextOffset}`);
     
@@ -1487,6 +1499,9 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
+window.clearLabTableCache = clearTableCache;
+
 
 
 
