@@ -46,8 +46,11 @@ Route::prefix('api')
             Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
                 ->name('auth.table');
 
-            Route::get('entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData'])
-                ->name('api.entity.data');
+            Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
+                ->name('api.entity.list');
+
+            Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
+                ->name('api.entity.show');
         });
 });
 
@@ -61,7 +64,8 @@ Route::middleware(['api','auth:sanctum'])->group(function () {
 
     Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
 
-    // Route::get('api/entity/{entity}/{entity_uid?}', [DynamicEntityController::class, 'getEntityData']);
+    // Route::get('api/entity/list/{entity_name}', [DynamicEntityController::class, 'list']);
+    // Route::get('api/entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show']);
 
     Route::get('api/hola/{form_schema_id}/{entity_uid?}', [UIController::class, 'getHtmlComponent']);
 });

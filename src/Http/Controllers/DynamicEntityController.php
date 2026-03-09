@@ -2,119 +2,170 @@
 
 namespace Iquesters\UserInterface\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Throwable;
 use Iquesters\Foundation\System\Http\ApiResponse;
+use Iquesters\Foundation\System\Traits\Loggable;
+use Throwable;
 
 class DynamicEntityController extends Controller
 {
-    public function getEntityData(string $entity, ?string $entity_uid = null)
+    use Loggable;
+
+    public function list(string $entity)
     {
         try {
-            if (! $entity) {
-                return response()->json(['error' => 'Entity name is required'], 400);
-            }
+            $this->ensureEntityTableExists($entity);
 
-            if (! Schema::hasTable($entity)) {
-                Log::warning("Entity fetch failed: Table '{$entity}' not found");
-                return response()->json(['error' => "Table {$entity} does not exist"], 404);
-            }
+            $offset = max((int) request()->get('offset', 0), 0);
+            $length = max((int) request()->get('length', 50), 1);
+            $page = (int) floor($offset / $length) + 1;
 
-            // ✅ Detect meta table
-            $possibleMetaTables = [
-                "{$entity}_metas",
-                "{$entity}_meta",
-                Str::singular($entity) . "_meta",
-                Str::singular($entity) . "_metas",
-            ];
-
-            $metaTable = collect($possibleMetaTables)
-                ->first(fn($table) => Schema::hasTable($table));
-
-            // ✅ Build query
             $query = DB::table($entity);
-
-            // ✅ Handle filtering by entity_uid
-            if ($entity_uid) {
-                $hasUid = Schema::hasColumn($entity, 'uid');
-                $hasId  = Schema::hasColumn($entity, 'id');
-
-                if ($hasUid && is_numeric($entity_uid)) {
-                    return response()->json([
-                        'success' => false,
-                        'error' => "This table uses 'uid' as the primary reference. Please pass a valid UID instead of an ID.",
-                    ], 400);
-                }
-
-                if ($hasUid) {
-                    $query->where('uid', $entity_uid);
-                } elseif ($hasId) {
-                    $query->where('id', $entity_uid);
-                } else {
-                    return response()->json([
-                        'success' => false,
-                        'error' => "Table {$entity} has no 'uid' or 'id' column to filter by.",
-                    ], 400);
-                }
-            }
-
-            // ✅ Add pagination / lazy loading parameters
-            $offset = request()->get('offset', 0);
-            $length = request()->get('length', 50);
-
-            $totalCount = $query->count(); // before limit
-
+            $totalCount = $query->count();
             $data = $query->offset($offset)->limit($length)->get();
+            $data = $this->attachMetaData($entity, $data);
 
-            // ✅ Attach meta data if available
-            if ($metaTable) {
-                $metaData = DB::table($metaTable)->get();
-                $groupedMeta = $metaData->groupBy('ref_parent');
+            return ApiResponse::paginated(
+                $data,
+                $totalCount,
+                $length,
+                $page,
+                'Request successful'
+            );
+        } catch (Throwable $e) {
+            return $this->handleException($e, $entity);
+        }
+    }
 
-                $data = $data->map(function ($item) use ($groupedMeta) {
-                    $item->meta = $groupedMeta[$item->id] ?? [];
-                    return $item;
-                });
+    public function show(string $entity, string $data_uid)
+    {
+        try {
+            $this->ensureEntityTableExists($entity);
+
+            $query = DB::table($entity);
+            $referenceColumn = $this->resolveReferenceColumn($entity, $data_uid);
+            $record = $query->where($referenceColumn, $data_uid)->first();
+
+            if (! $record) {
+                return ApiResponse::error(
+                    'Record not found',
+                    404,
+                    ['entity' => $entity, 'data_uid' => $data_uid]
+                );
             }
 
-            // return response()->json([
-            //     'success' => true,
-            //     'entity' => $entity,
-            //     'meta_table' => $metaTable ?? 'none',
-            //     'offset' => (int)$offset,
-            //     'length' => (int)$length,
-            //     'total' => $totalCount,
-            //     'count' => $data->count(),
-            //     'data' => $data,
-            // ]);
-            $page = floor($offset / $length) + 1;
+            $record = $this->attachMetaData($entity, collect([$record]))->first();
 
-return ApiResponse::paginated(
-    $data,
-    $totalCount,
-    $length,
-    $page,
-    'Request successful'
-);
-
+            return ApiResponse::success($record, 'Request successful');
         } catch (Throwable $e) {
-            Log::error('Entity Data API Error', [
+            return $this->handleException($e, $entity, $data_uid);
+        }
+    }
+
+    protected function ensureEntityTableExists(string $entity): void
+    {
+        if (! $entity) {
+            throw new \InvalidArgumentException('Entity name is required');
+        }
+
+        if (! Schema::hasTable($entity)) {
+            $this->logWarning("Entity fetch failed: Table '{$entity}' not found");
+            throw new \RuntimeException("Table {$entity} does not exist");
+        }
+    }
+
+    protected function resolveReferenceColumn(string $entity, string $dataUid): string
+    {
+        $hasUid = Schema::hasColumn($entity, 'uid');
+        $hasId = Schema::hasColumn($entity, 'id');
+
+        if ($hasUid && is_numeric($dataUid)) {
+            throw new \InvalidArgumentException(
+                "This table uses 'uid' as the primary reference. Please pass a valid UID instead of an ID."
+            );
+        }
+
+        if ($hasUid) {
+            return 'uid';
+        }
+
+        if ($hasId) {
+            return 'id';
+        }
+
+        throw new \InvalidArgumentException("Table {$entity} has no 'uid' or 'id' column to filter by.");
+    }
+
+    protected function attachMetaData(string $entity, $data)
+    {
+        $metaTable = $this->resolveMetaTable($entity);
+
+        if (! $metaTable || $data->isEmpty()) {
+            return $data;
+        }
+
+        $parentIds = $data
+            ->pluck('id')
+            ->filter()
+            ->values();
+
+        if ($parentIds->isEmpty()) {
+            return $data->map(function ($item) {
+                $item->meta = [];
+                return $item;
+            });
+        }
+
+        $metaData = DB::table($metaTable)
+            ->whereIn('ref_parent', $parentIds)
+            ->get();
+
+        $groupedMeta = $metaData->groupBy('ref_parent');
+
+        return $data->map(function ($item) use ($groupedMeta) {
+            $item->meta = $groupedMeta[$item->id] ?? [];
+            return $item;
+        });
+    }
+
+    protected function resolveMetaTable(string $entity): ?string
+    {
+        $possibleMetaTables = [
+            "{$entity}_metas",
+            "{$entity}_meta",
+            Str::singular($entity) . '_meta',
+            Str::singular($entity) . '_metas',
+        ];
+
+        return collect($possibleMetaTables)
+            ->first(fn ($table) => Schema::hasTable($table));
+    }
+
+    protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)
+    {
+        $status = 500;
+        $message = 'Something went wrong while retrieving entity data.';
+        $errors = null;
+
+        if ($e instanceof \InvalidArgumentException) {
+            $status = 400;
+            $message = $e->getMessage();
+        } elseif ($e instanceof \RuntimeException) {
+            $status = 404;
+            $message = $e->getMessage();
+        } else {
+            $this->logError('Entity Data API Error: ' . $e->getMessage() . ' ' . json_encode([
                 'entity' => $entity ?? 'unknown',
-                'message' => $e->getMessage(),
+                'data_uid' => $dataUid,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'timestamp' => now()->toDateTimeString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'error' => 'Internal Server Error',
-                'message' => 'Something went wrong while retrieving entity data.',
-            ], 500);
+            ]));
         }
+
+        return ApiResponse::error($message, $status, $errors);
     }
 }

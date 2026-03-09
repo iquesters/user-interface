@@ -432,7 +432,7 @@ function removeTableSkeleton(tableElement) {
 }
 
 async function fetchEntityData(entity, offset = 0, length = 50) {
-    const response = await apiClient.get(`/api/entity/${entity}`, {
+    const response = await apiClient.get(`/api/entity/list/${entity}`, {
         offset,
         length
     });
