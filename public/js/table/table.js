@@ -560,7 +560,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Create inbox container with proper Bootstrap classes
     const container = document.createElement('div');
     container.className = 'inbox-view-container w-100';
-    container.style.cssText = 'display: flex !important; height: 600px; position: relative;';
+    container.style.cssText = 'display: flex !important; height: 100%; min-height: 0; position: relative;';
     
     console.log('📦 Created inbox container');
     
@@ -1501,22 +1501,3 @@ function getSelectedRows(tableElement) {
 }
 
 window.clearLabTableCache = clearTableCache;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
