@@ -367,19 +367,7 @@ async function initLabTable(tableElement) {
     const cache = new EntityCache(entity, entriesPerPage);
     entityCaches.set(entity, cache);
 
-    // Smart initial fetch
-    const initialFetchSize = Math.min(entriesPerPage * 2, 100);
-    console.log(`🔄 Fetching initial ${initialFetchSize} records for ${entity}`);
-    showTableLoader(tableElement);
-
-    const initialData = await fetchEntityData(entity, 0, initialFetchSize);
-    
-    if (!initialData.success || !initialData.data) {
-        removeTableSkeleton(tableElement);
-        return showErrorMessage(tableElement, initialData.message || "Failed to load data");
-    }
-
-    cache.set(0, initialData.data, initialData.total);
+    // DataTables will perform the first fetch; keep the cache empty until then.
 
     // Merge configs
     const mergedConfig = mergeDataTableConfigs(
