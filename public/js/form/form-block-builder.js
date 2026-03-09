@@ -512,7 +512,7 @@ async function getfetchEntityData(entity,entityUId) {
     try {
         const token = getSanctumToken();
         console.log('Using token for API call11111111111111:', token ? token : 'No token');
-        const res = await fetch(`/api/entity/${entity}/${entityUId}`, {
+        const res = await fetch(`/api/entity/show/${entity}/${entityUId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`
             },
@@ -540,7 +540,7 @@ async function getfetchEntityData(entity,entityUId) {
  */
 async function renderEntityDataToForm(formSelector, entityResponse) {
     const form = document.querySelector(formSelector);
-    const entityData = entityResponse?.[0];
+    const entityData = entityResponse || null;
 
     if (!form || !entityData) return;
 
@@ -549,14 +549,3 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         if (field) field.value = value ?? "";
     }
 }
-
-
-
-
-
-
-
-
-
-
-

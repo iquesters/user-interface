@@ -1,4 +1,4 @@
-﻿# Viewport Height And Table JS
+# Viewport Height And Table JS
 
 ## Viewport Height
 
@@ -59,7 +59,7 @@ The main table behavior lives in `public/js/table/table.js`.
 - loads table schema from `/api/auth/table/{slug}`
 - initializes a per-entity cache
 - renders either standard table view or inbox view
-- fetches row data from `/api/entity/{entity}`
+- fetches row data from `/api/entity/list/{entity_name}`
 - supports manual refresh through shared cache clearing
 - supports fallback detail rendering in inbox view when no detail component is configured
 
