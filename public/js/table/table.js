@@ -584,8 +584,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Right panel (detail view)
     const rightPanelEle = document.createElement('div');
-    rightPanelEle.className = 'inbox-right-panel';
-    rightPanelEle.style.cssText = `flex: 1; overflow: auto; padding: 20px; background: #f8f9fa;`;
+    rightPanelEle.className = 'inbox-right-panel bg-light';
+    rightPanelEle.style.cssText = `flex: 1; overflow: auto;`;
     rightPanelEle.innerHTML = '<div class="text-center text-muted py-5">Select an item to view details</div>';
     
     container.appendChild(leftPanel);
@@ -810,7 +810,7 @@ function renderInboxRow(row, columns) {
     );
 
     return `
-        <div class="d-flex flex-column gap-1 p-2">
+        <div class="d-flex flex-column">
             ${visibleColumns
                 .map(col => {
                     let value = '';
@@ -930,8 +930,8 @@ function renderFallbackDetailComponent(data = {}) {
     recordEntries.forEach(([key, value]) => {
         rows.push(`
             <tr>
-                <th scope="row" class="w-25 text-muted fw-semibold">${escapeDetailHtml(formatDetailLabel(key))}</th>
-                <td>${formatFallbackDetailValue(value)}</td>
+                <th scope="row" class="text-muted fw-semibold" style="width: 32%;">${escapeDetailHtml(formatDetailLabel(key))}</th>
+                <td class="text-break">${formatFallbackDetailValue(value)}</td>
             </tr>
         `);
     });
@@ -943,8 +943,8 @@ function renderFallbackDetailComponent(data = {}) {
 
         rows.push(`
             <tr>
-                <th scope="row" class="w-25 text-muted fw-semibold">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
-                <td>${formatFallbackDetailValue(metaValue)}</td>
+                <th scope="row" class="text-muted fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                <td class="text-break">${formatFallbackDetailValue(metaValue)}</td>
             </tr>
         `);
     });
@@ -961,8 +961,9 @@ function renderFallbackDetailComponent(data = {}) {
         <div class="d-flex align-items-center justify-content-between mb-2">
             <h6 class="mb-0 fw-semibold text-muted">Record Information</h6>
         </div>
-        <div class="table-responsive border rounded">
-            <table class="table table-sm table-striped table-hover mb-0 align-middle">
+        <div class="table-responsive rounded">
+            <table class="table table-sm table-hover mb-0 align-middle" style="--bs-table-bg: transparent;">
+                <colgroup><col style="width: 32%;"><col></colgroup>
                 <tbody>
                     ${rows.join('')}
                 </tbody>
@@ -993,7 +994,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Create header - using Bootstrap classes
     const header = document.createElement('div');
-    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 bg-white border-bottom flex-shrink-0';
+    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 shadow-sm flex-shrink-0';
     
     // Title on left
     const title = document.createElement('h6');
@@ -1498,6 +1499,13 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll('.row-checkbox:checked');
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
+
+
+
+
+
+
 
 
 
