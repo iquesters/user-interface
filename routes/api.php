@@ -55,6 +55,9 @@ Route::prefix('api')
             Route::put('entity/update/{entity_name}/{data_uid}', [DynamicEntityController::class, 'update'])
                 ->name('api.entity.update');
 
+            Route::delete('entity/delete/{entity_name}/{data_uid}', [DynamicEntityController::class, 'delete'])
+                ->name('api.entity.delete');
+
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
         });

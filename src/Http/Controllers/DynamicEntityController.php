@@ -149,6 +149,31 @@ class DynamicEntityController extends Controller
         }
     }
 
+    public function delete(string $entity, string $data_uid)
+    {
+        try {
+            $this->logDeleteRequest($entity, $data_uid);
+
+            $record = $this->softDeleteEntityRecord($entity, $data_uid);
+
+            $this->logInfo(sprintf(
+                'Dynamic entity record soft deleted | file=%s | entity=%s | record_id=%s | reference=%s | timestamp=%s',
+                __FILE__,
+                $entity,
+                (string) ($record->id ?? 'null'),
+                $data_uid,
+                now()->toDateTimeString()
+            ));
+
+            $record = $this->attachMetaData($entity, collect([$record]))->first();
+            $record = $this->sanitizeRecordForResponse($record);
+
+            return ApiResponse::success($record, 'Record deleted successfully');
+        } catch (Throwable $e) {
+            return $this->handleException($e, $entity, $data_uid);
+        }
+    }
+
     protected function logStoreRequest(Request $request, string $entity): void
     {
         $this->logInfo(sprintf(
@@ -168,6 +193,17 @@ class DynamicEntityController extends Controller
             $entity,
             $dataUid,
             json_encode(array_keys($request->all())),
+            now()->toDateTimeString()
+        ));
+    }
+
+    protected function logDeleteRequest(string $entity, string $dataUid): void
+    {
+        $this->logInfo(sprintf(
+            'DynamicEntityController@delete invoked | file=%s | entity=%s | data_uid=%s | timestamp=%s',
+            __FILE__,
+            $entity,
+            $dataUid,
             now()->toDateTimeString()
         ));
     }
@@ -267,6 +303,56 @@ class DynamicEntityController extends Controller
 
             return DB::table($entity)->where('id', $existingRecord->id)->first();
         });
+    }
+
+    protected function softDeleteEntityRecord(string $entity, string $dataUid): object
+    {
+        $this->ensureEntityTableExists($entity);
+
+        $tableColumns = Schema::getColumnListing($entity);
+
+        if (! in_array('status', $tableColumns, true)) {
+            throw new \InvalidArgumentException("Table {$entity} does not support soft delete because it has no status column.");
+        }
+
+        return DB::transaction(function () use ($entity, $dataUid, $tableColumns) {
+            $referenceColumn = $this->resolveReferenceColumn($entity, $dataUid);
+            $existingRecord = DB::table($entity)->where($referenceColumn, $dataUid)->first();
+
+            if (! $existingRecord) {
+                throw new \RuntimeException('Record not found');
+            }
+
+            DB::table($entity)
+                ->where('id', $existingRecord->id)
+                ->update($this->buildSoftDeletePayload($tableColumns));
+
+            return DB::table($entity)->where('id', $existingRecord->id)->first();
+        });
+    }
+
+    protected function buildSoftDeletePayload(array $tableColumns): array
+    {
+        $userId = auth()->id() ?? 0;
+        $timestamp = now();
+        $payload = [
+            'status' => EntityStatus::DELETED,
+        ];
+
+        $columnValueMap = [
+            'updated_by' => $userId,
+            'updated_at' => $timestamp,
+            'deleted_by' => $userId,
+            'deleted_at' => $timestamp,
+        ];
+
+        foreach ($columnValueMap as $column => $value) {
+            if (in_array($column, $tableColumns, true)) {
+                $payload[$column] = $value;
+            }
+        }
+
+        return $payload;
     }
 
     protected function applyMissingCreateAuditDefaults(array $data, object $existingRecord): array

@@ -8,6 +8,7 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - `GET /api/entity/show/{entity_name}/{data_uid}`
 - `POST /api/entity/store/{entity_name}`
 - `PUT /api/entity/update/{entity_name}/{data_uid}`
+- `DELETE /api/entity/delete/{entity_name}/{data_uid}`
 
 ## Store Flow
 1. Resolve the target table from `{entity_name}` and confirm it exists.
@@ -33,6 +34,14 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 7. Update the main row inside a transaction.
 8. Upsert meta rows linked by `ref_parent`.
 9. Return the updated record in the standardized API response format.
+
+## Delete Flow
+1. Resolve the target table from `{entity_name}` and confirm it exists.
+2. Resolve the incoming `{data_uid}` against the table `uid` column when present, otherwise `id`.
+3. Require a `status` column to support soft delete semantics.
+4. Update the record status to `deleted`.
+5. Fill `updated_by`, `updated_at`, `deleted_by`, and `deleted_at` when those columns exist.
+6. Return the soft-deleted record in the standardized API response format.
 
 ## Type Handling
 - Integer-like columns are cast to integers.
