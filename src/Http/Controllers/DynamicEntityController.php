@@ -2,17 +2,29 @@
 
 namespace Iquesters\UserInterface\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityStatus;
 use Throwable;
 
 class DynamicEntityController extends Controller
 {
     use Loggable;
+
+    protected array $reservedPayloadKeys = [
+        '_token',
+        '_method',
+        'meta',
+    ];
 
     public function list(string $entity)
     {
@@ -65,6 +77,103 @@ class DynamicEntityController extends Controller
         }
     }
 
+    public function store(Request $request, string $entity)
+    {
+        try {
+            $this->logStoreRequest($request, $entity);
+
+            $schema = $this->resolveEntitySchema($request, $entity);
+            $mainData = $this->prepareMainData($schema['payload'], $schema['column_types'], $schema['table_columns']);
+            $metaData = $this->extractMetaData($schema['payload'], $schema['table_columns'], $request->input('meta', []));
+
+            $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
+
+            $record = $this->createEntityRecord($entity, $mainData, $metaData);
+
+            $this->logInfo(sprintf(
+                'Dynamic entity record created | file=%s | entity=%s | record_id=%s | timestamp=%s',
+                __FILE__,
+                $entity,
+                (string) ($record->id ?? 'null'),
+                now()->toDateTimeString()
+            ));
+
+            $record = $this->attachMetaData($entity, collect([$record]))->first();
+
+            return ApiResponse::success($record, 'Record created successfully');
+        } catch (Throwable $e) {
+            return $this->handleException($e, $entity);
+        }
+    }
+
+    protected function logStoreRequest(Request $request, string $entity): void
+    {
+        $this->logInfo(sprintf(
+            'DynamicEntityController@store invoked | file=%s | entity=%s | request_keys=%s | timestamp=%s',
+            __FILE__,
+            $entity,
+            json_encode(array_keys($request->all())),
+            now()->toDateTimeString()
+        ));
+    }
+
+    protected function resolveEntitySchema(Request $request, string $entity): array
+    {
+        $this->ensureEntityTableExists($entity);
+
+        $payload = $request->except($this->reservedPayloadKeys);
+        $tableColumns = Schema::getColumnListing($entity);
+        $columnTypes = $this->getColumnTypes($entity, $tableColumns);
+
+        // The store endpoint stays generic by deriving writable columns and types at runtime.
+        $this->logDebug(sprintf(
+            'Dynamic entity store schema resolved | entity=%s | table_columns=%s | column_types=%s | meta_keys=%s',
+            $entity,
+            json_encode($tableColumns),
+            json_encode($columnTypes),
+            json_encode(array_keys((array) $request->input('meta', [])))
+        ));
+
+        return [
+            'payload' => $payload,
+            'table_columns' => $tableColumns,
+            'column_types' => $columnTypes,
+        ];
+    }
+
+    protected function prepareMainData(array $payload, array $columnTypes, array $tableColumns): array
+    {
+        $mainData = $this->extractMainTableData($payload, $columnTypes);
+
+        return $this->applySystemDefaults($mainData, $tableColumns, false);
+    }
+
+    protected function ensureStorePayloadIsNotEmpty(array $mainData, array $metaData): void
+    {
+        if (empty($mainData) && empty($metaData)) {
+            throw new \InvalidArgumentException('Request payload is empty.');
+        }
+    }
+
+    protected function createEntityRecord(string $entity, array $mainData, array $metaData): object
+    {
+        return DB::transaction(function () use ($entity, $mainData, $metaData) {
+            $recordId = DB::table($entity)->insertGetId($mainData);
+
+            $this->logInfo(sprintf(
+                'Dynamic entity main row inserted | entity=%s | record_id=%s | main_columns=%s',
+                $entity,
+                (string) $recordId,
+                json_encode(array_keys($mainData))
+            ));
+
+            // Meta rows are saved in the same transaction so partial writes do not survive failures.
+            $this->storeMetaData($entity, $recordId, $metaData);
+
+            return DB::table($entity)->where('id', $recordId)->first();
+        });
+    }
+
     protected function ensureEntityTableExists(string $entity): void
     {
         if (! $entity) {
@@ -74,6 +183,123 @@ class DynamicEntityController extends Controller
         if (! Schema::hasTable($entity)) {
             $this->logWarning("Entity fetch failed: Table '{$entity}' not found");
             throw new \RuntimeException("Table {$entity} does not exist");
+        }
+    }
+
+    protected function extractMainTableData(array $payload, array $columnTypes): array
+    {
+        $data = [];
+
+        foreach ($payload as $key => $value) {
+            if (! array_key_exists($key, $columnTypes)) {
+                continue;
+            }
+
+            $data[$key] = $this->normalizeValueForColumn($key, $value, $columnTypes[$key]);
+        }
+
+        return $data;
+    }
+
+    protected function extractMetaData(array $payload, array $tableColumns, mixed $explicitMeta = []): array
+    {
+        $metaData = [];
+
+        foreach ($payload as $key => $value) {
+            if (in_array($key, $tableColumns, true)) {
+                continue;
+            }
+
+            $metaData[$key] = $value;
+        }
+
+        if (is_array($explicitMeta)) {
+            foreach ($explicitMeta as $key => $value) {
+                if (is_int($key) && is_array($value) && isset($value['meta_key'])) {
+                    $metaData[$value['meta_key']] = $value['meta_value'] ?? null;
+                    continue;
+                }
+
+                $metaData[$key] = $value;
+            }
+        }
+
+        return $metaData;
+    }
+
+    protected function applySystemDefaults(array $data, array $tableColumns, bool $isUpdate = false): array
+    {
+        $userId = auth()->id() ?? 0;
+        $timestamp = now();
+
+        if (! $isUpdate) {
+            if (in_array('uid', $tableColumns, true) && empty($data['uid'])) {
+                $data['uid'] = (string) Str::ulid();
+            }
+
+            if (in_array('status', $tableColumns, true) && ! array_key_exists('status', $data)) {
+                $data['status'] = EntityStatus::ACTIVE;
+            }
+
+            if (in_array('created_by', $tableColumns, true) && ! array_key_exists('created_by', $data)) {
+                $data['created_by'] = $userId;
+            }
+
+            if (in_array('created_at', $tableColumns, true) && ! array_key_exists('created_at', $data)) {
+                $data['created_at'] = $timestamp;
+            }
+        }
+
+        if (in_array('updated_by', $tableColumns, true) && ! array_key_exists('updated_by', $data)) {
+            $data['updated_by'] = $userId;
+        }
+
+        if (in_array('updated_at', $tableColumns, true) && ! array_key_exists('updated_at', $data)) {
+            $data['updated_at'] = $timestamp;
+        }
+
+        return $data;
+    }
+
+    protected function storeMetaData(string $entity, int $recordId, array $metaData): void
+    {
+        $metaTable = $this->resolveMetaTable($entity);
+
+        if (! $metaTable || empty($metaData)) {
+            return;
+        }
+
+        $metaColumns = Schema::getColumnListing($metaTable);
+        $userId = auth()->id() ?? 0;
+
+        foreach ($metaData as $key => $value) {
+            $row = [
+                'ref_parent' => $recordId,
+                'meta_key' => $key,
+                'meta_value' => $this->normalizeMetaValue($value),
+            ];
+
+            if (in_array('status', $metaColumns, true)) {
+                $row['status'] = EntityStatus::ACTIVE;
+            }
+
+            if (in_array('created_by', $metaColumns, true)) {
+                $row['created_by'] = $userId;
+            }
+
+            if (in_array('updated_by', $metaColumns, true)) {
+                $row['updated_by'] = $userId;
+            }
+
+            DB::table($metaTable)->insert($row);
+
+            $this->logDebug(sprintf(
+                'Dynamic entity meta row inserted | entity=%s | meta_table=%s | record_id=%s | meta_key=%s',
+                $entity,
+                $metaTable,
+                (string) $recordId,
+                (string) $key
+            ));
         }
     }
 
@@ -144,19 +370,134 @@ class DynamicEntityController extends Controller
             ->first(fn ($table) => Schema::hasTable($table));
     }
 
+    protected function getColumnTypes(string $entity, array $columns): array
+    {
+        $types = [];
+
+        foreach ($columns as $column) {
+            $types[$column] = Schema::getColumnType($entity, $column);
+        }
+
+        return $types;
+    }
+
+    protected function normalizeValueForColumn(string $column, mixed $value, string $columnType): mixed
+    {
+        if ($value === '' && ! in_array($columnType, ['string', 'text', 'mediumtext', 'longtext'], true)) {
+            return null;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if ($column === 'password' && is_string($value) && $value !== '') {
+            return Hash::needsRehash($value) ? Hash::make($value) : $value;
+        }
+
+        // Column types come from the schema, so normalization stays table-agnostic.
+        return match ($columnType) {
+            'integer', 'bigint', 'mediumint', 'smallint', 'tinyint' => $this->normalizeIntegerValue($column, $value),
+            'float', 'double', 'decimal', 'real' => $this->normalizeFloatValue($column, $value),
+            'boolean', 'bool' => $this->normalizeBooleanValue($column, $value),
+            'json' => $this->normalizeJsonValue($column, $value),
+            'date' => $this->normalizeDateValue($column, $value, 'Y-m-d'),
+            'datetime', 'timestamp' => $this->normalizeDateValue($column, $value, 'Y-m-d H:i:s'),
+            'time' => $this->normalizeDateValue($column, $value, 'H:i:s'),
+            'string', 'text', 'mediumtext', 'longtext', 'char', 'varchar', 'uuid', 'ulid' => $this->normalizeStringValue($value),
+            default => is_array($value) ? json_encode($value) : $value,
+        };
+    }
+
+    protected function normalizeIntegerValue(string $column, mixed $value): ?int
+    {
+        if (is_bool($value)) {
+            return $value ? 1 : 0;
+        }
+
+        if (! is_numeric($value)) {
+            throw new \InvalidArgumentException("Column {$column} expects an integer value.");
+        }
+
+        return (int) $value;
+    }
+
+    protected function normalizeFloatValue(string $column, mixed $value): ?float
+    {
+        if (! is_numeric($value)) {
+            throw new \InvalidArgumentException("Column {$column} expects a numeric value.");
+        }
+
+        return (float) $value;
+    }
+
+    protected function normalizeBooleanValue(string $column, mixed $value): bool
+    {
+        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        if ($normalized === null) {
+            throw new \InvalidArgumentException("Column {$column} expects a boolean value.");
+        }
+
+        return $normalized;
+    }
+
+    protected function normalizeJsonValue(string $column, mixed $value): string
+    {
+        if (is_string($value)) {
+            json_decode($value, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \InvalidArgumentException("Column {$column} expects valid JSON.");
+            }
+
+            return $value;
+        }
+
+        return json_encode($value);
+    }
+
+    protected function normalizeDateValue(string $column, mixed $value, string $format): string
+    {
+        try {
+            return Carbon::parse($value)->format($format);
+        } catch (Throwable) {
+            throw new \InvalidArgumentException("Column {$column} has an invalid date/time value.");
+        }
+    }
+
+    protected function normalizeStringValue(mixed $value): string
+    {
+        if (is_array($value)) {
+            return json_encode($value);
+        }
+
+        return (string) $value;
+    }
+
+    protected function normalizeMetaValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return is_array($value) ? json_encode($value) : (string) $value;
+    }
+
     protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)
     {
-        $status = 500;
-        $message = 'Something went wrong while retrieving entity data.';
-        $errors = null;
+        [$status, $message, $errors] = match (true) {
+            $e instanceof \InvalidArgumentException => [400, $e->getMessage(), null],
+            $e instanceof UniqueConstraintViolationException,
+            $e instanceof QueryException => $this->mapQueryException($e),
+            $e instanceof \RuntimeException => [404, $e->getMessage(), null],
+            default => [500, 'Something went wrong while processing entity data.', null],
+        };
 
-        if ($e instanceof \InvalidArgumentException) {
-            $status = 400;
-            $message = $e->getMessage();
-        } elseif ($e instanceof \RuntimeException) {
-            $status = 404;
-            $message = $e->getMessage();
-        } else {
+        if (! $e instanceof \InvalidArgumentException
+            && ! $e instanceof UniqueConstraintViolationException
+            && ! $e instanceof QueryException
+            && ! $e instanceof \RuntimeException) {
             $this->logError('Entity Data API Error: ' . $e->getMessage() . ' ' . json_encode([
                 'entity' => $entity ?? 'unknown',
                 'data_uid' => $dataUid,
@@ -166,6 +507,83 @@ class DynamicEntityController extends Controller
             ]));
         }
 
+        $this->logInfo(sprintf(
+            'Dynamic entity exception mapped | file=%s | entity=%s | data_uid=%s | exception_class=%s | mapped_status=%s | mapped_message=%s | has_errors=%s | timestamp=%s',
+            __FILE__,
+            $entity ?? 'null',
+            $dataUid ?? 'null',
+            get_class($e),
+            (string) $status,
+            $message,
+            ! empty($errors) ? 'true' : 'false',
+            now()->toDateTimeString()
+        ));
+
         return ApiResponse::error($message, $status, $errors);
+    }
+
+    protected function mapQueryException(QueryException $e): array
+    {
+        $errorInfo = $e->errorInfo ?? [];
+        $sqlState = $errorInfo[0] ?? null;
+        $driverCode = (int) ($errorInfo[1] ?? 0);
+        $driverMessage = $errorInfo[2] ?? $e->getMessage();
+
+        $this->logError(sprintf(
+            'Entity Data DB Error | sql_state=%s | driver_code=%s | file=%s | timestamp=%s | message=%s',
+            $sqlState ?? 'null',
+            (string) $driverCode,
+            __FILE__,
+            now()->toDateTimeString(),
+            $driverMessage
+        ));
+
+        switch (true) {
+            case $sqlState === '23000' && $driverCode === 1062:
+                $field = $this->extractFieldFromDuplicateKeyMessage($driverMessage);
+                $message = $field ? ucfirst($field) . ' already exists.' : 'Duplicate value already exists.';
+                $errors = $field ? [$field => ["The {$field} has already been taken."]] : null;
+
+                return [409, $message, $errors];
+
+            // Surface common relational integrity failures as client errors instead of leaking SQL details.
+            case $sqlState === '23000' && in_array($driverCode, [1451, 1452], true):
+                return [409, 'Related record does not exist or cannot be modified because it is in use.', null];
+
+            case $sqlState === '23000' && $driverCode === 1048:
+                $field = $this->extractFieldFromNotNullMessage($driverMessage);
+                $message = $field ? ucfirst($field) . ' is required.' : 'A required field is missing.';
+                $errors = $field ? [$field => ["The {$field} field is required."]] : null;
+
+                return [422, $message, $errors];
+        }
+
+        return [500, 'Unable to save the record due to a database constraint.', null];
+    }
+
+    protected function extractFieldFromDuplicateKeyMessage(string $message): ?string
+    {
+        if (preg_match("/for key '([^']+)'/i", $message, $matches) !== 1) {
+            return null;
+        }
+
+        $indexName = $matches[1];
+
+        if (str_ends_with($indexName, '_unique')) {
+            $indexName = substr($indexName, 0, -7);
+        }
+
+        $parts = explode('_', $indexName);
+
+        return count($parts) > 1 ? end($parts) : $indexName;
+    }
+
+    protected function extractFieldFromNotNullMessage(string $message): ?string
+    {
+        if (preg_match("/Column '([^']+)' cannot be null/i", $message, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return null;
     }
 }

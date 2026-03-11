@@ -49,6 +49,9 @@ Route::prefix('api')
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
                 ->name('api.entity.list');
 
+            Route::post('entity/store/{entity_name}', [DynamicEntityController::class, 'store'])
+                ->name('api.entity.store');
+
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
         });
