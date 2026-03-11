@@ -20,6 +20,16 @@ class DynamicEntityController extends Controller
 {
     use Loggable;
 
+    protected array $sensitiveResponseFields = [
+        'password',
+        'remember_token',
+        'token',
+        'access_token',
+        'refresh_token',
+        'secret',
+        'api_key',
+    ];
+
     protected array $reservedPayloadKeys = [
         '_token',
         '_method',
@@ -70,6 +80,7 @@ class DynamicEntityController extends Controller
             }
 
             $record = $this->attachMetaData($entity, collect([$record]))->first();
+            $record = $this->sanitizeRecordForResponse($record);
 
             return ApiResponse::success($record, 'Request successful');
         } catch (Throwable $e) {
@@ -99,10 +110,42 @@ class DynamicEntityController extends Controller
             ));
 
             $record = $this->attachMetaData($entity, collect([$record]))->first();
+            $record = $this->sanitizeRecordForResponse($record);
 
             return ApiResponse::success($record, 'Record created successfully');
         } catch (Throwable $e) {
             return $this->handleException($e, $entity);
+        }
+    }
+
+    public function update(Request $request, string $entity, string $data_uid)
+    {
+        try {
+            $this->logUpdateRequest($request, $entity, $data_uid);
+
+            $schema = $this->resolveEntitySchema($request, $entity);
+            $mainData = $this->prepareUpdateData($schema['payload'], $schema['column_types'], $schema['table_columns']);
+            $metaData = $this->extractMetaData($schema['payload'], $schema['table_columns'], $request->input('meta', []));
+
+            $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
+
+            $record = $this->updateEntityRecord($entity, $data_uid, $mainData, $metaData);
+
+            $this->logInfo(sprintf(
+                'Dynamic entity record updated | file=%s | entity=%s | record_id=%s | reference=%s | timestamp=%s',
+                __FILE__,
+                $entity,
+                (string) ($record->id ?? 'null'),
+                $data_uid,
+                now()->toDateTimeString()
+            ));
+
+            $record = $this->attachMetaData($entity, collect([$record]))->first();
+            $record = $this->sanitizeRecordForResponse($record);
+
+            return ApiResponse::success($record, 'Record updated successfully');
+        } catch (Throwable $e) {
+            return $this->handleException($e, $entity, $data_uid);
         }
     }
 
@@ -112,6 +155,18 @@ class DynamicEntityController extends Controller
             'DynamicEntityController@store invoked | file=%s | entity=%s | request_keys=%s | timestamp=%s',
             __FILE__,
             $entity,
+            json_encode(array_keys($request->all())),
+            now()->toDateTimeString()
+        ));
+    }
+
+    protected function logUpdateRequest(Request $request, string $entity, string $dataUid): void
+    {
+        $this->logInfo(sprintf(
+            'DynamicEntityController@update invoked | file=%s | entity=%s | data_uid=%s | request_keys=%s | timestamp=%s',
+            __FILE__,
+            $entity,
+            $dataUid,
             json_encode(array_keys($request->all())),
             now()->toDateTimeString()
         ));
@@ -148,6 +203,14 @@ class DynamicEntityController extends Controller
         return $this->applySystemDefaults($mainData, $tableColumns, false);
     }
 
+    protected function prepareUpdateData(array $payload, array $columnTypes, array $tableColumns): array
+    {
+        $mainData = $this->extractMainTableData($payload, $columnTypes);
+        unset($mainData['id'], $mainData['uid']);
+
+        return $this->applySystemDefaults($mainData, $tableColumns, true);
+    }
+
     protected function ensureStorePayloadIsNotEmpty(array $mainData, array $metaData): void
     {
         if (empty($mainData) && empty($metaData)) {
@@ -172,6 +235,51 @@ class DynamicEntityController extends Controller
 
             return DB::table($entity)->where('id', $recordId)->first();
         });
+    }
+
+    protected function updateEntityRecord(string $entity, string $dataUid, array $mainData, array $metaData): object
+    {
+        return DB::transaction(function () use ($entity, $dataUid, $mainData, $metaData) {
+            $referenceColumn = $this->resolveReferenceColumn($entity, $dataUid);
+            $existingRecord = DB::table($entity)->where($referenceColumn, $dataUid)->first();
+
+            if (! $existingRecord) {
+                throw new \RuntimeException('Record not found');
+            }
+
+            $mainData = $this->applyMissingCreateAuditDefaults($mainData, $existingRecord);
+
+            if (! empty($mainData)) {
+                DB::table($entity)
+                    ->where('id', $existingRecord->id)
+                    ->update($mainData);
+
+                $this->logInfo(sprintf(
+                    'Dynamic entity main row updated | entity=%s | record_id=%s | reference=%s | main_columns=%s',
+                    $entity,
+                    (string) $existingRecord->id,
+                    $dataUid,
+                    json_encode(array_keys($mainData))
+                ));
+            }
+
+            $this->upsertMetaData($entity, $existingRecord->id, $metaData);
+
+            return DB::table($entity)->where('id', $existingRecord->id)->first();
+        });
+    }
+
+    protected function applyMissingCreateAuditDefaults(array $data, object $existingRecord): array
+    {
+        if (property_exists($existingRecord, 'created_at') && empty($existingRecord->created_at) && ! array_key_exists('created_at', $data)) {
+            $data['created_at'] = now();
+        }
+
+        if (property_exists($existingRecord, 'created_by') && empty($existingRecord->created_by) && ! array_key_exists('created_by', $data)) {
+            $data['created_by'] = auth()->id() ?? 0;
+        }
+
+        return $data;
     }
 
     protected function ensureEntityTableExists(string $entity): void
@@ -301,6 +409,81 @@ class DynamicEntityController extends Controller
                 (string) $key
             ));
         }
+    }
+
+    protected function upsertMetaData(string $entity, int $recordId, array $metaData): void
+    {
+        $metaTable = $this->resolveMetaTable($entity);
+
+        if (! $metaTable || empty($metaData)) {
+            return;
+        }
+
+        $metaColumns = Schema::getColumnListing($metaTable);
+        $userId = auth()->id() ?? 0;
+        $timestamp = now();
+
+        foreach ($metaData as $key => $value) {
+            $existingMeta = DB::table($metaTable)
+                ->where('ref_parent', $recordId)
+                ->where('meta_key', $key)
+                ->first();
+
+            $row = $this->buildMetaUpsertRow($metaColumns, $value, $userId, $timestamp, (bool) $existingMeta);
+
+            DB::table($metaTable)->updateOrInsert(
+                [
+                    'ref_parent' => $recordId,
+                    'meta_key' => $key,
+                ],
+                $row
+            );
+
+            $this->logDebug(sprintf(
+                'Dynamic entity meta row upserted | entity=%s | meta_table=%s | record_id=%s | meta_key=%s',
+                $entity,
+                $metaTable,
+                (string) $recordId,
+                (string) $key
+            ));
+        }
+    }
+
+    protected function buildMetaUpsertRow(
+        array $metaColumns,
+        mixed $value,
+        int $userId,
+        mixed $timestamp,
+        bool $metaExists
+    ): array {
+        $row = [
+            'meta_value' => $this->normalizeMetaValue($value),
+        ];
+
+        $columnValueMap = [
+            'status' => EntityStatus::ACTIVE,
+            'updated_by' => $userId,
+            'updated_at' => $timestamp,
+        ];
+
+        foreach ($columnValueMap as $column => $columnValue) {
+            if (in_array($column, $metaColumns, true)) {
+                $row[$column] = $columnValue;
+            }
+        }
+
+        if (! $metaExists) {
+            foreach ([
+                'created_by' => $userId,
+                'created_at' => $timestamp,
+            ] as $column => $columnValue) {
+                if (in_array($column, $metaColumns, true)) {
+                    $row[$column] = $columnValue;
+                }
+            }
+        }
+
+        return $row;
     }
 
     protected function resolveReferenceColumn(string $entity, string $dataUid): string
@@ -482,6 +665,44 @@ class DynamicEntityController extends Controller
         }
 
         return is_array($value) ? json_encode($value) : (string) $value;
+    }
+
+    protected function sanitizeRecordForResponse(object $record): object
+    {
+        foreach ($this->sensitiveResponseFields as $field) {
+            if (property_exists($record, $field)) {
+                unset($record->{$field});
+            }
+        }
+
+        if (! isset($record->meta) || ! is_iterable($record->meta)) {
+            return $record;
+        }
+
+        foreach ($record->meta as $metaItem) {
+            if (! isset($metaItem->meta_key)) {
+                continue;
+            }
+
+            if ($this->isSensitiveFieldName((string) $metaItem->meta_key)) {
+                $metaItem->meta_value = '***REDACTED***';
+            }
+        }
+
+        return $record;
+    }
+
+    protected function isSensitiveFieldName(string $field): bool
+    {
+        $normalizedField = Str::lower($field);
+
+        foreach ($this->sensitiveResponseFields as $sensitiveField) {
+            if ($normalizedField === $sensitiveField || Str::contains($normalizedField, $sensitiveField)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)

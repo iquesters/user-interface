@@ -7,6 +7,7 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - `GET /api/entity/list/{entity_name}`
 - `GET /api/entity/show/{entity_name}/{data_uid}`
 - `POST /api/entity/store/{entity_name}`
+- `PUT /api/entity/update/{entity_name}/{data_uid}`
 
 ## Store Flow
 1. Resolve the target table from `{entity_name}` and confirm it exists.
@@ -19,6 +20,19 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 6. Insert the main row inside a transaction.
 7. Insert meta rows linked by `ref_parent` when a related meta table exists.
 8. Return the created record in the standardized API response format.
+
+## Update Flow
+1. Resolve the target table from `{entity_name}` and confirm it exists.
+2. Resolve the incoming `{data_uid}` against the table `uid` column when present, otherwise `id`.
+3. Read the table columns and column types dynamically from the schema.
+4. Split request data into:
+   - main table columns to update
+   - meta payload for the related `_meta` or `_metas` table
+5. Normalize values by detected column type before update.
+6. Apply update audit defaults such as `updated_by` and `updated_at` when those columns exist.
+7. Update the main row inside a transaction.
+8. Upsert meta rows linked by `ref_parent`.
+9. Return the updated record in the standardized API response format.
 
 ## Type Handling
 - Integer-like columns are cast to integers.
