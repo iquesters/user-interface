@@ -56,7 +56,9 @@ async function setupForm(formElement) {
         }
     }
 
-    if ((formMeta.submitButtonLabel || formMeta.allowCancel) && (formMeta.formEdit ?? true)) {
+    const hasSchemaActions = Array.isArray(formMeta.actions) && formMeta.actions.length > 0;
+
+    if (!hasSchemaActions && (formMeta.submitButtonLabel || formMeta.allowCancel) && (formMeta.formEdit ?? true)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
@@ -206,6 +208,8 @@ async function setupForm(formElement) {
 
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
+
+    bindDynamicFormSubmit(formElement, formMeta);
 }
 
 function handleSchemaNotFound(formElement) {
@@ -226,6 +230,181 @@ function handleSchemaNotFound(formElement) {
     alertDiv.textContent = "Form schema not found. Please contact administrator.";
 
     formElement.appendChild(alertDiv);
+}
+
+function bindDynamicFormSubmit(formElement, formMeta) {
+    if (formElement.dataset.dynamicSubmitBound === '1') {
+        return;
+    }
+
+    formElement.dataset.dynamicSubmitBound = '1';
+    formElement.addEventListener('submit', event => handleDynamicFormSubmit(event, formMeta));
+}
+
+async function handleDynamicFormSubmit(event, formMeta) {
+    const form = event.currentTarget;
+
+    if (!form.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+        form.classList.add('was-validated');
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    form.classList.add('was-validated');
+
+    const method = resolveDynamicFormMethod(formMeta, form);
+    const endpoint = resolveDynamicFormEndpoint(formMeta, form, method);
+
+    if (!endpoint) {
+        console.error('Dynamic form submit skipped: no endpoint available.', { formMeta });
+        return;
+    }
+
+    const payload = serializeDynamicFormPayload(form, formMeta);
+    try {
+        const result = await submitDynamicFormRequest(endpoint, method, payload, form);
+        const errors = result?.errors || result?.response_schema?.errors || null;
+
+        if (!result?.success) {
+            console.error('Dynamic form submit failed.', {
+                endpoint,
+                method,
+                payload,
+                result,
+            });
+
+            if (errors) {
+                window.formErrors = errors;
+            }
+
+            return;
+        }
+
+        window.dispatchEvent(new CustomEvent('shoz-form:submitted', {
+            detail: {
+                formId: form.id,
+                endpoint,
+                method,
+                payload,
+                response: result,
+            },
+        }));
+    } catch (error) {
+        console.error('Dynamic form submit error.', error);
+    }
+}
+
+async function submitDynamicFormRequest(endpoint, method, payload, form) {
+    const csrfToken = form.querySelector('input[name="_token"]')?.value;
+    const options = csrfToken
+        ? { headers: { 'X-CSRF-TOKEN': csrfToken } }
+        : {};
+
+    if (typeof apiClient !== 'undefined' && apiClient) {
+        switch (method) {
+            case 'PUT':
+                return apiClient.put(endpoint, payload, options);
+            case 'PATCH':
+                return apiClient.patch(endpoint, payload, options);
+            case 'DELETE':
+                return apiClient.delete(endpoint, options);
+            case 'POST':
+            default:
+                return apiClient.post(endpoint, payload, options);
+        }
+    }
+
+    const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+    };
+
+    const response = await fetch(endpoint, {
+        method,
+        headers,
+        credentials: 'same-origin',
+        body: method === 'DELETE' ? null : JSON.stringify(payload),
+    });
+
+    return response.json().catch(() => ({
+        success: response.ok,
+        status: response.status,
+    }));
+}
+
+function resolveDynamicFormMethod(formMeta, form) {
+    return (formMeta.method || form.getAttribute('method') || 'POST').toUpperCase();
+}
+
+function resolveDynamicFormEndpoint(formMeta, form, method) {
+    if (formMeta.endpoint) {
+        return formMeta.endpoint;
+    }
+
+    if (!formMeta.entity) {
+        return null;
+    }
+
+    const entityUid = form.dataset.entityUid;
+
+    if ((method === 'PUT' || method === 'PATCH') && entityUid) {
+        return `/api/entity/update/${formMeta.entity}/${entityUid}`;
+    }
+
+    if (method === 'DELETE' && entityUid) {
+        return `/api/entity/delete/${formMeta.entity}/${entityUid}`;
+    }
+
+    return `/api/entity/store/${formMeta.entity}`;
+}
+
+function serializeDynamicFormPayload(form, formMeta) {
+    const payload = {};
+    const metaPayload = {};
+    const fields = Array.isArray(formMeta.fields) ? formMeta.fields : [];
+
+    fields.forEach(field => {
+        const value = getSerializedFieldValue(form, field);
+        const target = field.meta === true ? metaPayload : payload;
+        target[field.id] = value;
+    });
+
+    if (Object.keys(metaPayload).length > 0) {
+        payload.meta = metaPayload;
+    }
+
+    return payload;
+}
+
+function getSerializedFieldValue(form, field) {
+    const fieldName = field.id;
+    const escapedName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(fieldName)
+        : fieldName;
+
+    if (field.type === 'checkbox') {
+        const checkboxInputs = form.querySelectorAll(`[name="${escapedName}"], [name="${escapedName}[]"]`);
+
+        if (Array.isArray(field.options) && field.options.length > 0) {
+            return Array.from(checkboxInputs)
+                .filter(input => input.checked)
+                .map(input => input.value);
+        }
+
+        return Array.from(checkboxInputs).some(input => input.checked);
+    }
+
+    if (field.type === 'radio') {
+        const checkedRadio = form.querySelector(`[name="${escapedName}"]:checked`);
+        return checkedRadio ? checkedRadio.value : null;
+    }
+
+    const input = form.querySelector(`[name="${escapedName}"]`);
+    return input ? input.value : null;
 }
 
 
@@ -349,9 +528,7 @@ function setupFormFooter(cardFooter, formMeta) {
     if (formMeta.actions) {
         formMeta.actions.forEach(action => {
             action.form = formMeta.id
-            // addAction(action, fragment);
-            const form = document.getElementById(formMeta.id);
-            addAction(action, form);
+            addAction(action, fragment);
         })
     }
 
@@ -458,16 +635,14 @@ function addAction(action, addTo) {
             actionElement.appendChild(actionElementIcon)
         }
 
-        if (action.text) {
-            const actionElementText = document.createTextNode(action.text)
-            actionElement.appendChild(actionElementText)
-        } else {
-            if (!action.icon) {
-                // adding default text
-                const actionElementText = document.createTextNode(action.element.type)
-                actionElement.appendChild(actionElementText)
-            }
-        }
+        const fallbackActionText =
+            action.type === 'submit'
+                ? 'Submit'
+                : (action.type || action.element.type || 'Action');
+
+        const actionText = action.text || fallbackActionText;
+        const actionElementText = document.createTextNode(actionText)
+        actionElement.appendChild(actionElementText)
 
         addTo.appendChild(actionElement)
     }
@@ -803,4 +978,3 @@ function checkFormAccess(formMeta, formElement) {
         }, false)
     })
 })();
-

@@ -97,7 +97,10 @@ function applyFieldDependencies(field, input) {
   // Delay until DOM is ready (ensures dependent fields exist)
   setTimeout(() => {
     field.dependencies.hide.forEach(dep => {
-      const depInput = document.getElementById(dep.id);
+      const depInput =
+        document.getElementById(dep.id) ||
+        document.querySelector(`[name="${dep.id}"]`) ||
+        document.querySelector(`[name="${dep.id}[]"]`);
       if (!depInput) return;
 
       const checkHideCondition = () => {
@@ -111,7 +114,9 @@ function applyFieldDependencies(field, input) {
           dep.operator === "!==" ? depValue !== dep.value :
           false;
 
-        const container = document.getElementById(field.id + SUFFIX.CONTAINER);
+        const container =
+          document.getElementById((field._domId || field.id) + SUFFIX.CONTAINER) ||
+          document.getElementById(field.id + SUFFIX.CONTAINER);
         if (container) container.style.display = shouldHide ? "none" : "";
 
         // Optional: clear input when hidden
@@ -124,6 +129,5 @@ function applyFieldDependencies(field, input) {
     });
   }, 0);
 }
-
 
 

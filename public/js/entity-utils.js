@@ -56,11 +56,13 @@ function addPrimaryField() {
             <select class="form-select form-select-sm" name="fields[${fieldIndex}][type]" required>
                 <option value="string">String</option>
                 <option value="text">Text</option>
+                <option value="longtext">Longtext</option>
                 <option value="integer">Integer</option>
                 <option value="decimal">Decimal</option>
                 <option value="boolean">Boolean</option>
                 <option value="date">Date</option>
                 <option value="datetime">DateTime</option>
+                <option value="time">Time</option>
             </select>
         </td>
         <td><input type="text" class="form-control form-control-sm" name="fields[${fieldIndex}][label]" required></td>
@@ -83,6 +85,8 @@ function addPrimaryField() {
                 <option value="number">Number</option>
                 <option value="email">Email</option>
                 <option value="date">Date</option>
+                <option value="datetime-local">Datetime-local</option>
+                <option value="time">Time</option>
                 <option value="checkbox">Checkbox</option>
                 <option value="select">Select</option>
             </select>
@@ -112,10 +116,13 @@ function addMetaField() {
             <select class="form-select form-select-sm" name="meta_fields[${metaFieldIndex}][type]" required>
                 <option value="string" selected>String</option>
                 <option value="text">Text</option>
+                <option value="longtext">Longtext</option>
                 <option value="integer">Integer</option>
                 <option value="decimal">Decimal</option>
                 <option value="boolean">Boolean</option>
-                <option value="json">JSON</option>
+                <option value="date">Date</option>
+                <option value="datetime">DateTime</option>
+                <option value="time">Time</option>
             </select>
         </td>
         <td><input type="text" class="form-control form-control-sm" name="meta_fields[${metaFieldIndex}][label]" required></td>
@@ -136,6 +143,10 @@ function addMetaField() {
                 <option value="text" selected>Text</option>
                 <option value="textarea">Textarea</option>
                 <option value="number">Number</option>
+                <option value="email">Email</option>
+                <option value="date">Date</option>
+                <option value="datetime-local">Datetime-local</option>
+                <option value="time">Time</option>
                 <option value="select">Select</option>
                 <option value="checkbox">Checkbox</option>
             </select>

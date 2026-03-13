@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityStatus;
@@ -94,8 +95,17 @@ class DynamicEntityController extends Controller
             $this->logStoreRequest($request, $entity);
 
             $schema = $this->resolveEntitySchema($request, $entity);
-            $mainData = $this->prepareMainData($schema['payload'], $schema['column_types'], $schema['table_columns']);
-            $metaData = $this->extractMetaData($schema['payload'], $schema['table_columns'], $request->input('meta', []));
+            $mainData = $this->prepareMainData(
+                $schema['payload'],
+                $schema['main_field_definitions'],
+                $schema['table_columns'],
+                $schema['writable_main_columns']
+            );
+            $metaData = $this->prepareMetaData(
+                $schema['payload'],
+                $schema['meta_field_definitions'],
+                $request->input('meta', [])
+            );
 
             $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
 
@@ -124,8 +134,17 @@ class DynamicEntityController extends Controller
             $this->logUpdateRequest($request, $entity, $data_uid);
 
             $schema = $this->resolveEntitySchema($request, $entity);
-            $mainData = $this->prepareUpdateData($schema['payload'], $schema['column_types'], $schema['table_columns']);
-            $metaData = $this->extractMetaData($schema['payload'], $schema['table_columns'], $request->input('meta', []));
+            $mainData = $this->prepareUpdateData(
+                $schema['payload'],
+                $schema['main_field_definitions'],
+                $schema['table_columns'],
+                $schema['writable_main_columns']
+            );
+            $metaData = $this->prepareMetaData(
+                $schema['payload'],
+                $schema['meta_field_definitions'],
+                $request->input('meta', [])
+            );
 
             $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
 
@@ -213,35 +232,51 @@ class DynamicEntityController extends Controller
         $this->ensureEntityTableExists($entity);
 
         $payload = $request->except($this->reservedPayloadKeys);
+        $entityDefinition = $this->resolveEntityDefinition($entity);
         $tableColumns = Schema::getColumnListing($entity);
-        $columnTypes = $this->getColumnTypes($entity, $tableColumns);
+        $mainFieldDefinitions = $this->getMainFieldDefinitions($entityDefinition);
+        $metaFieldDefinitions = $this->getMetaFieldDefinitions($entityDefinition);
+        $writableMainColumns = $this->getWritableMainTableColumns($tableColumns, $mainFieldDefinitions);
 
         // The store endpoint stays generic by deriving writable columns and types at runtime.
         $this->logDebug(sprintf(
-            'Dynamic entity store schema resolved | entity=%s | table_columns=%s | column_types=%s | meta_keys=%s',
+            'Dynamic entity store schema resolved | entity=%s | table_columns=%s | main_field_keys=%s | meta_keys=%s',
             $entity,
             json_encode($tableColumns),
-            json_encode($columnTypes),
-            json_encode(array_keys((array) $request->input('meta', [])))
+            json_encode(array_keys($mainFieldDefinitions)),
+            json_encode(array_keys($metaFieldDefinitions))
         ));
 
         return [
             'payload' => $payload,
             'table_columns' => $tableColumns,
-            'column_types' => $columnTypes,
+            'entity_definition' => $entityDefinition,
+            'main_field_definitions' => $mainFieldDefinitions,
+            'meta_field_definitions' => $metaFieldDefinitions,
+            'writable_main_columns' => $writableMainColumns,
         ];
     }
 
-    protected function prepareMainData(array $payload, array $columnTypes, array $tableColumns): array
+    protected function prepareMainData(
+        array $payload,
+        array $mainFieldDefinitions,
+        array $tableColumns,
+        array $writableMainColumns
+    ): array
     {
-        $mainData = $this->extractMainTableData($payload, $columnTypes);
+        $mainData = $this->extractMainTableData($payload, $mainFieldDefinitions, $writableMainColumns);
 
         return $this->applySystemDefaults($mainData, $tableColumns, false);
     }
 
-    protected function prepareUpdateData(array $payload, array $columnTypes, array $tableColumns): array
+    protected function prepareUpdateData(
+        array $payload,
+        array $mainFieldDefinitions,
+        array $tableColumns,
+        array $writableMainColumns
+    ): array
     {
-        $mainData = $this->extractMainTableData($payload, $columnTypes);
+        $mainData = $this->extractMainTableData($payload, $mainFieldDefinitions, $writableMainColumns);
         unset($mainData['id'], $mainData['uid']);
 
         return $this->applySystemDefaults($mainData, $tableColumns, true);
@@ -380,41 +415,49 @@ class DynamicEntityController extends Controller
         }
     }
 
-    protected function extractMainTableData(array $payload, array $columnTypes): array
+    protected function extractMainTableData(array $payload, array $mainFieldDefinitions, array $writableMainColumns): array
     {
         $data = [];
 
         foreach ($payload as $key => $value) {
-            if (! array_key_exists($key, $columnTypes)) {
+            if (! $this->isWritableMainTableColumn($key, $writableMainColumns)) {
                 continue;
             }
 
-            $data[$key] = $this->normalizeValueForColumn($key, $value, $columnTypes[$key]);
+            if (! array_key_exists($key, $mainFieldDefinitions)) {
+                continue;
+            }
+
+            $fieldDefinition = $mainFieldDefinitions[$key];
+            $this->validateNullability($key, $value, $fieldDefinition);
+            $data[$key] = $this->normalizeValueFromFieldDefinition($key, $value, $fieldDefinition);
         }
 
         return $data;
     }
 
-    protected function extractMetaData(array $payload, array $tableColumns, mixed $explicitMeta = []): array
+    protected function prepareMetaData(
+        array $payload,
+        array $metaFieldDefinitions,
+        mixed $explicitMeta = []
+    ): array
     {
         $metaData = [];
-
-        foreach ($payload as $key => $value) {
-            if (in_array($key, $tableColumns, true)) {
-                continue;
-            }
-
-            $metaData[$key] = $value;
-        }
 
         if (is_array($explicitMeta)) {
             foreach ($explicitMeta as $key => $value) {
                 if (is_int($key) && is_array($value) && isset($value['meta_key'])) {
-                    $metaData[$value['meta_key']] = $value['meta_value'] ?? null;
+                    $key = $value['meta_key'];
+                    $value = $value['meta_value'] ?? null;
+                }
+
+                if (! array_key_exists($key, $metaFieldDefinitions)) {
                     continue;
                 }
 
-                $metaData[$key] = $value;
+                $fieldDefinition = $metaFieldDefinitions[$key];
+                $this->validateNullability($key, $value, $fieldDefinition);
+                $metaData[$key] = $this->normalizeValueFromFieldDefinition($key, $value, $fieldDefinition);
             }
         }
 
@@ -639,6 +682,65 @@ class DynamicEntityController extends Controller
             ->first(fn ($table) => Schema::hasTable($table));
     }
 
+    protected function resolveEntityDefinition(string $entityTable): FoundationEntity
+    {
+        $entity = FoundationEntity::query()
+            ->whereHas('metas', function ($query) use ($entityTable) {
+                $query->where(function ($metaQuery) use ($entityTable) {
+                    $metaQuery->where('meta_key', 'published_table_name')
+                        ->where('meta_value', $entityTable);
+                })->orWhere(function ($metaQuery) use ($entityTable) {
+                    $metaQuery->where('meta_key', 'table_name')
+                        ->where('meta_value', $entityTable);
+                });
+            })
+            ->first();
+
+        if (! $entity) {
+            throw new \RuntimeException("Entity definition for table {$entityTable} was not found.");
+        }
+
+        return $entity;
+    }
+
+    protected function getMainFieldDefinitions(FoundationEntity $entityDefinition): array
+    {
+        $fields = is_array($entityDefinition->fields) ? $entityDefinition->fields : [];
+        $definitions = [];
+
+        foreach ($fields as $key => $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+
+            $fieldName = $field['name'] ?? (is_string($key) ? $key : null);
+            if (! $fieldName) {
+                continue;
+            }
+
+            $field['name'] = $fieldName;
+            $definitions[$fieldName] = $field;
+        }
+
+        return $definitions;
+    }
+
+    protected function getMetaFieldDefinitions(FoundationEntity $entityDefinition): array
+    {
+        $fields = is_array($entityDefinition->meta_fields) ? $entityDefinition->meta_fields : [];
+        $definitions = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field) || empty($field['meta_key'])) {
+                continue;
+            }
+
+            $definitions[$field['meta_key']] = $field;
+        }
+
+        return $definitions;
+    }
+
     protected function getColumnTypes(string $entity, array $columns): array
     {
         $types = [];
@@ -648,6 +750,69 @@ class DynamicEntityController extends Controller
         }
 
         return $types;
+    }
+
+    protected function getWritableMainTableColumns(array $tableColumns, array $mainFieldDefinitions): array
+    {
+        $schemaColumns = array_keys($mainFieldDefinitions);
+
+        return array_values(array_filter($tableColumns, function ($column) use ($schemaColumns) {
+            return in_array($column, $schemaColumns, true)
+                && ! in_array($column, [
+                    'id',
+                    'uid',
+                    'status',
+                    'created_by',
+                    'updated_by',
+                    'deleted_by',
+                    'created_at',
+                    'updated_at',
+                    'deleted_at',
+                ], true);
+        }));
+    }
+
+    protected function isWritableMainTableColumn(string $column, array $writableMainColumns): bool
+    {
+        // Defense-in-depth guard: create/update already derive their schema from the entity table,
+        // but we keep this explicit allowlist check so only approved main-table columns can be written.
+        // If schema derivation becomes the only trusted source later, this extra check can be removed.
+        return in_array($column, $writableMainColumns, true);
+    }
+
+    protected function normalizeValueFromFieldDefinition(string $column, mixed $value, array $fieldDefinition): mixed
+    {
+        $columnType = $this->mapFieldTypeToColumnType($fieldDefinition['type'] ?? 'string');
+
+        return $this->normalizeValueForColumn($column, $value, $columnType);
+    }
+
+    protected function mapFieldTypeToColumnType(string $fieldType): string
+    {
+        return match (strtolower($fieldType)) {
+            'string', 'varchar' => 'varchar',
+            'text' => 'text',
+            'longtext' => 'longtext',
+            'integer', 'bigint', 'smallint', 'tinyint' => 'integer',
+            'decimal', 'float', 'double', 'real' => 'decimal',
+            'boolean', 'bool' => 'boolean',
+            'date' => 'date',
+            'datetime', 'timestamp' => 'datetime',
+            'time' => 'time',
+            'char', 'uuid', 'ulid' => 'char',
+            'json' => 'json',
+            default => 'text',
+        };
+    }
+
+    protected function validateNullability(string $column, mixed $value, array $fieldDefinition): void
+    {
+        $nullable = (bool) ($fieldDefinition['nullable'] ?? true);
+        $required = (bool) ($fieldDefinition['required'] ?? false);
+
+        if (($value === null || $value === '') && ($required || ! $nullable)) {
+            throw new \InvalidArgumentException("Field {$column} cannot be empty.");
+        }
     }
 
     protected function normalizeValueForColumn(string $column, mixed $value, string $columnType): mixed

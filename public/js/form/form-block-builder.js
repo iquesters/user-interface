@@ -28,8 +28,10 @@ async function setupFormBlock(formCol, formMeta) {
         formIdInput.setAttribute(ATTR_CONS.AUTOCOMPLETE,ATTR_CONS.OFF)
         form.appendChild(formIdInput)
 
-        form.setAttribute(ATTR_CONS.METHOD, formMeta.method)
-        // form.setAttribute('action', formMeta.action)
+        form.setAttribute(ATTR_CONS.METHOD, formMeta.method || 'POST')
+        if (formMeta.endpoint) {
+            form.setAttribute('action', formMeta.endpoint)
+        }
         form.setAttribute(ATTR_CONS.ENTYPE, formMeta.enctype)
         // form.classList.add(...['row', 'row-cols-1', 'row-cols-md-4', 'g-2', 'needs-validation'])
         form.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, STYLE_CLASS.G_2, STYLE_CLASS.NEEDS_VALIDATION])
@@ -46,7 +48,9 @@ async function setupFormBlock(formCol, formMeta) {
 
         // add fields to form
         if (formMeta.fields && formMeta.fields.length > 0) {
-            formMeta.fields.forEach(field => {
+            formMeta.fields.forEach((field, index) => {
+                field._renderIndex = index;
+                field._domId = buildFieldDomId(formMeta, field, index);
                 field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
                 addField(field, form, formMeta);
             });
@@ -106,7 +110,7 @@ async function addField(field, addTo,formMeta) {
             select.classList.add('is-invalid'); // Bootstrap red border
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
-            errorDiv.id = `${field.id}-error`;
+            errorDiv.id = `${getFieldDomId(field)}-error`;
             errorDiv.textContent = window.formErrors[field.id][0]; // first error message
             formFloating.appendChild(errorDiv);
         }
@@ -153,7 +157,7 @@ async function addField(field, addTo,formMeta) {
             textarea.classList.add('is-invalid');
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
-            errorDiv.id = `${field.id}-error`;
+            errorDiv.id = `${getFieldDomId(field)}-error`;
             errorDiv.textContent = window.formErrors[field.id][0];
             formContainer.appendChild(errorDiv);
         }
@@ -175,11 +179,11 @@ async function addField(field, addTo,formMeta) {
         
     
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
-        input.setAttribute(ATTR_CONS.LIST, `${field.id}${SUFFIX.LIST}`);
+        input.setAttribute(ATTR_CONS.LIST, `${getFieldDomId(field)}${SUFFIX.LIST}`);
         fragment.appendChild(formContainer);
 
         const datalist = document.createElement(HTML_TAG.DATALIST);
-        datalist.id = `${field.id}${SUFFIX.LIST}`;
+        datalist.id = `${getFieldDomId(field)}${SUFFIX.LIST}`;
 
         if (Array.isArray(field.options)) {
             field.options.forEach(opt => {
@@ -202,7 +206,7 @@ async function addField(field, addTo,formMeta) {
             input.classList.add('is-invalid');
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
-            errorDiv.id = `${field.id}-error`;
+            errorDiv.id = `${getFieldDomId(field)}-error`;
             errorDiv.textContent = window.formErrors[field.id][0];
             formContainer.appendChild(errorDiv);
         }
@@ -336,7 +340,7 @@ function createHelperText(field, container) {
     if (field.helpertext || field.helperText) {
         const helper = document.createElement(HTML_TAG.DIV);
         helper.classList.add(STYLE_CLASS.FORM_TEXT);
-        helper.id = `${field.id}${SUFFIX.HELP}`;
+        helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = field.helpertext || field.helperText;
         container.appendChild(helper);
     }
@@ -354,7 +358,8 @@ function createHelperText(field, container) {
  */
 function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.INPUT) {
     const formContainer = document.createElement(HTML_TAG.DIV);
-    formContainer.id = `${field.id}${SUFFIX.CONTAINER}`;
+    const fieldDomId = getFieldDomId(field);
+    formContainer.id = `${fieldDomId}${SUFFIX.CONTAINER}`;
 
     // ✅ Add structure classes
     if (useFloatingLabel) {
@@ -366,14 +371,14 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
 
     // ✅ Create label (for both structures)
     const label = document.createElement(HTML_TAG.LABEL);
-    label.id = `${field.id}${SUFFIX.LABEL}`;
-    label.setAttribute(ATTR_CONS.FOR, field.id);
+    label.id = `${fieldDomId}${SUFFIX.LABEL}`;
+    label.setAttribute(ATTR_CONS.FOR, fieldDomId);
     label.classList.add(STYLE_CLASS.FORM_LABEL);
     label.textContent = field.label;
 
     // ✅ Create input or textarea
     const inputElement = document.createElement(inputTag);
-    inputElement.id = field.id;
+    inputElement.id = fieldDomId;
     inputElement.name = field.id;
     inputElement.classList.add(STYLE_CLASS.FORM_CONTROL);
 
@@ -432,8 +437,9 @@ function createOptionInput(field, opt, type) {
     div.classList.add(STYLE_CLASS.FORM_CHECK);
 
     const input = document.createElement(HTML_TAG.INPUT);
+    const fieldDomId = getFieldDomId(field);
     input.type = type;
-    input.id = field.id + "-" + opt.value;
+    input.id = `${fieldDomId}-${opt.value}`;
     input.name = type === INPUT_TYPE.CHECKBOX ? field.id + "[]" : field.id;
     input.value = opt.value;
     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
@@ -452,7 +458,7 @@ function createOptionInput(field, opt, type) {
 
 function createSelectInput(field) {
     const select = document.createElement(HTML_TAG.SELECT);
-    select.id = field.id;
+    select.id = getFieldDomId(field);
     select.name = field.id;
     select.classList.add(STYLE_CLASS.FORM_SELECT);
 
@@ -499,10 +505,28 @@ function appendBackendError(field, container, input = null) {
             errorDiv.classList.add("d-block");
         }
 
-        errorDiv.id = `${field.id}-error`;
+        errorDiv.id = `${getFieldDomId(field)}-error`;
         errorDiv.textContent = errorMsg;
         container.appendChild(errorDiv);
     }
+}
+
+function buildFieldDomId(formMeta, field, index) {
+    const formId = formMeta?.id || 'form';
+    const fieldId = field?.id || 'field';
+    return `${sanitizeDomIdSegment(formId)}-${sanitizeDomIdSegment(fieldId)}-${index + 1}`;
+}
+
+function getFieldDomId(field) {
+    return field?._domId || field?.id;
+}
+
+function sanitizeDomIdSegment(value) {
+    return String(value)
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'field';
 }
 
 /**
