@@ -12,7 +12,7 @@
 )
 
 @section('content')
-    <div id="listViewportLayout" class="d-flex flex-column gap-3" data-auto-viewport-height data-viewport-height-offset="8" data-viewport-height-min="360" style="min-height: 0;">
+    <div id="listViewportLayout" class="d-flex flex-column" data-auto-viewport-height data-viewport-height-offset="8" data-viewport-height-min="360" style="min-height: 0;">
     {{-- Title (Always visible) --}}
     <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="fs-6">

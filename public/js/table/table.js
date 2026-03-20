@@ -683,12 +683,23 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         },
         ajax: (params, callback) =>
             handleAjaxFetch(params, callback, cache, entityName, listTable),
+        initComplete: function (...args) {
+            if (typeof dtConfig.initComplete === 'function') {
+                dtConfig.initComplete.apply(this, args);
+            }
+
+            applyInboxStickyStyles(leftPanel);
+        },
+        drawCallback: function (...args) {
+            if (typeof dtConfig.drawCallback === 'function') {
+                dtConfig.drawCallback.apply(this, args);
+            }
+
+            applyInboxStickyStyles(leftPanel);
+        },
     });
 
-    // Apply sticky positioning after DataTable is initialized
-    setTimeout(() => {
-        applyInboxStickyStyles(leftPanel);
-    }, 100);
+    applyInboxStickyStyles(leftPanel);
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);
@@ -794,6 +805,8 @@ function applyInboxStickyStyles(leftPanel) {
         }
     });
     
+    applyCompactDataTableControls(dtContainer);
+
     console.log('✅ Sticky styles application complete');
 }
 
@@ -868,6 +881,34 @@ function applyTableModeLayout(tableElement) {
         if (hasPagination || hasInfo) {
             row.classList.add('flex-shrink-0');
         }
+    });
+
+    applyCompactDataTableControls(dtContainer);
+}
+
+function applyCompactDataTableControls(container) {
+    if (!container) {
+        return;
+    }
+
+    container.querySelectorAll('.dt-paging .pagination').forEach((pagination) => {
+        pagination.classList.add('pagination-sm', 'mb-0');
+    });
+
+    container.querySelectorAll('.dt-paging .page-link').forEach((link) => {
+        link.classList.add('py-1', 'px-2', 'small');
+    });
+
+    container.querySelectorAll('.dt-length select').forEach((select) => {
+        select.classList.add('form-select-sm');
+    });
+
+    container.querySelectorAll('.dt-search input[type="search"]').forEach((input) => {
+        input.classList.add('form-control-sm');
+    });
+
+    container.querySelectorAll('.dt-info, .dt-length, .dt-search').forEach((element) => {
+        element.classList.add('small');
     });
 }
 
