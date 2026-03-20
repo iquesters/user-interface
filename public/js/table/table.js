@@ -797,6 +797,80 @@ function applyInboxStickyStyles(leftPanel) {
     console.log('✅ Sticky styles application complete');
 }
 
+function applyTableModeLayout(tableElement) {
+    const shell = tableElement.closest('.lab-table-shell');
+    if (!shell) {
+        return;
+    }
+
+    const dtContainer = shell.querySelector('.dt-container');
+    if (!dtContainer) {
+        return;
+    }
+
+    shell.classList.add('overflow-hidden');
+    shell.style.minHeight = '0';
+
+    dtContainer.classList.add('d-flex', 'flex-column', 'overflow-hidden');
+    dtContainer.classList.remove('h-auto');
+    dtContainer.classList.add('flex-grow-1');
+    dtContainer.style.height = '100%';
+    dtContainer.style.minHeight = '0';
+
+    const layoutRows = Array.from(dtContainer.children).filter((element) =>
+        element.classList.contains('dt-layout-row') || element.classList.contains('dt-layout-table')
+    );
+
+    layoutRows.forEach((row) => {
+        const hasSearch = row.querySelector('.dt-search, input[type="search"]');
+        const hasLength = row.querySelector('.dt-length, select');
+        const hasTable = row.querySelector('table');
+        const hasPagination = row.querySelector('.dt-paging, .dataTables_paginate');
+        const hasInfo = row.querySelector('.dt-info, .dataTables_info');
+
+        if ((hasSearch || hasLength) && !hasTable) {
+            row.classList.add('flex-shrink-0');
+            return;
+        }
+
+        if (hasTable) {
+            row.classList.add('d-flex', 'flex-column', 'flex-grow-1', 'overflow-hidden');
+            row.style.minHeight = '0';
+
+            const tableCell = row.querySelector('.dt-layout-cell');
+            if (tableCell) {
+                tableCell.classList.add('d-flex', 'flex-column', 'flex-grow-1', 'overflow-hidden');
+                tableCell.style.height = '100%';
+                tableCell.style.minHeight = '0';
+            }
+
+            const scrollHost = row.querySelector('.table-responsive')
+                || row.querySelector('.dt-scroll-body')
+                || tableElement.parentElement;
+
+            if (scrollHost) {
+                scrollHost.classList.add('flex-grow-1', 'overflow-auto');
+                scrollHost.style.height = '100%';
+                scrollHost.style.minHeight = '0';
+            }
+
+            const thead = row.querySelector('thead');
+            if (thead) {
+                thead.style.position = 'sticky';
+                thead.style.top = '0';
+                thead.style.zIndex = '10';
+                thead.style.background = 'inherit';
+            }
+
+            return;
+        }
+
+        if (hasPagination || hasInfo) {
+            row.classList.add('flex-shrink-0');
+        }
+    });
+}
+
 /**
  * Render inbox row with "Label: Value" in one line (Bootstrap only)
  */
@@ -1278,7 +1352,23 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         ],
         ajax: async (dataTablesParams, callback) =>
             handleAjaxFetch(dataTablesParams, callback, cache, entityName, tableElement),
+        initComplete: function (...args) {
+            if (typeof dtConfig.initComplete === 'function') {
+                dtConfig.initComplete.apply(this, args);
+            }
+
+            applyTableModeLayout(tableElement);
+        },
+        drawCallback: function (...args) {
+            if (typeof dtConfig.drawCallback === 'function') {
+                dtConfig.drawCallback.apply(this, args);
+            }
+
+            applyTableModeLayout(tableElement);
+        },
     });
+
+    applyTableModeLayout(tableElement);
 
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
