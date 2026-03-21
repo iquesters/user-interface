@@ -32,13 +32,24 @@ class UIController extends Controller
         }
     }
 
-    public function view($form_schema_id, $entity_uid= null)
+    public function view(Request $request, $form_schema_id, $entity_uid= null)
     {
         try {
             Log::info("In UIController view method", [
                 'form_schema_id' => $form_schema_id,
-                'entity_uid' => $entity_uid
+                'entity_uid' => $entity_uid,
+                'request' => $request->all(),
             ]);
+
+            if ($request->boolean('ajax')) {
+                return response()->json([
+                    'html' => view('userinterface::components.form', [
+                        'id' => $form_schema_id,
+                        'entity_uid' => $entity_uid,
+                    ])->render()
+                ]);
+            }
+
             return view('userinterface::ui.form.view', compact('form_schema_id', 'entity_uid'));
         } catch (\Throwable $th) {
             //throw $th;

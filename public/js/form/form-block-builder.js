@@ -46,12 +46,20 @@ async function setupFormBlock(formCol, formMeta) {
         }
         console.log("formData = " + formData)
 
+        const entityUId = form.dataset.entityUid;
+        let entityData = null;
+
+        if (formMeta.entity && entityUId) {
+            const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
+            entityData = getentityResponse?.data || null;
+        }
+
         // add fields to form
         if (formMeta.fields && formMeta.fields.length > 0) {
             formMeta.fields.forEach((field, index) => {
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
-                field.value = formData && formData.hasOwnProperty(field.id) ? formData[field.id] : ""
+                field.value = resolveFieldValue(field.id, formData, entityData);
                 addField(field, form, formMeta);
             });
         } else {
@@ -63,10 +71,9 @@ async function setupFormBlock(formCol, formMeta) {
             }
         }
 
-        // Fetch and render entity data if entity and entityUId are provided
-        const entityUId = form.dataset.entityUid;
-        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId); 
-        renderEntityDataToForm('.shoz-form', getentityResponse.data);
+        if (entityData) {
+            renderEntityDataToForm(form, entityData);
+        }
 
     }
 }
@@ -230,6 +237,8 @@ async function addField(field, addTo,formMeta) {
         if (formMeta.formEdit === false) {
             const valueDiv = document.createElement(HTML_TAG.DIV);
             valueDiv.textContent = field.value || "—";
+            valueDiv.dataset.fieldId = field.id;
+            valueDiv.classList.add('form-control-plaintext');
             fragment.appendChild(valueDiv);
             addTo.appendChild(fragment);
             return;
@@ -534,12 +543,20 @@ function sanitizeDomIdSegment(value) {
  */
 async function getfetchEntityData(entity,entityUId) {
     try {
-        const token = getSanctumToken();
-        console.log('Using token for API call11111111111111:', token ? token : 'No token');
+        if (!entity || !entityUId) {
+            return { success: false, error: 'Missing entity or entity UID' };
+        }
+
+        if (typeof apiClient !== 'undefined' && apiClient) {
+            return await apiClient.get(`/api/entity/show/${entity}/${entityUId}`);
+        }
+
         const res = await fetch(`/api/entity/show/${entity}/${entityUId}`, {
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
+            credentials: 'same-origin',
         });
         
         if (res.status === 401) {
@@ -558,18 +575,77 @@ async function getfetchEntityData(entity,entityUId) {
     }
 }
 
+function resolveFieldValue(fieldId, formData, entityData) {
+    if (formData && Object.prototype.hasOwnProperty.call(formData, fieldId)) {
+        return formData[fieldId];
+    }
+
+    if (!entityData) {
+        return "";
+    }
+
+    if (Object.prototype.hasOwnProperty.call(entityData, fieldId)) {
+        return entityData[fieldId] ?? "";
+    }
+
+    const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
+    const metaItem = metaEntries.find((item) => item?.meta_key === fieldId);
+
+    return metaItem ? (metaItem.meta_value ?? "") : "";
+}
+
 /**
  * 
  * Render fetched entity data into form fields 
  */
 async function renderEntityDataToForm(formSelector, entityResponse) {
-    const form = document.querySelector(formSelector);
+    const form = typeof formSelector === 'string'
+        ? document.querySelector(formSelector)
+        : formSelector;
     const entityData = entityResponse || null;
 
     if (!form || !entityData) return;
 
     for (const [key, value] of Object.entries(entityData)) {
-        const field = form.querySelector(`#${key}`);
-        if (field) field.value = value ?? "";
+        const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+            ? CSS.escape(key)
+            : key.replace(/"/g, '\\"');
+        const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
+        const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
+
+        if (field) {
+            if (field.type === 'checkbox') {
+                field.checked = Boolean(Number(value)) || value === true || value === '1';
+            } else {
+                field.value = value ?? "";
+            }
+        }
+
+        if (readOnlyField) {
+            readOnlyField.textContent = value ?? "—";
+        }
     }
+
+    const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
+    metaEntries.forEach((item) => {
+        const metaKey = item?.meta_key;
+        if (!metaKey) {
+            return;
+        }
+
+        const metaValue = item?.meta_value ?? "";
+        const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+            ? CSS.escape(metaKey)
+            : metaKey.replace(/"/g, '\\"');
+        const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
+        const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
+
+        if (field) {
+            field.value = metaValue;
+        }
+
+        if (readOnlyField) {
+            readOnlyField.textContent = metaValue || "—";
+        }
+    });
 }

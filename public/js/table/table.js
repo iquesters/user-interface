@@ -457,7 +457,7 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
 }
 
 async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.form') {
-    const urlParts = ['/hola', formSchemaId];
+    const urlParts = ['/view', formSchemaId];
     if (entityUid) {
         urlParts.push(entityUid);
     }
@@ -465,6 +465,7 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
     const endpoint = urlParts.join('/');
     
     const response = await apiClient.get(endpoint, {
+        ajax: true,
         component: componentName
     });
 
@@ -1086,6 +1087,21 @@ function renderFallbackDetailComponent(data = {}) {
     `;
 }
 
+function resolveDetailConfig(schema = {}) {
+    const columns = schema?.["dt-options"]?.columns || [];
+    const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
+
+    return {
+        detailsComponent: schema["details-component"]
+            || schema?.["dt-options"]?.["details-component"]
+            || null,
+        formSchemaUid: schema["form-schema-uid"]
+            || schema?.["dt-options"]?.["form-schema-uid"]
+            || columnWithFormSchema?.["form-schema-uid"]
+            || null,
+    };
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data) {
     // Store the current width/percentage before modifying
     const currentWidth = rightPanelEle.style.width;
@@ -1175,21 +1191,22 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     try {
         let result;
+        const detailConfig = resolveDetailConfig(schema);
         
         // Priority 1: Custom details component
-        if (schema["details-component"]) {
-            console.log(`📋 Loading custom component: ${schema["details-component"]}`);
+        if (detailConfig.detailsComponent) {
+            console.log(`📋 Loading custom component: ${detailConfig.detailsComponent}`);
             result = await fetchHtmlComponent(
-                schema["form-schema-uid"] || schema["details-component"], 
+                detailConfig.formSchemaUid || detailConfig.detailsComponent,
                 data.uid, 
-                schema["details-component"]
+                detailConfig.detailsComponent
             );
         } 
         // Priority 2: Form schema UID
-        else if (schema["form-schema-uid"]) {
+        else if (detailConfig.formSchemaUid) {
             console.log(`📝 Loading form component for UID: ${data.uid}`);
             result = await fetchHtmlComponent(
-                schema["form-schema-uid"], 
+                detailConfig.formSchemaUid,
                 data.uid, 
                 'userinterface::components.form'
             );
