@@ -37,6 +37,15 @@ async function setupForm(formElement) {
     
     formMeta.id = formElement.id
 
+    const renderMode = formElement.dataset.renderMode || formMeta.renderMode || 'default';
+    formMeta.renderMode = renderMode;
+
+    if (renderMode === 'modal') {
+        await renderFormForModal(formElement, formMeta);
+        bindDynamicFormSubmit(formElement, formMeta);
+        return formMeta;
+    }
+
     const cardProvider = new CardProvider(formMeta.placeholder);
     formElement.before(cardProvider.getCard());
 
@@ -210,6 +219,52 @@ async function setupForm(formElement) {
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 
     bindDynamicFormSubmit(formElement, formMeta);
+    return formMeta;
+}
+
+async function renderFormForModal(formElement, formMeta) {
+    if (!formElement.querySelector(`input[name="${INPUT_TYPE.FORMID}"]`)) {
+        const formIdInput = document.createElement(HTML_TAG.INPUT);
+        formIdInput.type = INPUT_TYPE.HIDDEN;
+        formIdInput.name = INPUT_TYPE.FORMID;
+        formIdInput.value = formMeta.id;
+        formIdInput.setAttribute(ATTR_CONS.AUTOCOMPLETE, ATTR_CONS.OFF);
+        formElement.appendChild(formIdInput);
+    }
+
+    formElement.setAttribute(ATTR_CONS.METHOD, formMeta.method || 'POST');
+    if (formMeta.endpoint) {
+        formElement.setAttribute('action', formMeta.endpoint);
+    }
+    formElement.setAttribute(ATTR_CONS.ENTYPE, formMeta.enctype || 'multipart/form-data');
+    formElement.classList.add(STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, STYLE_CLASS.G_2, STYLE_CLASS.NEEDS_VALIDATION);
+
+    let formData = formElement.dataset.formData;
+    if (formData) {
+        formData = JSON.parse(formData);
+        delete formElement.dataset.formData;
+    }
+
+    const entityUId = formElement.dataset.entityUid;
+    let entityData = null;
+
+    if (formMeta.entity && entityUId) {
+        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
+        entityData = getentityResponse?.data || null;
+    }
+
+    if (Array.isArray(formMeta.fields)) {
+        formMeta.fields.forEach((field, index) => {
+            field._renderIndex = index;
+            field._domId = buildFieldDomId(formMeta, field, index);
+            field.value = resolveFieldValue(field.id, formData, entityData);
+            addField(field, formElement, formMeta);
+        });
+    }
+
+    if (entityData) {
+        renderEntityDataToForm(formElement, entityData);
+    }
 }
 
 function handleSchemaNotFound(formElement) {

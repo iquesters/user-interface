@@ -75,7 +75,7 @@ $library_options = (object)(['selectable'=>true]);
         // Append + submit
         document.body.appendChild(form);
         form.submit();
-        document.getElementById('shozModal').style.display = 'none';
+        document.getElementById('labModal').style.display = 'none';
         setTimeout(() => {
             window.location.href = "/myprofile";
         }, 50);

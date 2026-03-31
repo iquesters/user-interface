@@ -81,6 +81,7 @@ function addPrimaryField() {
         <td>
             <select class="form-select form-select-sm" name="fields[${fieldIndex}][input_type]" required>
                 <option value="text" selected>Text</option>
+                <option value="hidden">Hidden</option>
                 <option value="textarea">Textarea</option>
                 <option value="number">Number</option>
                 <option value="email">Email</option>
@@ -141,6 +142,7 @@ function addMetaField() {
         <td>
             <select class="form-select form-select-sm" name="meta_fields[${metaFieldIndex}][input_type]" required>
                 <option value="text" selected>Text</option>
+                <option value="hidden">Hidden</option>
                 <option value="textarea">Textarea</option>
                 <option value="number">Number</option>
                 <option value="email">Email</option>

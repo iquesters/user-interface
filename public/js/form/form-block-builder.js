@@ -80,6 +80,18 @@ async function setupFormBlock(formCol, formMeta) {
 
 
 async function addField(field, addTo,formMeta) {
+    if (field.type === INPUT_TYPE.HIDDEN) {
+        const input = document.createElement(HTML_TAG.INPUT);
+        input.type = INPUT_TYPE.HIDDEN;
+        input.id = getFieldDomId(field);
+        input.name = field.id;
+        input.value = field.value || field.default || "";
+        input.setAttribute(ATTR_CONS.AUTOCOMPLETE, ATTR_CONS.OFF);
+        applyFieldValidation(field, input);
+        addTo.appendChild(input);
+        return;
+    }
+
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
