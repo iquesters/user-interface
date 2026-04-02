@@ -1,4 +1,4 @@
-# Breadcrumb Implementation 
+# Breadcrumb Integration Documentation
 
 ## For Users
 Breadcrumbs help you navigate through the application by showing
@@ -13,8 +13,8 @@ Dashboard → Contacts → View Contact
 
 ### Overview
 The application uses the `diglactic/laravel-breadcrumbs` package.
-Breadcrumbs are already rendered in `app.blade.php` inside the
-`user-interface` package and will automatically show on any page
+Breadcrumbs are already rendered globally in `app.blade.php` inside
+the `user-interface` package and will automatically show on any page
 where a breadcrumb is defined.
 
 ### How It Currently Works
@@ -22,48 +22,39 @@ where a breadcrumb is defined.
 - Currently only `dashboard` and `admin.dashboard` are defined in `user-interface/routes/breadcrumbs.php`
 - The breadcrumb bar is hidden automatically if no definition exists for the current route
 
+### Problem With Current Approach
+- `messenger` is the **main application** that consumes all packages — breadcrumb definitions should live inside their respective packages, not in the main application
+- Writing all breadcrumb definitions in `user-interface/routes/breadcrumbs.php` is not scalable — each package owns its own routes and should own its own breadcrumb definitions
+- Unstructured scattering of breadcrumb definitions across packages makes maintenance harder
+
+---
+
+## Approach 1 — Each Package Owns Its Breadcrumbs
+
+Just like tabs, each package is self-contained and responsible for its own breadcrumb definitions.
+
 ### Architecture
 ```
-User visits a page
+User visits a page (e.g. contacts.index in smart-messenger)
         ↓
-app.blade.php checks if Breadcrumbs::exists()
+app.blade.php checks Breadcrumbs::exists()
         ↓
-Looks for definition in messenger/routes/breadcrumbs.php
+Looks for definition in smart-messenger/routes/breadcrumbs.php
         ↓
-If found → renders breadcrumb
+If found → renders breadcrumb trail
 If not found → hides breadcrumb bar
 ```
 
-### Approach to Add Breadcrumbs to All Pages
-
-Since `messenger` is the main application that consumes all packages
-(user-interface, smart-messenger, user-management, foundation etc.),
-the recommended approach is to define **all breadcrumbs centrally**
-in `messenger/routes/breadcrumbs.php`.
-
-This avoids scattering breadcrumb definitions across multiple packages
-and gives a single place to manage all navigation trails.
-
 ### Implementation Steps
 
-#### Step 1 — Create `routes/breadcrumbs.php` in messenger
+#### Step 1 — Each package creates its own `routes/breadcrumbs.php`
+
+For example in `smart-messenger/routes/breadcrumbs.php`:
 ```php
 <?php
 
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
-
-// Dashboard
-Breadcrumbs::for('dashboard', function (BreadcrumbTrail $trail) {
-    $trail->push('Dashboard', route('dashboard'));
-});
-
-// Admin Dashboard
-Breadcrumbs::for('admin.dashboard', function (BreadcrumbTrail $trail) {
-    $trail->push('Admin Dashboard', route('admin.dashboard'));
-});
-
-// ---- Smart Messenger ----
 
 // Contacts
 Breadcrumbs::for('contacts.index', function (BreadcrumbTrail $trail) {
@@ -87,54 +78,45 @@ Breadcrumbs::for('channels.index', function (BreadcrumbTrail $trail) {
     $trail->parent('dashboard');
     $trail->push('Channels', route('channels.index'));
 });
+```
 
-// ---- User Interface ----
+For `organisation/routes/breadcrumbs.php`:
+```php
+<?php
 
-// Forms
-Breadcrumbs::for('form.list', function (BreadcrumbTrail $trail) {
+use Diglactic\Breadcrumbs\Breadcrumbs;
+use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
+
+Breadcrumbs::for('organisation.index', function (BreadcrumbTrail $trail) {
     $trail->parent('dashboard');
-    $trail->push('Forms', route('form.list'));
-});
-
-Breadcrumbs::for('form.create', function (BreadcrumbTrail $trail) {
-    $trail->parent('form.list');
-    $trail->push('Create Form', route('form.create'));
-});
-
-Breadcrumbs::for('form.overview', function (BreadcrumbTrail $trail, $id) {
-    $trail->parent('form.list');
-    $trail->push('Form Overview', route('form.overview', $id));
-});
-
-// Tables
-Breadcrumbs::for('table.list', function (BreadcrumbTrail $trail) {
-    $trail->parent('dashboard');
-    $trail->push('Tables', route('table.list'));
-});
-
-Breadcrumbs::for('table.create', function (BreadcrumbTrail $trail) {
-    $trail->parent('table.list');
-    $trail->push('Create Table', route('table.create'));
-});
-
-// Settings
-Breadcrumbs::for('settings', function (BreadcrumbTrail $trail) {
-    $trail->parent('dashboard');
-    $trail->push('Settings', route('settings'));
+    $trail->push('Organisation', route('organisation.index'));
 });
 ```
 
-#### Step 2 — Register the breadcrumbs file in messenger
+For `integration/routes/breadcrumbs.php`:
+```php
+<?php
 
-In `messenger/app/Providers/AppServiceProvider.php` or `RouteServiceProvider.php`:
+use Diglactic\Breadcrumbs\Breadcrumbs;
+use Diglactic\Breadcrumbs\Generator as BreadcrumbTrail;
+
+Breadcrumbs::for('integration.index', function (BreadcrumbTrail $trail) {
+    $trail->parent('dashboard');
+    $trail->push('Integrations', route('integration.index'));
+});
+```
+
+#### Step 2 — Register breadcrumbs file in each package's Service Provider
+
+In each package's `ServiceProvider.php`:
 ```php
 public function boot(): void
 {
-    require base_path('routes/breadcrumbs.php');
+    $this->loadRoutesFrom(__DIR__ . '/../../routes/breadcrumbs.php');
 }
 ```
 
-#### Step 3 — Verify breadcrumbs render
+#### Step 3 — No changes needed in `app.blade.php`
 
 Breadcrumbs are already rendered in `user-interface/resources/views/layouts/app.blade.php`:
 ```php
@@ -145,32 +127,105 @@ Breadcrumbs are already rendered in `user-interface/resources/views/layouts/app.
 </div>
 ```
 
-No changes needed here — it will automatically pick up all definitions. ✅
+This automatically picks up definitions from all packages. 
+
+---
+
+## Approach 2 — Pass `$breadcrumbs` Array (Like Tabs)
+
+Instead of using `breadcrumbs.php` files, breadcrumbs can be passed
+directly from the controller as an array — exactly like `$tabs`.
+
+### How It Works
+
+In the controller:
+```php
+return view('contacts.index', [
+    'breadcrumbs' => [
+        ['label' => 'Dashboard', 'route' => 'dashboard'],
+        ['label' => 'Contacts', 'route' => 'contacts.index'],
+    ]
+]);
+```
+
+In `app.blade.php` — same as tabs:
+```php
+@includeWhen(isset($breadcrumbs) && is_array($breadcrumbs), 'userinterface::layouts.common.breadcrumbs')
+```
+
+Create a `breadcrumbs.blade.php` component in user-interface:
+```php
+@if(!empty($breadcrumbs))
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            @foreach($breadcrumbs as $crumb)
+                @if($loop->last)
+                    <li class="breadcrumb-item active">{{ $crumb['label'] }}</li>
+                @else
+                    <li class="breadcrumb-item">
+                        <a href="{{ route($crumb['route']) }}">{{ $crumb['label'] }}</a>
+                    </li>
+                @endif
+            @endforeach
+        </ol>
+    </nav>
+@endif
+```
+
+### Benefits Over Approach 1
+- No `breadcrumbs.php` file needed in any package
+- No service provider registration needed
+- Each page fully controls its own breadcrumbs
+- Exactly mirrors the tabs pattern
+- Easier to maintain and extend
+
+---
 
 ### Folder Structure
 ```
-messenger/                          ← main app
-├── routes/
-│   └── breadcrumbs.php            ← all breadcrumbs defined here
-│
-user-interface/                     ← package
+user-interface/                         ← renders breadcrumbs globally
 ├── docs/
 │   └── breadcrumbs.md
 ├── routes/
-│   └── breadcrumbs.php            ← only dashboard definitions
+│   └── breadcrumbs.php                ← dashboard definitions only
 ├── resources/
 │   └── views/
 │       └── layouts/
-│           └── app.blade.php      ← renders breadcrumbs automatically
+│           ├── app.blade.php          ← renders breadcrumbs automatically
+│           └── common/
+│               └── breadcrumbs.blade.php  ← breadcrumb component (Approach 2)
+│
+smart-messenger/                        ← defines its own breadcrumbs
+├── routes/
+│   └── breadcrumbs.php                ← (Approach 1 only)
+├── src/
+│   └── SmartMessengerServiceProvider.php
+│
+organisation/                           ← defines its own breadcrumbs
+├── routes/
+│   └── breadcrumbs.php                ← (Approach 1 only)
+├── src/
+│   └── OrganisationServiceProvider.php
+│
+integration/                            ← defines its own breadcrumbs
+├── routes/
+│   └── breadcrumbs.php                ← (Approach 1 only)
+├── src/
+│   └── IntegrationServiceProvider.php
 ```
 
 ### Key Files
-- `messenger/routes/breadcrumbs.php` — central breadcrumb definitions
-- `user-interface/routes/breadcrumbs.php` — existing dashboard definitions
-- `user-interface/resources/views/layouts/app.blade.php` — renders breadcrumbs
+- `user-interface/resources/views/layouts/app.blade.php` — renders breadcrumbs globally
+- `user-interface/routes/breadcrumbs.php` — dashboard definitions
+- `{package}/routes/breadcrumbs.php` — each package's own breadcrumb definitions (Approach 1)
+- `user-interface/resources/views/layouts/common/breadcrumbs.blade.php` — breadcrumb component (Approach 2)
 
 ### Notes
 - Always define parent breadcrumb before child
-- Breadcrumb bar is hidden automatically if no definition exists
+- Breadcrumb bar hides automatically if no definition exists for the current route
 - All breadcrumbs should trace back to `dashboard` as the root
-- Dynamic routes (e.g. show, edit) should pass the model or ID as parameter
+- Dynamic routes should pass the model or ID as a parameter
+- Both approaches are valid depending on the use case.
+    - Approach 1 is more structured and aligns with package-based architecture
+    - Approach 2 is more flexible and closely mirrors the tabs pattern
+- This ensures breadcrumbs can scale across all modules while maintaining consistency in the user experience.
