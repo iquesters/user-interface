@@ -20,6 +20,7 @@ class UserInterfaceConf extends BaseConf
     protected int $small_screen_bottom_tabs;
     protected string $small_screen_featured_tab;
     protected string $small_screen_featured_position;
+    protected SnackbarConf $snackbar_conf;
 
     protected ApiConf $api_conf;
     
@@ -35,6 +36,7 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_bottom_tabs = 4;
         $default_values->small_screen_featured_tab = '';
         $default_values->small_screen_featured_position = 'center';
+        $default_values->snackbar_conf = new SnackbarConf();
         
         $default_values->api_conf = new ApiConf();
         $default_values->api_conf->prefix = 'user-interface'; // Must be auto generated from module enum - the vendor name  

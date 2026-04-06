@@ -1,4 +1,9 @@
 <script>
+    @php
+        $uiConf = \Iquesters\Foundation\Support\ConfProvider::from(\Iquesters\Foundation\Enums\Module::USER_INFE);
+        $uiSnackbarConf = $uiConf->snackbar_conf;
+    @endphp
+
     document.addEventListener('DOMContentLoaded', function() {
         // Get all toggle buttons
         const toggleButtons = document.querySelectorAll('.toggle-password');
@@ -31,6 +36,26 @@
 
     // Store the CSRF token from Laravel for secure POST requests
     window.CSRF_TOKEN = "{{ csrf_token() }}";
+
+    window.USER_INTERFACE_CONFIG = window.USER_INTERFACE_CONFIG || {};
+    window.USER_INTERFACE_CONFIG.snackbar = {
+        position: @json($uiSnackbarConf->position ?? 'bottom-right'),
+        duration: @json($uiSnackbarConf->duration ?? 3000),
+        stackMode: @json($uiSnackbarConf->stack_mode ?? 'stack'),
+        maxVisible: @json($uiSnackbarConf->max_visible ?? 4),
+        allowDismiss: @json($uiSnackbarConf->allow_dismiss ?? true),
+        variant: @json($uiSnackbarConf->variant ?? 'light'),
+        bgClass: @json($uiSnackbarConf->bg_class ?? ''),
+        textClass: @json($uiSnackbarConf->text_class ?? ''),
+        borderClass: @json($uiSnackbarConf->border_class ?? ''),
+        shadowClass: @json($uiSnackbarConf->shadow_class ?? 'shadow'),
+        toastClass: @json($uiSnackbarConf->toast_class ?? ''),
+        bodyClass: @json($uiSnackbarConf->body_class ?? ''),
+        closeButtonClass: @json($uiSnackbarConf->close_button_class ?? ''),
+    };
+
+    // Temporary compatibility alias for existing code paths.
+    window.UI_SNACKBAR_CONFIG = window.USER_INTERFACE_CONFIG.snackbar;
 </script>
 
 <!-- jQuery -->

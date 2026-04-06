@@ -296,6 +296,17 @@ function bindDynamicFormSubmit(formElement, formMeta) {
     formElement.addEventListener('submit', event => handleDynamicFormSubmit(event, formMeta));
 }
 
+function dispatchDynamicFormEvent(eventName, detail = {}) {
+    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+}
+
+function resolveDynamicFormMessage(result, fallbackMessage) {
+    return result?.message
+        || result?.response_schema?.message
+        || result?.response_schema?.title
+        || fallbackMessage;
+}
+
 async function handleDynamicFormSubmit(event, formMeta) {
     const form = event.currentTarget;
 
@@ -335,20 +346,38 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 window.formErrors = errors;
             }
 
-            return;
-        }
-
-        window.dispatchEvent(new CustomEvent('shoz-form:submitted', {
-            detail: {
+            dispatchDynamicFormEvent('shoz-form:submit-failed', {
                 formId: form.id,
                 endpoint,
                 method,
                 payload,
                 response: result,
-            },
-        }));
+                errors,
+                message: resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.'),
+            });
+
+            return;
+        }
+
+        dispatchDynamicFormEvent('shoz-form:submitted', {
+            formId: form.id,
+            endpoint,
+            method,
+            payload,
+            response: result,
+            message: resolveDynamicFormMessage(result, 'Form submitted successfully.'),
+        });
     } catch (error) {
         console.error('Dynamic form submit error.', error);
+
+        dispatchDynamicFormEvent('shoz-form:submit-failed', {
+            formId: form.id,
+            endpoint,
+            method,
+            payload,
+            error,
+            message: error?.message || 'Something went wrong while submitting the form.',
+        });
     }
 }
 

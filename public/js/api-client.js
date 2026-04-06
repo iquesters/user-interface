@@ -400,9 +400,26 @@ class ApiClient {
         } else if (typeof toastr !== 'undefined') {
             const type = toastConfig.type || 'info';
             toastr[type](toastConfig.message || '');
+        } else if (typeof window !== 'undefined' && window.AppSnackbar && typeof window.AppSnackbar.show === 'function') {
+            window.AppSnackbar.show(
+                toastConfig.message || '',
+                toastConfig.type || 'info',
+                {
+                    duration: toastConfig.duration || 3000,
+                    position: toastConfig.position,
+                }
+            );
         } else {
             console.log('Toast:', toastConfig);
         }
+    }
+
+    showToast(message, type = 'info', options = {}) {
+        this._showToast({
+            message,
+            type,
+            ...options,
+        });
     }
 
     /**

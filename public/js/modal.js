@@ -213,16 +213,65 @@ function showModal(modalContent = {}) {
     return renderBasicModal(modalContent)
 }
 
+function showModalSnackbar(message, type = 'info') {
+    const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
+
+    if (typeof window !== 'undefined' && window.AppSnackbar && typeof window.AppSnackbar.show === 'function') {
+        window.AppSnackbar.show(text, type, {
+            duration: type === 'error' ? 4500 : 3000,
+        })
+        return
+    }
+
+    if (typeof apiClient !== 'undefined' && typeof apiClient.showToast === 'function') {
+        apiClient.showToast(text, type, {
+            duration: type === 'error' ? 4500 : 3000,
+        })
+        return
+    }
+
+    if (typeof Toastify !== 'undefined') {
+        Toastify({
+            text,
+            duration: type === 'error' ? 4500 : 3000,
+            gravity: 'top',
+            position: 'right',
+            backgroundColor: type === 'error' ? '#dc3545' : '#198754',
+        }).showToast()
+        return
+    }
+
+    if (typeof toastr !== 'undefined') {
+        const toastrMethod = type === 'error' ? 'error' : 'success'
+        toastr[toastrMethod](text)
+        return
+    }
+
+    console.log(`[${type.toUpperCase()}] ${text}`)
+}
+
 window.addEventListener('shoz-form:submitted', event => {
-    const { formId } = event.detail || {}
+    const { formId, message } = event.detail || {}
 
     if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
         return
     }
 
+    showModalSnackbar(message, 'success')
+
     if (activeSchemaFormModalState.closeOnSuccess) {
         bootstrap.Modal.getInstance(document.getElementById('labModal'))?.hide()
     }
+})
+
+window.addEventListener('shoz-form:submit-failed', event => {
+    const { formId, message } = event.detail || {}
+
+    if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
+        return
+    }
+
+    showModalSnackbar(message, 'error')
 })
 
 resetModalState()
