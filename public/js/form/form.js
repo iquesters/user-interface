@@ -269,6 +269,7 @@ async function renderFormForModal(formElement, formMeta) {
 
 function handleSchemaNotFound(formElement) {
     console.error("Form schema not found for:", formElement.id);
+    formElement.dataset.schemaState = 'not-found';
 
     // Clear form content
     formElement.innerHTML = "";

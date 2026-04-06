@@ -5,11 +5,21 @@ namespace Iquesters\UserInterface\Http\Controllers\Api\Meta;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Routing\Controller;
 use Iquesters\UserInterface\Models\FormSchema;
-use stdClass;
 use Illuminate\Support\Facades\Log;
+use Iquesters\Foundation\System\Http\ApiResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 class FormController extends Controller
 {
+    private function buildSchemaErrorResponse(\Throwable $e)
+    {
+        return ApiResponse::error(
+            $e->getMessage(),
+            Response::HTTP_OK,
+            $e->getMessage()
+        );
+    }
+
     private function normalizeSchema(mixed $schema): mixed
     {
         if (is_string($schema)) {
@@ -45,26 +55,27 @@ class FormController extends Controller
      */
     public function getFormSchemaBySlug($slug)
     {
-        Log::info("Fetching form schema for slug: " . $slug);
-        $response = new stdClass([
-            'message' => 'Schema is empty',
-            'data' => null
-        ]);
+        try {
+            Log::info("Fetching form schema for slug: " . $slug);
 
-        if ($slug) {
+            if (!$slug) {
+                throw new \Exception('Form schema slug not found');
+            }
+
             $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
             Log::info("Form schema result: " . json_encode($form));
-            if (isset($form)) {
-                $response->{'message'} = "Form schema found";
-                $response->{'data'} = $this->normalizeSchema($form->schema);
-            } else {
-                $response->{'message'} = "Form schema not found";
-            }
-        } else {
-            $response->{'message'} = "Form schema ID not found";
-        }
 
-        return json_encode($response);
+            if (!$form) {
+                throw new \Exception('Form schema not found');
+            }
+
+            return ApiResponse::success(
+                $this->normalizeSchema($form->schema),
+                'Form schema found'
+            );
+        } catch (\Throwable $e) {
+            return $this->buildSchemaErrorResponse($e);
+        }
     }
 
     /**
@@ -72,25 +83,26 @@ class FormController extends Controller
      */
     public function getFormSchema($uid)
     {
-        Log::info("Fetching form schema for uid: " . $uid);
-        $response = new stdClass([
-            'message' => 'Schema is empty',
-            'data' => null
-        ]);
+        try {
+            Log::info("Fetching form schema for uid: " . $uid);
 
-        if ($uid) {
-            $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
-            if (isset($form)) {
-                $response->{'message'} = "Form schema found";
-                $response->{'data'} = $this->normalizeSchema($form->schema);
-            } else {
-                $response->{'message'} = "Form schema not found";
+            if (!$uid) {
+                throw new \Exception('Form schema ID not found');
             }
-        } else {
-            $response->{'message'} = "Form schema ID not found";
-        }
 
-        return json_encode($response);
+            $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
+
+            if (!$form) {
+                throw new \Exception('Form schema not found');
+            }
+
+            return ApiResponse::success(
+                $this->normalizeSchema($form->schema),
+                'Form schema found'
+            );
+        } catch (\Throwable $e) {
+            return $this->buildSchemaErrorResponse($e);
+        }
     }
 
 }
