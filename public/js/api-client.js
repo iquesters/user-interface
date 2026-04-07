@@ -400,8 +400,8 @@ class ApiClient {
         } else if (typeof toastr !== 'undefined') {
             const type = toastConfig.type || 'info';
             toastr[type](toastConfig.message || '');
-        } else if (typeof window !== 'undefined' && window.AppSnackbar && typeof window.AppSnackbar.show === 'function') {
-            window.AppSnackbar.show(
+        } else if (typeof window !== 'undefined' && typeof window.showSnackbar === 'function') {
+            window.showSnackbar(
                 toastConfig.message || '',
                 toastConfig.type || 'info',
                 {

@@ -42,6 +42,7 @@
         </div>
     </main>
 
+    @include('userinterface::layouts.common.snackbar')
     @include('userinterface::layouts.common.js')
 </body>
 </html>

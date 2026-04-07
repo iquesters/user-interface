@@ -216,8 +216,8 @@ function showModal(modalContent = {}) {
 function showModalSnackbar(message, type = 'info') {
     const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
 
-    if (typeof window !== 'undefined' && window.AppSnackbar && typeof window.AppSnackbar.show === 'function') {
-        window.AppSnackbar.show(text, type, {
+    if (typeof window !== 'undefined' && typeof window.showSnackbar === 'function') {
+        window.showSnackbar(text, type, {
             duration: type === 'error' ? 4500 : 3000,
         })
         return

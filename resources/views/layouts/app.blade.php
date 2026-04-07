@@ -72,6 +72,7 @@
                 </div>
             </div>
             @include('userinterface::layouts.common.modal')
+            @include('userinterface::layouts.common.snackbar')
             {{-- @include('layouts.common.footer') --}}
         </div>
         <!-- <div class="ui-minibar">

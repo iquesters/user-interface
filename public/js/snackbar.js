@@ -1,5 +1,5 @@
 ;(function (global) {
-    const CONTAINER_ID = 'app-snackbar-container'
+    const CONTAINER_ID = 'labSnackbar'
     const LIGHT_VARIANT_CLASS_MAP = {
         success: {
             bgClass: 'bg-white',
@@ -168,11 +168,11 @@
         toastEl.remove()
 
         if (container && !container.childElementCount) {
-            container.remove()
+            container.innerHTML = ''
         }
     }
 
-    function show(message, type = 'info', options = {}) {
+    function showSnackbar(message, type = 'info', options = {}) {
         const conf = getConfig()
         const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
         const position = normalizePosition(options.position || conf.position)
@@ -238,7 +238,5 @@
         window.setTimeout(() => removeToast(toastEl), delay)
     }
 
-    global.AppSnackbar = {
-        show,
-    }
+    global.showSnackbar = showSnackbar
 })(window)
