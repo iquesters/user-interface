@@ -38,7 +38,7 @@
             <li class="nav-item" role="presentation">
                 <a
                     id="{{ $autoTabId }}"
-                    href="{{ route($tab['route'], $routeParams) }}"
+                    href="{{ Route::has($tab['route']) ? route($tab['route'], $routeParams) : '#' }}"
                     class="nav-link
                            {{ $isActive ? 'active' : '' }}
                            d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
@@ -51,6 +51,16 @@
                 </a>
             </li>
         @endforeach
+
+         <li class="nav-item" role="presentation">
+            <a
+                href="#"
+                class="nav-link d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
+            >
+                <i class="fas fa-fw fa-clock-rotate-left me-1"></i>
+            </a>
+        </li>
+
     </ul>
 @endif
 
