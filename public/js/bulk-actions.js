@@ -147,16 +147,14 @@ class BulkActionsManager {
             this.bulkActionsContainer.classList.remove('d-none');
             this.selectionCountBadge.classList.remove('d-none');
             this.clearSelectionBtn.classList.remove('d-none');
-            
+             
             // Hide select hint
             this.selectHint.classList.add('d-none');
-            
-            // Update count - find the number span inside the badge
+
             const countSpan = this.selectionCountBadge.querySelector('.selected-count');
             if (countSpan) {
                 countSpan.textContent = count;
             } else {
-                // Fallback if structure is different
                 this.selectionCountBadge.textContent = `${count} Selected`;
             }
         } else {
@@ -164,16 +162,15 @@ class BulkActionsManager {
             this.bulkActionsContainer.classList.add('d-none');
             this.selectionCountBadge.classList.add('d-none');
             this.clearSelectionBtn.classList.add('d-none');
-            
+             
             // Show select hint
             this.selectHint.classList.remove('d-none');
-            
-            // Reset count for next time
+
             const countSpan = this.selectionCountBadge.querySelector('.selected-count');
             if (countSpan) {
                 countSpan.textContent = '0';
             }
-            
+             
             // Clear selected UIDs
             this.selectedUids.clear();
         }

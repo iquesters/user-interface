@@ -24,6 +24,10 @@ const DEFAULT_DT_CONFIG = {
     pagingType: "full_numbers",
     lengthMenu: [10, 25, 50, 100],
     language: {
+        info: "_START_ to _END_ of _TOTAL_",
+        infoEmpty: "0 to 0 of 0",
+        infoFiltered: "",
+        lengthMenu: "_MENU_",
         searchPlaceholder: "Search records...",
         search: "",
     },
@@ -550,6 +554,53 @@ function getUserPersonalization(entityName) {
     return {};
 }
 
+function clearInboxRowSelection(tableElement) {
+    if (!tableElement) {
+        return;
+    }
+
+    tableElement.querySelectorAll('tbody tr.bg-primary-subtle').forEach((row) => {
+        row.classList.remove('bg-primary-subtle');
+        row.querySelectorAll('td, th').forEach((cell) => {
+            cell.classList.remove('bg-primary-subtle');
+        });
+    });
+}
+
+function setInboxRowSelection(rowElement) {
+    if (!rowElement) {
+        return;
+    }
+
+    const tableElement = rowElement.closest('table');
+    clearInboxRowSelection(tableElement);
+
+    rowElement.classList.add('bg-primary-subtle');
+    rowElement.querySelectorAll('td, th').forEach((cell) => {
+        cell.classList.add('bg-primary-subtle');
+    });
+}
+
+function styleInboxRows(tableElement) {
+    if (!tableElement) {
+        return;
+    }
+
+    tableElement.querySelectorAll('thead tr').forEach((row) => {
+        row.classList.add('border-bottom', 'border-2', 'border-light-subtle');
+        row.querySelectorAll('th, td').forEach((cell) => {
+            cell.classList.add('border-bottom', 'border-light-subtle');
+        });
+    });
+
+    tableElement.querySelectorAll('tbody tr').forEach((row) => {
+        row.classList.add('border-bottom', 'border-2', 'border-light-subtle');
+        row.querySelectorAll('td, th').forEach((cell) => {
+            cell.classList.add('border-bottom', 'border-light-subtle');
+        });
+    });
+}
+
 // ---------------------------
 // 📧 INBOX VIEW RENDERING
 // ---------------------------
@@ -567,7 +618,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Left panel (list view) - flex container with flex-column
     const leftPanel = document.createElement('div');
-    leftPanel.className = 'inbox-left-panel p-1 d-flex flex-column overflow-hidden border-end';
+    leftPanel.className = 'inbox-left-panel p-1 d-flex flex-column border-end';
+    leftPanel.style.overflow = 'hidden';
     leftPanel.style.width = `${DEFAULT_LEFT_PANEL_WIDTH}%`;
     
     // Resizer
@@ -623,7 +675,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Create DataTable
     const listTable = document.createElement('table');
     listTable.__sourceTable = tableElement;
-    listTable.className = 'table table-striped table-bordered table-hover inbox-list-table';
+    listTable.className = 'table table-bordered table-hover inbox-list-table';
     listTable.style.cssText = 'margin: 0; cursor: pointer; width: 100%;';
     
     // Format entity name nicely
@@ -689,6 +741,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
                 dtConfig.initComplete.apply(this, args);
             }
 
+            styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
         },
         drawCallback: function (...args) {
@@ -696,10 +749,12 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
                 dtConfig.drawCallback.apply(this, args);
             }
 
+            styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
         },
     });
 
+    styleInboxRows(listTable);
     applyInboxStickyStyles(leftPanel);
 
     // Setup resizer
@@ -720,7 +775,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         const data = dt.row(this).data();
         if (data) {
             loadDetailComponent(rightPanelEle, schema, data);
-            $(this).addClass('table-active').siblings().removeClass('table-active');
+            setInboxRowSelection(this);
         }
     });
     
@@ -750,6 +805,9 @@ function applyInboxStickyStyles(leftPanel) {
     dtContainer.style.flexDirection = 'column';
     dtContainer.style.height = '100%';
     dtContainer.style.overflow = 'hidden';
+    dtContainer.style.minHeight = '0';
+    leftPanel.style.height = '100%';
+    leftPanel.style.minHeight = '0';
     
     // Find all direct children of dt-container (layout rows)
     const layoutRows = Array.from(dtContainer.children).filter(el => 
@@ -783,11 +841,46 @@ function applyInboxStickyStyles(leftPanel) {
         
         // Table row: Contains the actual table
         else if (hasTable) {
+            row.style.setProperty('--bs-gutter-x', '0');
+            row.style.marginLeft = '0';
+            row.style.marginRight = '0';
             row.style.flex = '1 1 auto';
-            row.style.overflow = 'auto';
+            row.style.overflow = 'hidden';
             row.style.minHeight = '0';
+            row.style.height = '0';
             row.style.position = 'relative';
             row.classList.add('border-top', 'border-bottom');
+
+            const tableCell = row.querySelector('.dt-layout-cell, .dt-layout-full');
+            if (tableCell) {
+                let scrollFrame = row.querySelector('.inbox-scroll-frame');
+                if (!scrollFrame) {
+                    scrollFrame = document.createElement('div');
+                    scrollFrame.className = 'inbox-scroll-frame';
+                    scrollFrame.style.display = 'flex';
+                    scrollFrame.style.flexDirection = 'column';
+                    scrollFrame.style.flex = '1 1 auto';
+                    scrollFrame.style.height = '100%';
+                    scrollFrame.style.minHeight = '0';
+                    scrollFrame.style.overflowX = 'auto';
+                    scrollFrame.style.overflowY = 'scroll';
+                    scrollFrame.style.scrollbarGutter = 'stable';
+                    row.appendChild(scrollFrame);
+                }
+
+                if (tableCell.parentElement !== scrollFrame) {
+                    scrollFrame.appendChild(tableCell);
+                }
+
+                tableCell.style.display = 'flex';
+                tableCell.style.flexDirection = 'column';
+                tableCell.style.flex = '1 1 auto';
+                tableCell.style.height = '100%';
+                tableCell.style.minHeight = '0';
+                tableCell.style.overflow = 'visible';
+                tableCell.style.paddingLeft = '0';
+                tableCell.style.paddingRight = '0';
+            }
             
             // Make thead sticky within this scrollable container
             const thead = row.querySelector('thead');
@@ -848,6 +941,9 @@ function applyTableModeLayout(tableElement) {
         }
 
         if (hasTable) {
+            row.style.setProperty('--bs-gutter-x', '0');
+            row.style.marginLeft = '0';
+            row.style.marginRight = '0';
             row.classList.add('d-flex', 'flex-column', 'flex-grow-1', 'overflow-hidden');
             row.style.minHeight = '0';
 
@@ -856,6 +952,8 @@ function applyTableModeLayout(tableElement) {
                 tableCell.classList.add('d-flex', 'flex-column', 'flex-grow-1', 'overflow-hidden');
                 tableCell.style.height = '100%';
                 tableCell.style.minHeight = '0';
+                tableCell.style.paddingLeft = '0';
+                tableCell.style.paddingRight = '0';
             }
 
             const scrollHost = row.querySelector('.table-responsive')
@@ -863,9 +961,12 @@ function applyTableModeLayout(tableElement) {
                 || tableElement.parentElement;
 
             if (scrollHost) {
-                scrollHost.classList.add('flex-grow-1', 'overflow-auto');
+                scrollHost.classList.add('flex-grow-1');
                 scrollHost.style.height = '100%';
                 scrollHost.style.minHeight = '0';
+                scrollHost.style.overflowX = 'auto';
+                scrollHost.style.overflowY = 'scroll';
+                scrollHost.style.scrollbarGutter = 'stable';
             }
 
             const thead = row.querySelector('thead');
@@ -1171,9 +1272,9 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         rightPanelEle.appendChild(emptyState);
         
         // Remove active class from selected row
-        const activeRow = parentContainer?.querySelector('tr.table-active');
-        if (activeRow) {
-            activeRow.classList.remove('table-active');
+        const listTable = parentContainer?.querySelector('.inbox-list-table');
+        if (listTable) {
+            clearInboxRowSelection(listTable);
         }
     };
     
@@ -1556,6 +1657,21 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength)
 function showTableLoader(tableElement) {
     const tbody = tableElement.querySelector("tbody");
     if (!tbody) return;
+
+    if (tableElement.classList.contains('inbox-list-table')) {
+        tbody.innerHTML = `
+            <tr class="border-bottom border-2 border-light-subtle">
+                <td class="checkbox-column border-bottom border-light-subtle"></td>
+                <td class="border-bottom border-light-subtle">
+                    <div class="d-flex justify-content-center align-items-center gap-2 text-muted py-4">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        <span>Loading...</span>
+                    </div>
+                </td>
+            </tr>`;
+        return;
+    }
+
     tbody.innerHTML = `
         <tr>
             <td colspan="100%" class="text-center py-4">
