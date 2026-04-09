@@ -92,6 +92,11 @@ async function addField(field, addTo,formMeta) {
         return;
     }
 
+    if (typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta)) {
+        renderReadOnlyField(field, addTo);
+        return;
+    }
+
     if (field.type === INPUT_TYPE.RADIO) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
@@ -274,6 +279,40 @@ async function addField(field, addTo,formMeta) {
         appendFieldInfoAndFeedback(field, formContainer);
     }
 
+}
+
+function renderReadOnlyField(field, addTo) {
+    const fragment = createFieldFragment(field, addTo);
+
+    if (field.label) {
+        fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+    }
+
+    const valueDiv = document.createElement(HTML_TAG.DIV);
+    valueDiv.dataset.fieldId = field.id;
+    valueDiv.classList.add('form-control-plaintext', 'border', 'rounded', 'px-3', 'py-2', 'bg-light-subtle');
+    valueDiv.textContent = getReadOnlyFieldDisplayValue(field);
+    fragment.appendChild(valueDiv);
+
+    createHelperText(field, fragment);
+}
+
+function getReadOnlyFieldDisplayValue(field) {
+    const value = field.value;
+
+    if (Array.isArray(value)) {
+        return value.length > 0 ? value.join(', ') : '—';
+    }
+
+    if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
+        return value ? 'Yes' : 'No';
+    }
+
+    if (value === null || value === undefined || value === '') {
+        return '—';
+    }
+
+    return value;
 }
 
 

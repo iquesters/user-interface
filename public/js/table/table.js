@@ -1233,6 +1233,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
             // Initialize forms if present
             const form = contentContainer.querySelector('.shoz-form');
             if (form && typeof setupForm === 'function') {
+                form.dataset.formMode = 'view';
                 const formMeta = await setupForm(form);
 
                 if (!formMeta && form.dataset.schemaState === 'not-found') {

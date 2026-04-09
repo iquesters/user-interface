@@ -5,6 +5,7 @@
     'meta' => '',
     'formData' => '',
     'entity_uid' => null,
+    'form_mode' => null,
 ])
 
 
@@ -17,7 +18,8 @@
       enctype="{{ $enctype }}"
       data-form-meta="{{ $meta }}"
       data-form-data='{{ $formData }}'
-      data-entity-uid="{{ $entity_uid }}">
+      data-entity-uid="{{ $entity_uid }}"
+      data-form-mode="{{ $form_mode }}">
     @csrf
 
   <div class="form-skeleton">

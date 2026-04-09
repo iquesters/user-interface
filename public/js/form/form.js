@@ -1,19 +1,281 @@
 let dtpOption
 
+const DEFAULT_FORM_CONFIG = {
+    allowView: true,
+    allowEdit: true,
+    allowDelete: true,
+    allowSubmit: true,
+    allowCancel: true,
+    renderMode: 'default',
+    enctype: 'multipart/form-data',
+    fields: [],
+    actions: [],
+};
+
+function mergeFormConfigs(defaultConfig, schemaConfig = {}, userConfig = {}) {
+    return {
+        ...defaultConfig,
+        ...schemaConfig,
+        ...userConfig,
+        header: mergeNestedFormObject(defaultConfig.header, schemaConfig.header, userConfig.header),
+        info: mergeNestedFormObject(defaultConfig.info, schemaConfig.info, userConfig.info),
+        placeholder: mergeNestedFormObject(defaultConfig.placeholder, schemaConfig.placeholder, userConfig.placeholder),
+        fields: mergeFormFields(defaultConfig.fields || [], schemaConfig.fields || [], userConfig.fields || []),
+        actions: mergeFormActions(defaultConfig.actions || [], schemaConfig.actions || [], userConfig.actions || []),
+    };
+}
+
+function mergeNestedFormObject(defaultValue = {}, schemaValue = {}, userValue = {}) {
+    return {
+        ...(defaultValue || {}),
+        ...(schemaValue || {}),
+        ...(userValue || {}),
+    };
+}
+
+function mergeFormFields(defaultFields, schemaFields, userFields) {
+    return schemaFields.map((field, index) => {
+        const fieldKey = field?.id ?? field?.name ?? index;
+        const defaultField = defaultFields.find(item => (item?.id ?? item?.name) === fieldKey);
+        const userField = userFields.find(item => (item?.id ?? item?.name) === fieldKey);
+
+        return {
+            ...(defaultField || {}),
+            ...(field || {}),
+            ...(userField || {}),
+        };
+    });
+}
+
+function mergeFormActions(defaultActions, schemaActions, userActions) {
+    return schemaActions.map((action, index) => {
+        const actionKey = action?.id ?? action?.route ?? action?.text ?? index;
+        const defaultAction = defaultActions.find(item => (item?.id ?? item?.route ?? item?.text) === actionKey);
+        const userAction = userActions.find(item => (item?.id ?? item?.route ?? item?.text) === actionKey);
+
+        return {
+            ...(defaultAction || {}),
+            ...(action || {}),
+            ...(userAction || {}),
+            element: mergeNestedFormObject(defaultAction?.element, action?.element, userAction?.element),
+        };
+    });
+}
+
+function getUserFormPersonalization(formId) {
+    return {};
+}
+
+function resolveFormMode(formElement, formMeta = {}) {
+    const explicitMode = formElement.dataset.formMode || formMeta.formMode;
+    if (explicitMode === 'view' || explicitMode === 'edit') {
+        return explicitMode;
+    }
+
+    const pathname = window.location.pathname.toLowerCase();
+    if (pathname.includes('/view/')) {
+        return 'view';
+    }
+
+    if (pathname.includes('/edit/')) {
+        return 'edit';
+    }
+
+    if (formElement.closest('.inbox-detail-content')) {
+        return 'view';
+    }
+
+    return 'edit';
+}
+
+function isFormReadOnly(formMeta = {}) {
+    return formMeta.formMode === 'view';
+}
+
+function buildFormRoute(formId, entityUid, mode = 'view') {
+    if (!formId || !entityUid) {
+        return null;
+    }
+
+    return `/${mode}/${formId}/${entityUid}`;
+}
+
+function getInlineLoaderHtml() {
+    return `
+        <div class="d-flex justify-content-center align-items-center gap-2 text-muted py-4">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            <span>Loading...</span>
+        </div>
+    `;
+}
+
+async function switchFormMode(formElement, nextMode, formMeta) {
+    const entityUid = formElement.dataset.entityUid;
+    const route = buildFormRoute(formMeta.id, entityUid, nextMode);
+    const detailContainer = formElement.closest('.inbox-detail-content');
+
+    if (!detailContainer || !entityUid) {
+        if (route) {
+            window.location.href = route;
+        }
+        return;
+    }
+
+    detailContainer.innerHTML = getInlineLoaderHtml();
+
+    const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.form');
+
+    if (!result?.success || !result?.html) {
+        detailContainer.innerHTML = `
+            <div class="alert alert-danger m-2">
+                Unable to switch the form to ${nextMode} mode.
+            </div>
+        `;
+        return;
+    }
+
+    detailContainer.innerHTML = result.html;
+
+    const nextForm = detailContainer.querySelector('.shoz-form');
+    if (!nextForm) {
+        return;
+    }
+
+    nextForm.dataset.formMode = nextMode;
+
+    const nextFormMeta = await setupForm(nextForm);
+    if (typeof setupCoreFormElement === 'function') {
+        setupCoreFormElement();
+    }
+    if (typeof initializeDetailViewScripts === 'function') {
+        initializeDetailViewScripts(detailContainer);
+    }
+
+    return nextFormMeta;
+}
+
+async function handleFormDeleteAction(formElement, formMeta) {
+    const entityUid = formElement.dataset.entityUid;
+    if (!entityUid || !formMeta.entity) {
+        return;
+    }
+
+    const confirmed = window.confirm('Delete this record? This action cannot be undone.');
+    if (!confirmed) {
+        return;
+    }
+
+    const endpoint = resolveDynamicFormEndpoint(
+        {
+            ...formMeta,
+            method: 'DELETE',
+        },
+        formElement,
+        'DELETE'
+    );
+
+    try {
+        const result = await submitDynamicFormRequest(endpoint, 'DELETE', {}, formElement);
+        if (!result?.success) {
+            console.error('Delete request failed.', { endpoint, result });
+            return;
+        }
+
+        const detailContainer = formElement.closest('.inbox-detail-content');
+        const tableElement = document.querySelector('.lab-table');
+
+        if (detailContainer) {
+            detailContainer.innerHTML = `
+                <div class="alert alert-success m-2">
+                    Record deleted successfully.
+                </div>
+            `;
+        }
+
+        if (tableElement && typeof window.clearLabTableCache === 'function') {
+            window.clearLabTableCache(tableElement);
+        }
+
+        if (tableElement && typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(tableElement)) {
+            $(tableElement).DataTable().ajax.reload(null, false);
+            return;
+        }
+
+        window.location.reload();
+    } catch (error) {
+        console.error('Delete request failed.', error);
+    }
+}
+
+function createHeaderIconButton(iconClasses, title, buttonClasses, clickHandler) {
+    const button = document.createElement(HTML_TAG.BUTTON);
+    button.type = 'button';
+    button.className = buttonClasses;
+    button.title = title;
+
+    const icon = document.createElement('i');
+    icon.className = iconClasses;
+    button.appendChild(icon);
+
+    button.addEventListener('click', clickHandler);
+    return button;
+}
+
+function appendViewModeActions(container, formMeta, formElement) {
+    const entityUid = formElement.dataset.entityUid;
+    if (!entityUid) {
+        return;
+    }
+
+    if (formMeta.allowEdit) {
+        container.appendChild(
+            createHeaderIconButton(
+                'fas fa-pencil-alt',
+                'Edit',
+                'btn btn-sm btn-outline-primary',
+                (event) => {
+                    event.preventDefault();
+                    switchFormMode(formElement, 'edit', formMeta);
+                }
+            )
+        );
+    }
+
+    if (formMeta.allowDelete) {
+        container.appendChild(
+            createHeaderIconButton(
+                'fas fa-trash',
+                'Delete',
+                'btn btn-sm btn-outline-danger',
+                (event) => {
+                    event.preventDefault();
+                    handleFormDeleteAction(formElement, formMeta);
+                }
+            )
+        );
+    }
+}
+
 async function setupForm(formElement) {
     console.log("setuping shoz-form...")
     console.log("formId = " + formElement.id)
 
-    let formMeta = formElement.dataset.formMeta
-    if (formMeta) {
-        formMeta = JSON.parse(formMeta)
+    let schemaMeta = formElement.dataset.formMeta
+    if (schemaMeta) {
+        schemaMeta = JSON.parse(schemaMeta)
         delete formElement.dataset.formMeta
     } else {
-        formMeta = await getFormSchema(formElement.id)
+        schemaMeta = await getFormSchema(formElement.id)
     }
 
+    const formMeta = mergeFormConfigs(
+        DEFAULT_FORM_CONFIG,
+        schemaMeta,
+        getUserFormPersonalization(formElement.id)
+    );
+
     console.log("formMeta>>>>>>>>>>>", formMeta)
-    if (!formMeta) {
+    if (!schemaMeta) {
         
         handleSchemaNotFound(formElement);
         // break the code
@@ -36,6 +298,8 @@ async function setupForm(formElement) {
     }
     
     formMeta.id = formElement.id
+    formMeta.formMode = resolveFormMode(formElement, formMeta);
+    formElement.dataset.formMode = formMeta.formMode;
 
     const renderMode = formElement.dataset.renderMode || formMeta.renderMode || 'default';
     formMeta.renderMode = renderMode;
@@ -51,7 +315,7 @@ async function setupForm(formElement) {
 
     if (formMeta.header || formMeta.heading) {
         const cardHeader = cardProvider.getCardHeader();
-        setupFormHeader(cardHeader, formMeta);
+        setupFormHeader(cardHeader, formMeta, formElement);
     }
 
     if (formMeta.fields || formMeta.actions) {
@@ -59,7 +323,7 @@ async function setupForm(formElement) {
             const cardBody = cardProvider.getCardBody();
             setupFormBody(cardBody, formMeta);
         }
-        if (formMeta.actions) {
+        if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
             setupFormFooter(cardFooter, formMeta);
         }
@@ -67,7 +331,7 @@ async function setupForm(formElement) {
 
     const hasSchemaActions = Array.isArray(formMeta.actions) && formMeta.actions.length > 0;
 
-    if (!hasSchemaActions && (formMeta.submitButtonLabel || formMeta.allowCancel) && (formMeta.formEdit ?? true)) {
+    if (!isFormReadOnly(formMeta) && !hasSchemaActions && (formMeta.submitButtonLabel || formMeta.allowSubmit || formMeta.allowCancel)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
         btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
@@ -498,7 +762,7 @@ function getSerializedFieldValue(form, field) {
  * @param {*} cardHeader 
  * @param {*} formMeta 
  */
-function setupFormHeader(cardHeader, formMeta) {
+function setupFormHeader(cardHeader, formMeta, formElement) {
 
     const fragment = document.createElement(HTML_TAG.DIV);
     fragment.id = cardHeader.id + "-item"
@@ -553,6 +817,16 @@ function setupFormHeader(cardHeader, formMeta) {
         })
 
         fragment.appendChild(headingActionDiv)
+    }
+
+    if (isFormReadOnly(formMeta)) {
+        const viewModeActionDiv = document.createElement(HTML_TAG.DIV);
+        viewModeActionDiv.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2);
+        appendViewModeActions(viewModeActionDiv, formMeta, formElement);
+
+        if (viewModeActionDiv.childNodes.length > 0) {
+            fragment.appendChild(viewModeActionDiv);
+        }
     }
 
     // removing placeholder
@@ -981,12 +1255,12 @@ function wrapElement(toWrap, wrapper = document.createElement('div')) {
 
 // Form access check (view or edit permissions)
 function checkFormAccess(formMeta, formElement) {
-    const pathname = window.location.pathname.toLowerCase();
     const { allowView = true, allowEdit = true } = formMeta;
+    const mode = resolveFormMode(formElement, formMeta);
 
     const noAccess =
-        (pathname.includes('edit') && !allowEdit) ||
-        (pathname.includes('view') && !allowView);
+        (mode === 'edit' && !allowEdit) ||
+        (mode === 'view' && !allowView);
 
     if (noAccess) {
         const msg = document.createElement('p');

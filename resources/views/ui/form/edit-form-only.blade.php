@@ -9,6 +9,7 @@
         [
             'id' => $form_schema_id,
             'entity_uid' => $entity_uid,
+            'form_mode' => 'edit',
         ])
     @include('userinterface::layouts.common.js')
 </body>
