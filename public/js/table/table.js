@@ -1226,7 +1226,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Create header - using Bootstrap classes
     const header = document.createElement('div');
-    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 flex-shrink-0';
+    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 pt-2 pb-1 px-3 flex-shrink-0 border-bottom';
     
     // Title on left
     const titleWrapper = document.createElement('div');
@@ -1242,11 +1242,10 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Try to get a meaningful title from the data
     let titleText = 'Details';
+    const titleFields = ['title', 'name', 'subject', 'uid', 'id'];
     if (data) {
-        if (data.title) titleText = data.title;
-        else if (data.name) titleText = data.name;
-        else if (data.subject) titleText = data.subject;
-        else if (data.uid || data.id) titleText = `${data.uid || data.id}`;
+        const matchedField = titleFields.find((field) => data[field]);
+        if (matchedField) titleText = `${data[matchedField]}`;
     }
     title.textContent = titleText;
     titleWrapper.appendChild(title);
