@@ -5,7 +5,7 @@ class CardProvider {
     constructor(placeholder) {
         this.card = document.createElement('div');
         this.card.id = "gen-card-" + Date.now()
-        this.card.classList.add(...['card', 'bg-light', 'border-0']);
+        this.card.classList.add(...['w-100', 'p-1']);
         if (placeholder) {
             this.card.placeholder = placeholder
             this.card.classList.add(...[placeholder.animation || DEFAULT_PLACEHOLDER_ANIMATION]);
@@ -15,7 +15,7 @@ class CardProvider {
     getCardHeader() {
         const cardHeader = document.createElement('div');
         cardHeader.id = this.card.id + "-header"
-        cardHeader.classList.add(...['card-header', 'bg-light', 'border-0']);
+        cardHeader.classList.add(...['w-100']);
         this.card.appendChild(cardHeader);
         return cardHeader;
     }
@@ -23,7 +23,7 @@ class CardProvider {
     getCardBody() {
         const cardBody = document.createElement('div');
         cardBody.id = this.card.id + "-body"
-        cardBody.classList.add('card-body');
+        cardBody.classList.add('w-100');
         this.card.appendChild(cardBody);
         return cardBody;
     }
@@ -31,7 +31,7 @@ class CardProvider {
     getCardFooter() {
         const cardFooter = document.createElement('div');
         cardFooter.id = this.card.id + "-footer"
-        cardFooter.classList.add(...['card-footer', 'bg-light', 'border-0']);
+        cardFooter.classList.add(...['w-100']);
         this.card.appendChild(cardFooter);
         return cardFooter;
     }

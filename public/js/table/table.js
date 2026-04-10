@@ -635,7 +635,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     
     // Right panel (detail view)
     const rightPanelEle = document.createElement('div');
-    rightPanelEle.className = 'inbox-right-panel bg-light';
+    rightPanelEle.className = 'inbox-right-panel';
     rightPanelEle.style.cssText = `flex: 1; overflow: auto;`;
     rightPanelEle.innerHTML = '<div class="text-center text-muted py-5">Select an item to view details</div>';
     
@@ -732,6 +732,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         ],
         select: {
             style: 'single',
+            info: false,
             className: 'bg-primary bg-opacity-10'
         },
         ajax: (params, callback) =>
@@ -1174,10 +1175,10 @@ function renderFallbackDetailComponent(data = {}) {
     }
 
     return `
-        <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center justify-content-between mb-2 pt-3 px-2">
             <h6 class="mb-0 fw-semibold text-muted">Record Information</h6>
         </div>
-        <div class="table-responsive rounded">
+        <div class="table-responsive rounded p-1">
             <table class="table table-sm table-hover mb-0 align-middle" style="--bs-table-bg: transparent;">
                 <colgroup><col style="width: 32%;"><col></colgroup>
                 <tbody>
@@ -1225,10 +1226,18 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Create header - using Bootstrap classes
     const header = document.createElement('div');
-    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 shadow-sm flex-shrink-0';
+    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 py-2 px-3 flex-shrink-0';
     
     // Title on left
-    const title = document.createElement('h6');
+    const titleWrapper = document.createElement('div');
+    titleWrapper.className = 'd-flex flex-column';
+
+    const entityLabel = document.createElement('small');
+    entityLabel.className = 'small text-muted';
+    entityLabel.style.fontSize = '0.7rem';
+    entityLabel.textContent = formatDetailLabel(schema?.entity || 'Details');
+
+    const title = document.createElement('p');
     title.className = 'mb-0 fw-medium text-primary';
     
     // Try to get a meaningful title from the data
@@ -1237,9 +1246,11 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         if (data.title) titleText = data.title;
         else if (data.name) titleText = data.name;
         else if (data.subject) titleText = data.subject;
-        else if (data.id || data.uid) titleText = `Item #${data.id || data.uid}`;
+        else if (data.uid || data.id) titleText = `${data.uid || data.id}`;
     }
     title.textContent = titleText;
+    titleWrapper.appendChild(title);
+    titleWrapper.appendChild(entityLabel);
     
     // Cross icon on right - using Bootstrap btn-close
     const closeButton = document.createElement('button');
@@ -1257,10 +1268,10 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         rightPanelEle.innerHTML = '';
         rightPanelEle.className = rightPanelEle.className
             .split(' ')
-            .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white')
+            .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white' && cls !== 'bg-light')
             .join(' ');
         
-        rightPanelEle.classList.add('d-flex', 'flex-column', 'bg-light', 'overflow-hidden', 'p-0', 'm-0');
+        rightPanelEle.classList.add('d-flex', 'flex-column', 'overflow-hidden', 'p-0', 'm-0');
         
         // Restore width settings
         if (currentWidth) rightPanelEle.style.width = currentWidth;
@@ -1278,7 +1289,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         }
     };
     
-    header.appendChild(title);
+    header.appendChild(titleWrapper);
     header.appendChild(closeButton);
     
     // Content container - using Bootstrap classes

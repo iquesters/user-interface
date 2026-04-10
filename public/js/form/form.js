@@ -371,9 +371,7 @@ async function setupForm(formElement) {
         console.log("Applying Bootstrap card elevation styles");
 
         formElement.classList.add(
-            STYLE_CLASS.CARD,
             STYLE_CLASS.SHADOW,
-            STYLE_CLASS.BG_WHITE,
             STYLE_CLASS.ROUNDED_3,
             STYLE_CLASS.P_3,
             STYLE_CLASS.TRANSITION_ALL
