@@ -16,7 +16,7 @@
     })->values();
 @endphp
 
-@if ($visibleTabs->count() > 1)
+@if ($visibleTabs->count() > 0)
     <ul
         id="{{ $tabId }}"
         class="nav {{ $secondary ? 'nav-pills' : 'nav-tabs' }}
