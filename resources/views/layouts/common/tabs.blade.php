@@ -16,7 +16,7 @@
     })->values();
 @endphp
 
-@if ($visibleTabs->count() > 1)
+@if ($visibleTabs->count() >= 1)
     <ul
         id="{{ $tabId }}"
         class="nav {{ $secondary ? 'nav-pills' : 'nav-tabs' }}
@@ -52,12 +52,12 @@
             </li>
         @endforeach
 
-         <li class="nav-item" role="presentation">
-            <a
+        <li class="nav-item" role="presentation">
+            <a         
                 href="#"
-                class="nav-link d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
+                class="nav-link text-primary d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
             >
-                <i class="fas fa-fw fa-clock-rotate-left me-1"></i>
+                <i class="fas fa-fw fa-clock-rotate-left"></i>
             </a>
         </li>
 
