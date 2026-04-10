@@ -3,6 +3,15 @@
 @php
     $entity = ucwords(str_replace('_', ' ', $table_schema->schema['entity']));
     $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
+
+    $tabs = [
+        [
+            'route' => request()->route()->getName(),
+            'params' => request()->route()->parameters(),
+            'icon' => 'fas fa-fw fa-table',
+            'label' => $entity,
+        ],
+    ];
 @endphp
 
 @section('page-title', \Iquesters\Foundation\Helpers\MetaHelper::make([$entity]))
