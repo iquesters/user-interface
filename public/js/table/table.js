@@ -1204,6 +1204,19 @@ function resolveDetailConfig(schema = {}) {
     };
 }
 
+function getNestedDetailValue(source, paths = []) {
+    for (const path of paths) {
+        let value = source;
+        for (const key of path) {
+            value = value?.[key];
+        }
+        if (value !== null && value !== undefined && value !== '') {
+            return value;
+        }
+    }
+    return null;
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data) {
     // Store the current width/percentage before modifying
     const currentWidth = rightPanelEle.style.width;
@@ -1250,6 +1263,19 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     title.textContent = titleText;
     titleWrapper.appendChild(title);
     titleWrapper.appendChild(entityLabel);
+
+    const metaWrapper = document.createElement('div');
+    metaWrapper.className = 'd-flex flex-column align-items-end';
+
+    const metaUser = document.createElement('small');
+    metaUser.className = 'small text-muted';
+    metaUser.style.fontSize = '0.7rem';
+    metaUser.style.display = 'none';
+
+    const metaDate = document.createElement('small');
+    metaDate.className = 'small text-muted';
+    metaDate.style.fontSize = '0.7rem';
+    metaDate.style.display = 'none';
     
     // Cross icon on right - using Bootstrap btn-close
     const closeButton = document.createElement('button');
@@ -1289,6 +1315,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     };
     
     header.appendChild(titleWrapper);
+    header.appendChild(metaWrapper);
     header.appendChild(closeButton);
     
     // Content container - using Bootstrap classes
@@ -1351,6 +1378,36 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                     contentContainer.innerHTML = renderFallbackDetailComponent(data);
                     initializeDetailViewScripts(contentContainer);
                     return;
+                }
+            }
+
+            if (form && detailConfig.formSchemaUid) {
+                const displayBy = getNestedDetailValue(data, [
+                    ['detail_summary', 'user_name'],
+                    ['updater', 'name'],
+                    ['updatedBy', 'name'],
+                    ['updated_by_user', 'name'],
+                    ['updated_by_name'],
+                    ['creator', 'name'],
+                    ['createdBy', 'name'],
+                    ['created_by_user', 'name'],
+                    ['created_by_name'],
+                ]);
+                const displayAt = getNestedDetailValue(data, [
+                    ['detail_summary', 'display_datetime'],
+                    ['updated_at'],
+                    ['updatedAt'],
+                    ['created_at'],
+                    ['createdAt'],
+                ]);
+
+                if (displayBy || displayAt) {
+                    metaUser.textContent = displayBy || '-';
+                    metaDate.textContent = displayAt || '-';
+                    metaUser.style.display = 'block';
+                    metaDate.style.display = 'block';
+                    metaWrapper.appendChild(metaUser);
+                    metaWrapper.appendChild(metaDate);
                 }
             }
             if (typeof setupCoreFormElement === 'function') {

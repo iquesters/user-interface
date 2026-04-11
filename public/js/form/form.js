@@ -92,6 +92,36 @@ function isFormReadOnly(formMeta = {}) {
     return formMeta.formMode === 'view';
 }
 
+function resolveModeConfig(formMeta = {}) {
+    const formMode = formMeta.formMode || 'edit';
+    const modes = formMeta.modes || {};
+    return modes[formMode] || {};
+}
+
+function resolveFormHeaderConfig(formMeta = {}) {
+    const modeConfig = resolveModeConfig(formMeta);
+    const modeHeader = modeConfig.header || {};
+    const baseHeader = formMeta.header || {};
+
+    return {
+        ...baseHeader,
+        ...modeHeader,
+        text: modeHeader.title || modeHeader.text || baseHeader.text || formMeta.heading,
+    };
+}
+
+function resolveFormInfoConfig(formMeta = {}) {
+    const modeConfig = resolveModeConfig(formMeta);
+    const modeHeader = modeConfig.header || {};
+    const baseInfo = formMeta.info || {};
+
+    return {
+        ...baseInfo,
+        icon: baseInfo.icon,
+        innerHTML: modeHeader.description || baseInfo.innerHTML || '',
+    };
+}
+
 function buildFormRoute(formId, entityUid, mode = 'view') {
     if (!formId || !entityUid) {
         return null;
@@ -349,7 +379,8 @@ async function setupForm(formElement) {
     const cardProvider = new CardProvider(formMeta.placeholder);
     formElement.before(cardProvider.getCard());
 
-    if (formMeta.header || formMeta.heading) {
+    const resolvedHeader = resolveFormHeaderConfig(formMeta);
+    if (resolvedHeader.text) {
         const cardHeader = cardProvider.getCardHeader();
         setupFormHeader(cardHeader, formMeta, formElement);
     }
@@ -606,13 +637,13 @@ async function handleDynamicFormSubmit(event, formMeta) {
     if (!form.checkValidity()) {
         event.preventDefault();
         event.stopPropagation();
-        form.classList.add('was-validated');
+        form.classList.add(STYLE_CLASS.WAS_VALIDATED);
         return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    form.classList.add('was-validated');
+        form.classList.add(STYLE_CLASS.WAS_VALIDATED);
 
     const method = resolveDynamicFormMethod(formMeta, form);
     const endpoint = resolveDynamicFormEndpoint(formMeta, form, method);
@@ -800,21 +831,23 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
     }
     cardHeader.appendChild(fragment)
 
+    const resolvedHeader = resolveFormHeaderConfig(formMeta);
+
     const headingDiv = document.createElement(HTML_TAG.DIV)
     headingDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
     // adding icon
-    if(formMeta.header && formMeta.header.icon){
+    if(resolvedHeader.icon){
         const headingIcon = document.createElement('i')
         headingIcon.classList.add(...["fa-fw"])
-        headingIcon.className += (" " + formMeta.header.icon)
+        headingIcon.className += (" " + resolvedHeader.icon)
         headingDiv.appendChild(headingIcon)
     }
     // adding text
-    const headingText = document.createElement('h5')
+    const headingText = document.createElement('h6')
     headingText.id = `form-heading-text-${formMeta.id}`;
     headingText.classList.add(...[STYLE_CLASS.MB_0, STYLE_CLASS.MT_1]);
-    headingText.textContent = (formMeta.header && formMeta.header.text) || formMeta.heading;
+    headingText.textContent = resolvedHeader.text;
     headingDiv.appendChild(headingText)
 
 
@@ -836,11 +869,11 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
     fragment.appendChild(headingDiv)
 
     // adding header actions
-    if (formMeta.header && formMeta.header.actions) {
+    if (resolvedHeader.actions) {
         const headingActionDiv = document.createElement(HTML_TAG.DIV)
         headingActionDiv.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
 
-        formMeta.header.actions.forEach(action => {
+        resolvedHeader.actions.forEach(action => {
             addAction(action, headingActionDiv);
         })
 
@@ -871,22 +904,22 @@ function setupFormBody(cardBody, formMeta) {
 
     const fragment = document.createElement('div');
     fragment.id = cardBody.id + "-item"
-    fragment.classList.add(...['row', 'row-cols-1', 'g-2']);
+        fragment.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, STYLE_CLASS.G_2]);
     // if (formMeta.placeholder) {
     //     fragment.classList.add(...['placeholder', formMeta.placeholder.color || DEFAULT_PLACEHOLDER_COLOR]);
     // }
     cardBody.appendChild(fragment)
 
     const infoCol = document.createElement('div');
-    infoCol.classList.add(...['col']);
+    infoCol.classList.add(STYLE_CLASS.COL);
     fragment.appendChild(infoCol)
 
-    if (formMeta.info) {
+    if (resolveFormInfoConfig(formMeta).innerHTML) {
         setupInfoBlock(infoCol, formMeta);
     }
 
     const formCol = document.createElement('div');
-    formCol.classList.add(...['col']);
+    formCol.classList.add(STYLE_CLASS.COL);
     fragment.appendChild(formCol)
 
     if (formMeta.fields) {
@@ -906,7 +939,7 @@ function setupFormFooter(cardFooter, formMeta, formElement) {
 
     const fragment = document.createElement('div');
     fragment.id = cardFooter.id + "-item"
-    fragment.classList.add(...['d-flex', 'align-items-center', 'justify-content-end', 'gap-2']);
+    fragment.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.JUSTIFY_CONTENT_END, STYLE_CLASS.GAP_2]);
     if (formMeta.placeholder) {
         fragment.classList.add(...['placeholder', formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
     }
@@ -1002,8 +1035,8 @@ function addAction(action, addTo) {
 
         // creating action element
         const actionElement = document.createElement(action.element.type)
-        actionElement.classList.add(...['d-flex', 'align-items-center', 'gap-2'])
-        actionElement.classList.add('btn')
+        actionElement.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2])
+        actionElement.classList.add(STYLE_CLASS.BTN)
         actionElement.classList.add('btn-' + action.element.size);
         if ('link' === action.element.variant) {
             actionElement.classList.add('btn-' + action.element.variant);
@@ -1052,31 +1085,33 @@ function addAction(action, addTo) {
  * @param {*} formMeta 
  */
 function setupInfoBlock(infoCol, formMeta) {
-    if (formMeta.info) {
+    const resolvedInfo = resolveFormInfoConfig(formMeta);
+
+    if (resolvedInfo.innerHTML) {
         const fragment = document.createElement('div')
         fragment.id = infoCol.id + "-item"
-        fragment.classList.add(...['info-block', 'bg-light-subtle', 'text-light-emphasis', 'rounded', 'p-2', 'mb-2']);
+        fragment.classList.add(...['info-block', STYLE_CLASS.ROUNDED, STYLE_CLASS.MB_2]);
         if (formMeta.placeholder) {
             fragment.classList.add(...['placeholder', formMeta.placeholder.color || STYLE_CLASS.DEFAULT_PLACEHOLDER_COLOR]);
         }
         infoCol.appendChild(fragment)
 
         const para = document.createElement('p')
-        para.classList.add('card-text');
+        para.classList.add(STYLE_CLASS.CARD_TEXT);
         fragment.appendChild(para)
 
-        if (formMeta.info.icon) {
+        if (resolvedInfo.icon) {
             const infoBlockIcon = document.createElement('i')
             infoBlockIcon.classList.add(...["fa-fw"])
-            infoBlockIcon.className += (" " + formMeta.info.icon)
-            infoBlockIcon.classList.add('pe-1')
+            infoBlockIcon.className += (" " + resolvedInfo.icon)
+            infoBlockIcon.classList.add(STYLE_CLASS.PE_1)
             para.appendChild(infoBlockIcon)
         }
 
         const infoBlockHTML = document.createElement('span')
         infoBlockHTML.id = `form-info-block-${formMeta.id}`;
-        infoBlockHTML.classList.add("form-info-block")
-        infoBlockHTML.innerHTML = formMeta.info.innerHTML
+        infoBlockHTML.classList.add("form-info-block", STYLE_CLASS.SMALL)
+        infoBlockHTML.innerHTML = resolvedInfo.innerHTML
 
         para.appendChild(infoBlockHTML)
 
@@ -1090,11 +1125,11 @@ function addFieldHelpInfo(field, addTo) {
     if (field && addTo) {
         if (field.info) {
             const fieldHelpInfoBlock = document.createElement('div')
-            fieldHelpInfoBlock.classList.add(...['help-info', 'small', 'text-secondary']);
+            fieldHelpInfoBlock.classList.add(...['help-info', STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_SECONDARY]);
             addTo.appendChild(fieldHelpInfoBlock)
 
             const infoSpanHTML = document.createElement('span')
-            infoSpanHTML.classList.add('small')
+            infoSpanHTML.classList.add(STYLE_CLASS.SMALL)
             infoSpanHTML.innerHTML = field.info.innerHTML
             fieldHelpInfoBlock.appendChild(infoSpanHTML)
         }
@@ -1105,13 +1140,13 @@ function addFieldFeedback(feedback, addTo) {
     if (feedback && addTo) {
         if (feedback.valid) {
             const fieldFeedbackValidBlock = document.createElement('div')
-            fieldFeedbackValidBlock.classList.add('valid-feedback');
+            fieldFeedbackValidBlock.classList.add(STYLE_CLASS.VALID_FEEDBACK);
             fieldFeedbackValidBlock.textContent = feedback.valid
             addTo.appendChild(fieldFeedbackValidBlock)
         }
         if (feedback.invalid) {
             const fieldFeedbackInvalidBlock = document.createElement('div')
-            fieldFeedbackInvalidBlock.classList.add('invalid-feedback');
+            fieldFeedbackInvalidBlock.classList.add(STYLE_CLASS.INVALID_FEEDBACK);
             fieldFeedbackInvalidBlock.textContent = feedback.invalid
             addTo.appendChild(fieldFeedbackInvalidBlock)
         }
@@ -1138,12 +1173,12 @@ function setupOneCoreFormElement(element) {
 
         // checking if label is provided in the data-label attr
         if (element.attr('data-label')) {
-            element.parent().append("<label class=\"control-label\" for=\"" + element.attr('id') + "\" title=\"" + element.attr('data-label') + "\">" + element.attr('data-label') + "</label>")
+            element.parent().append("<label class=\"" + STYLE_CLASS.FORM_LABEL + "\" for=\"" + element.attr('id') + "\" title=\"" + element.attr('data-label') + "\">" + element.attr('data-label') + "</label>")
         }
 
         // checking if additional info is provided in the data-help-info attr
         if (element.attr('data-help-info')) {
-            element.parent().append("<p class=\"shoz-help-text small text-muted\">" + element.attr('data-help-info') + "</p>")
+            element.parent().append("<p class=\"shoz-help-text " + STYLE_CLASS.SMALL + " " + STYLE_CLASS.TEXT_MUTED + "\">" + element.attr('data-help-info') + "</p>")
         }
 
         // check if select option or not
@@ -1372,7 +1407,7 @@ function checkFormAccess(formMeta, formElement) {
                 });
             });
 
-            form.classList.add('was-validated')
+        form.classList.add(STYLE_CLASS.WAS_VALIDATED)
         }, false)
     })
 })();

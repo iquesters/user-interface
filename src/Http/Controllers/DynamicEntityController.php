@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Iquesters\Foundation\Helpers\DateTimeHelper;
 use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
@@ -50,6 +51,7 @@ class DynamicEntityController extends Controller
             $totalCount = $query->count();
             $data = $query->offset($offset)->limit($length)->get();
             $data = $this->attachMetaData($entity, $data);
+            $data = $this->transformRecordsForResponse($data);
 
             return ApiResponse::paginated(
                 $data,
@@ -80,8 +82,8 @@ class DynamicEntityController extends Controller
                 );
             }
 
-            $record = $this->attachMetaData($entity, collect([$record]))->first();
-            $record = $this->sanitizeRecordForResponse($record);
+            $record = $this->attachMetaData($entity, collect([$record]));
+            $record = $this->transformRecordsForResponse($record)->first();
 
             return ApiResponse::success($record, 'Request successful');
         } catch (Throwable $e) {
@@ -119,8 +121,8 @@ class DynamicEntityController extends Controller
                 now()->toDateTimeString()
             ));
 
-            $record = $this->attachMetaData($entity, collect([$record]))->first();
-            $record = $this->sanitizeRecordForResponse($record);
+            $record = $this->attachMetaData($entity, collect([$record]));
+            $record = $this->transformRecordsForResponse($record)->first();
 
             return ApiResponse::success($record, 'Record created successfully');
         } catch (Throwable $e) {
@@ -159,8 +161,8 @@ class DynamicEntityController extends Controller
                 now()->toDateTimeString()
             ));
 
-            $record = $this->attachMetaData($entity, collect([$record]))->first();
-            $record = $this->sanitizeRecordForResponse($record);
+            $record = $this->attachMetaData($entity, collect([$record]));
+            $record = $this->transformRecordsForResponse($record)->first();
 
             return ApiResponse::success($record, 'Record updated successfully');
         } catch (Throwable $e) {
@@ -184,8 +186,8 @@ class DynamicEntityController extends Controller
                 now()->toDateTimeString()
             ));
 
-            $record = $this->attachMetaData($entity, collect([$record]))->first();
-            $record = $this->sanitizeRecordForResponse($record);
+            $record = $this->attachMetaData($entity, collect([$record]));
+            $record = $this->transformRecordsForResponse($record)->first();
 
             return ApiResponse::success($record, 'Record deleted successfully');
         } catch (Throwable $e) {
@@ -941,6 +943,63 @@ class DynamicEntityController extends Controller
         }
 
         return $record;
+    }
+
+    protected function transformRecordsForResponse($records)
+    {
+        $records = collect($records);
+
+        if ($records->isEmpty()) {
+            return $records;
+        }
+
+        $userNames = $this->resolveUserNamesForRecords($records);
+
+        return $records->map(function ($record) use ($userNames) {
+            $record = $this->sanitizeRecordForResponse($record);
+            $record->detail_summary = $this->buildDetailSummary($record, $userNames);
+
+            return $record;
+        });
+    }
+
+    protected function resolveUserNamesForRecords($records): array
+    {
+        if (! Schema::hasTable('users')) {
+            return [];
+        }
+
+        $userIds = $records
+            ->flatMap(function ($record) {
+                return [
+                    $record->updated_by ?? null,
+                    $record->created_by ?? null,
+                ];
+            })
+            ->filter(fn ($id) => ! is_null($id) && $id !== '')
+            ->unique()
+            ->values();
+
+        if ($userIds->isEmpty()) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->whereIn('id', $userIds)
+            ->pluck('name', 'id')
+            ->map(fn ($name) => (string) $name)
+            ->all();
+    }
+
+    protected function buildDetailSummary(object $record, array $userNames): array
+    {
+        $userId = $record->updated_by ?? $record->created_by ?? null;
+        $timestamp = $record->updated_at ?? $record->created_at ?? null;
+
+        return [
+            'user_name' => $userNames[$userId] ?? null,
+            'display_datetime' => DateTimeHelper::displayDateTime($timestamp),
+        ];
     }
 
     protected function isSensitiveFieldName(string $field): bool

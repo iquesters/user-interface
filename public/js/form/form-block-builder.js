@@ -101,7 +101,7 @@ async function addField(field, addTo,formMeta) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
         }
 
         if (Array.isArray(field.options)) {
@@ -119,7 +119,7 @@ async function addField(field, addTo,formMeta) {
         
         // ✅ Label (same as radio & checkbox)
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
         }
 
         // ✅ Create select element
@@ -150,7 +150,7 @@ async function addField(field, addTo,formMeta) {
         
         if (Array.isArray(field.options)) {
             if (field.label) {
-                fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
             }
             field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.CHECKBOX)));
         } else {
@@ -283,16 +283,31 @@ async function addField(field, addTo,formMeta) {
 
 function renderReadOnlyField(field, addTo) {
     const fragment = createFieldFragment(field, addTo);
+    const fieldDomId = getFieldDomId(field);
+    const formContainer = document.createElement(HTML_TAG.DIV);
+    formContainer.id = `${fieldDomId}${SUFFIX.CONTAINER}`;
+    fragment.appendChild(formContainer);
 
     if (field.label) {
-        fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL, STYLE_CLASS.FW_BOLD]));
+        const label = createLabel(field.label, fieldDomId, [STYLE_CLASS.FORM_LABEL]);
+        label.id = `${fieldDomId}${SUFFIX.LABEL}`;
+        formContainer.appendChild(label);
     }
 
     const valueDiv = document.createElement(HTML_TAG.DIV);
+    valueDiv.id = fieldDomId;
     valueDiv.dataset.fieldId = field.id;
-    valueDiv.classList.add('form-control-plaintext', 'border', 'rounded', 'px-3', 'py-2', 'bg-light-subtle');
+    valueDiv.classList.add(
+        STYLE_CLASS.FORM_CONTROL_PLAINTEXT,
+        STYLE_CLASS.BORDER,
+        STYLE_CLASS.ROUNDED,
+        STYLE_CLASS.P_1,
+        STYLE_CLASS.PX_2,
+        STYLE_CLASS.BG_LIGHT_SUBTLE,
+        STYLE_CLASS.W_100
+    );
     valueDiv.textContent = getReadOnlyFieldDisplayValue(field);
-    fragment.appendChild(valueDiv);
+    formContainer.appendChild(valueDiv);
 
     createHelperText(field, fragment);
 }
@@ -381,6 +396,7 @@ function createFieldFragment(field, addTo, addClass = null) {
     const fragment = document.createElement(HTML_TAG.DIV);
     fragment.id = addTo.id + SUFFIX.FIELD;
     addFieldSize(field, fragment);
+    fragment.classList.add(STYLE_CLASS.MB_2);
     
     // optional extra class (for things like 'form-check-group')
     if (addClass) {
@@ -399,7 +415,8 @@ function createFieldFragment(field, addTo, addClass = null) {
 function createHelperText(field, container) {
     if (field.helpertext || field.helperText) {
         const helper = document.createElement(HTML_TAG.DIV);
-        helper.classList.add(STYLE_CLASS.FORM_TEXT);
+        helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL);
+        helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = field.helpertext || field.helperText;
         container.appendChild(helper);
@@ -423,9 +440,7 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
 
     // ✅ Add structure classes
     if (useFloatingLabel) {
-        formContainer.classList.add(STYLE_CLASS.FORM_FLOATING, STYLE_CLASS.MB_3);
-    } else {
-        formContainer.classList.add(STYLE_CLASS.MB_3);
+        formContainer.classList.add(STYLE_CLASS.FORM_FLOATING);
     }
     
 
