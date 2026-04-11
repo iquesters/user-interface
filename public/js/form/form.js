@@ -68,7 +68,7 @@ function getUserFormPersonalization(formId) {
 
 function resolveFormMode(formElement, formMeta = {}) {
     const explicitMode = formElement.dataset.formMode || formMeta.formMode;
-    if (explicitMode === 'view' || explicitMode === 'edit') {
+    if (explicitMode === 'view' || explicitMode === 'edit' || explicitMode === 'create' || explicitMode === 'delete') {
         return explicitMode;
     }
 
@@ -78,7 +78,11 @@ function resolveFormMode(formElement, formMeta = {}) {
     }
 
     if (pathname.includes('/edit/')) {
-        return 'edit';
+        return formElement.dataset.entityUid ? 'edit' : 'create';
+    }
+
+    if (pathname.includes('/delete/')) {
+        return 'delete';
     }
 
     if (formElement.closest('.inbox-detail-content')) {
@@ -120,6 +124,66 @@ function resolveFormInfoConfig(formMeta = {}) {
         icon: baseInfo.icon,
         innerHTML: modeHeader.description || baseInfo.innerHTML || '',
     };
+}
+
+function resolveFormTransportConfig(formMeta = {}) {
+    const modeConfig = resolveModeConfig(formMeta);
+
+    return {
+        method: modeConfig.method || formMeta.method || 'POST',
+        endpoint: modeConfig.endpoint || formMeta.endpoint || null,
+    };
+}
+
+function applyModeOverrides(formMeta = {}) {
+    const modeConfig = resolveModeConfig(formMeta);
+    const modePermissions = {
+        create: {
+            allowView: false,
+            allowEdit: false,
+            allowDelete: false,
+            allowSubmit: true,
+            allowCancel: true,
+        },
+        view: {
+            allowView: true,
+            allowEdit: true,
+            allowDelete: true,
+            allowSubmit: false,
+            allowCancel: false,
+        },
+        edit: {
+            allowView: true,
+            allowEdit: true,
+            allowDelete: true,
+            allowSubmit: true,
+            allowCancel: true,
+        },
+        delete: {
+            allowView: true,
+            allowEdit: false,
+            allowDelete: true,
+            allowSubmit: false,
+            allowCancel: true,
+        },
+    };
+    const overrideKeys = ['allowView', 'allowEdit', 'allowDelete', 'allowSubmit', 'allowCancel'];
+    const activeMode = formMeta.formMode || 'edit';
+    const defaultModePermissions = modePermissions[activeMode] || {};
+
+    overrideKeys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(defaultModePermissions, key)) {
+            formMeta[key] = defaultModePermissions[key];
+        }
+    });
+
+    overrideKeys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(modeConfig, key)) {
+            formMeta[key] = modeConfig[key];
+        }
+    });
+
+    return formMeta;
 }
 
 function buildFormRoute(formId, entityUid, mode = 'view') {
@@ -357,15 +421,23 @@ async function setupForm(formElement) {
 
 
 
+    formMeta.id = formElement.id
+    formMeta.formMode = resolveFormMode(formElement, formMeta);
+    formElement.dataset.formMode = formMeta.formMode;
+    applyModeOverrides(formMeta);
+
     // ✅ Access check
     const hasAccess = checkFormAccess(formMeta,formElement);
     if (!hasAccess) {
         return;
     }
-    
-    formMeta.id = formElement.id
-    formMeta.formMode = resolveFormMode(formElement, formMeta);
-    formElement.dataset.formMode = formMeta.formMode;
+
+    const transportConfig = resolveFormTransportConfig(formMeta);
+    formMeta.method = transportConfig.method;
+    formMeta.endpoint = transportConfig.endpoint
+        ? transportConfig.endpoint.replace('{uid}', formElement.dataset.entityUid || '')
+        : null;
+    formElement.__formMeta = formMeta;
 
     const renderMode = formElement.dataset.renderMode || formMeta.renderMode || 'default';
     formMeta.renderMode = renderMode;
@@ -617,6 +689,7 @@ function bindDynamicFormSubmit(formElement, formMeta) {
     }
 
     formElement.dataset.dynamicSubmitBound = '1';
+    formElement.__formMeta = formMeta;
     formElement.addEventListener('submit', event => handleDynamicFormSubmit(event, formMeta));
 }
 
@@ -1057,6 +1130,26 @@ function addAction(action, addTo) {
 
         if (action.form) {
             actionElement.setAttribute('form', action.form)
+        }
+
+        if (action.type === 'submit' && action.element.type === 'button') {
+            actionElement.type = 'submit';
+        }
+
+        if (action.type === 'cancel') {
+            actionElement.type = 'button';
+            actionElement.addEventListener('click', (event) => {
+                event.preventDefault();
+                const formElement = action.form ? document.getElementById(action.form) : null;
+                if (!formElement) {
+                    return;
+                }
+
+                handleFormCancelAction(formElement, formElement.__formMeta || {
+                    id: action.form,
+                    formMode: formElement.dataset.formMode || 'edit',
+                });
+            });
         }
 
         if (action.icon && action.type !== 'submit') {

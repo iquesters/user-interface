@@ -7,6 +7,6 @@
         [
             'id' => $form_schema_id,
             'entity_uid' => $entity_uid,
-            'form_mode' => 'edit',
+            'form_mode' => $entity_uid ? 'edit' : 'create',
         ])
 @endsection
