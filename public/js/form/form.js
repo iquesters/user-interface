@@ -207,6 +207,26 @@ async function handleFormDeleteAction(formElement, formMeta) {
     }
 }
 
+async function handleFormCancelAction(formElement, formMeta) {
+    const entityUid = formElement.dataset.entityUid;
+    const detailContainer = formElement.closest('.inbox-detail-content');
+
+    if (detailContainer && entityUid && formMeta.formMode === 'edit') {
+        await switchFormMode(formElement, 'view', formMeta);
+        return;
+    }
+
+    if (window.history.length > 1) {
+        window.history.back();
+        return;
+    }
+
+    const viewRoute = buildFormRoute(formMeta.id, entityUid, 'view');
+    if (viewRoute) {
+        window.location.href = viewRoute;
+    }
+}
+
 function createHeaderIconButton(iconClasses, title, buttonClasses, clickHandler) {
     const button = document.createElement(HTML_TAG.BUTTON);
     button.type = 'button';
@@ -221,6 +241,22 @@ function createHeaderIconButton(iconClasses, title, buttonClasses, clickHandler)
     return button;
 }
 
+function appendDefaultCancelButton(container, formElement, formMeta) {
+    if (!formMeta.allowCancel) {
+        return;
+    }
+
+    const cancelBtn = document.createElement(HTML_TAG.BUTTON);
+    cancelBtn.type = "button";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.classList.add(STYLE_CLASS.BTN, STYLE_CLASS.BTN_SM, STYLE_CLASS.BTN_OUTLINE_SECONDARY);
+    cancelBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        handleFormCancelAction(formElement, formMeta);
+    });
+    container.insertBefore(cancelBtn, container.firstChild);
+}
+
 function appendViewModeActions(container, formMeta, formElement) {
     const entityUid = formElement.dataset.entityUid;
     if (!entityUid) {
@@ -232,7 +268,7 @@ function appendViewModeActions(container, formMeta, formElement) {
             createHeaderIconButton(
                 'fas fa-pencil-alt',
                 'Edit',
-                'btn btn-sm btn-outline-primary',
+                'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0',
                 (event) => {
                     event.preventDefault();
                     switchFormMode(formElement, 'edit', formMeta);
@@ -246,7 +282,7 @@ function appendViewModeActions(container, formMeta, formElement) {
             createHeaderIconButton(
                 'fas fa-trash',
                 'Delete',
-                'btn btn-sm btn-outline-danger',
+                'btn btn-sm btn-link text-danger text-decoration-none d-inline-flex align-items-center gap-1 px-0',
                 (event) => {
                     event.preventDefault();
                     handleFormDeleteAction(formElement, formMeta);
@@ -325,7 +361,7 @@ async function setupForm(formElement) {
         }
         if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
-            setupFormFooter(cardFooter, formMeta);
+            setupFormFooter(cardFooter, formMeta, formElement);
         }
     }
 
@@ -339,14 +375,8 @@ async function setupForm(formElement) {
 
         // Cancel button
         if (formMeta.allowCancel) {
-            // console.log("Adding cancel button with label:", formMeta.allowCancel);
-            const cancelBtn = document.createElement(HTML_TAG.BUTTON);
-            cancelBtn.type = "button";
-            cancelBtn.textContent = "Cancel";
-            cancelBtn.classList.add(STYLE_CLASS.BTN, STYLE_CLASS.BTN_SECONDARY);
             btnContainer.classList.add(STYLE_CLASS.JUSTIFY_CONTENT_END);
-            btnContainer.appendChild(cancelBtn);
-            
+            appendDefaultCancelButton(btnContainer, formElement, formMeta);
         }
 
         // Submit button
@@ -355,7 +385,7 @@ async function setupForm(formElement) {
             const submitBtn = document.createElement(HTML_TAG.BUTTON);
             submitBtn.type = "submit";
             submitBtn.textContent = formMeta.submitButtonLabel || "Submit";
-            submitBtn.classList.add(STYLE_CLASS.BTN, STYLE_CLASS.BTN_PRIMARY);
+            submitBtn.classList.add(STYLE_CLASS.BTN, STYLE_CLASS.BTN_SM, STYLE_CLASS.BTN_OUTLINE_PRIMARY);
             btnContainer.classList.add(STYLE_CLASS.JUSTIFY_CONTENT_END);
             btnContainer.appendChild(submitBtn);
             
@@ -819,7 +849,7 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
 
     if (isFormReadOnly(formMeta)) {
         const viewModeActionDiv = document.createElement(HTML_TAG.DIV);
-        viewModeActionDiv.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_2);
+        viewModeActionDiv.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, STYLE_CLASS.GAP_3);
         appendViewModeActions(viewModeActionDiv, formMeta, formElement);
 
         if (viewModeActionDiv.childNodes.length > 0) {
@@ -872,7 +902,7 @@ function setupFormBody(cardBody, formMeta) {
  * @param {*} cardFooter 
  * @param {*} formMeta 
  */
-function setupFormFooter(cardFooter, formMeta) {
+function setupFormFooter(cardFooter, formMeta, formElement) {
 
     const fragment = document.createElement('div');
     fragment.id = cardFooter.id + "-item"
@@ -887,6 +917,16 @@ function setupFormFooter(cardFooter, formMeta) {
             action.form = formMeta.id
             addAction(action, fragment);
         })
+    }
+
+    const hasCancelAction = Array.isArray(formMeta.actions)
+        && formMeta.actions.some((action) => {
+            const actionText = String(action?.text || '').trim().toLowerCase();
+            return action?.type === 'cancel' || actionText === 'cancel';
+        });
+
+    if (!isFormReadOnly(formMeta) && !hasCancelAction) {
+        appendDefaultCancelButton(fragment, formElement, formMeta);
     }
 
     // removing placeholder
@@ -925,8 +965,9 @@ function addAction(action, addTo) {
         // if action.element.color is provided and valid it is good to go
         //  else defaulting element type to DEFAULT_ACTION_ELEMENT_COLOR
         action.element.color =
-            (action.element.color && STYLE_CLASS.SUPPORTED_ACTION_ELEMENT_COLORS.includes(action.element.color)) ?
-                action.element.color : STYLE_CLASS.DEFAULT_ACTION_ELEMENT_COLOR
+            (action.element.color && STYLE_CLASS.SUPPORTED_ACTION_ELEMENT_COLORS.includes(action.element.color))
+                ? action.element.color
+                : (action.type === 'submit' ? 'primary' : STYLE_CLASS.DEFAULT_ACTION_ELEMENT_COLOR)
 
         // if action.element.variant is provided and valid it is good to go
         //  else defaulting element type to DEFAULT_ACTION_ELEMENT_VARIANT
@@ -985,7 +1026,7 @@ function addAction(action, addTo) {
             actionElement.setAttribute('form', action.form)
         }
 
-        if (action.icon) {
+        if (action.icon && action.type !== 'submit') {
             const actionElementIcon = document.createElement('i')
             actionElementIcon.classList.add(...["fa-fw"])
             actionElementIcon.className += (" " + action.icon)
