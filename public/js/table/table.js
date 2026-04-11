@@ -1317,6 +1317,34 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     header.appendChild(titleWrapper);
     header.appendChild(metaWrapper);
     header.appendChild(closeButton);
+
+    const displayBy = getNestedDetailValue(data, [
+        ['detail_summary', 'user_name'],
+        ['updater', 'name'],
+        ['updatedBy', 'name'],
+        ['updated_by_user', 'name'],
+        ['updated_by_name'],
+        ['creator', 'name'],
+        ['createdBy', 'name'],
+        ['created_by_user', 'name'],
+        ['created_by_name'],
+    ]);
+    const displayAt = getNestedDetailValue(data, [
+        ['detail_summary', 'display_datetime'],
+        ['updated_at'],
+        ['updatedAt'],
+        ['created_at'],
+        ['createdAt'],
+    ]);
+
+    if (displayBy || displayAt) {
+        metaUser.textContent = displayBy || '-';
+        metaDate.textContent = displayAt || '-';
+        metaUser.style.display = 'block';
+        metaDate.style.display = 'block';
+        metaWrapper.appendChild(metaUser);
+        metaWrapper.appendChild(metaDate);
+    }
     
     // Content container - using Bootstrap classes
     const contentContainer = document.createElement('div');
@@ -1381,35 +1409,6 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                 }
             }
 
-            if (form && detailConfig.formSchemaUid) {
-                const displayBy = getNestedDetailValue(data, [
-                    ['detail_summary', 'user_name'],
-                    ['updater', 'name'],
-                    ['updatedBy', 'name'],
-                    ['updated_by_user', 'name'],
-                    ['updated_by_name'],
-                    ['creator', 'name'],
-                    ['createdBy', 'name'],
-                    ['created_by_user', 'name'],
-                    ['created_by_name'],
-                ]);
-                const displayAt = getNestedDetailValue(data, [
-                    ['detail_summary', 'display_datetime'],
-                    ['updated_at'],
-                    ['updatedAt'],
-                    ['created_at'],
-                    ['createdAt'],
-                ]);
-
-                if (displayBy || displayAt) {
-                    metaUser.textContent = displayBy || '-';
-                    metaDate.textContent = displayAt || '-';
-                    metaUser.style.display = 'block';
-                    metaDate.style.display = 'block';
-                    metaWrapper.appendChild(metaUser);
-                    metaWrapper.appendChild(metaDate);
-                }
-            }
             if (typeof setupCoreFormElement === 'function') {
                 setupCoreFormElement();
             }
