@@ -160,6 +160,10 @@ class UserInterfaceSeeder extends BaseSeeder
         'table_schemas' => [
             'fields' => [],
             'meta_fields' =>[]
+        ],
+        'form_schemas' => [
+            'fields' => [],
+            'meta_fields' =>[]
         ]
     ];
     /**
