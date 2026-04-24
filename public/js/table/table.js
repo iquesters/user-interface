@@ -460,18 +460,17 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
     };
 }
 
-async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.form') {
-    const urlParts = ['/view', formSchemaId];
+async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.lab-form') {
+    const payload = {
+        schema_id: formSchemaId
+    };
+
     if (entityUid) {
-        urlParts.push(entityUid);
+        payload.entity_uid = entityUid;
     }
 
-    const endpoint = urlParts.join('/');
-    
-    const response = await apiClient.get(endpoint, {
-        ajax: true,
-        component: componentName
-    });
+    const endpoint = `/api/components/${encodeURIComponent(componentName)}`;
+    const response = await apiClient.post(endpoint, { payload });
 
     if (!response.success) {
         return {
@@ -489,7 +488,8 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
     if (response.data?.html) {
         return {
             success: true,
-            html: response.data.html
+            html: response.data.html,
+            component: response.data.component || null
         };
     }
 
@@ -1374,7 +1374,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
             result = await fetchHtmlComponent(
                 detailConfig.formSchemaUid,
                 data.uid, 
-                'userinterface::components.form'
+                'userinterface::components.lab-form'
             );
         } 
         // Priority 3: No configuration found

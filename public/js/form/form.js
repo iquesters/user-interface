@@ -217,7 +217,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
 
     detailContainer.innerHTML = getInlineLoaderHtml();
 
-    const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.form');
+    const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.lab-form');
 
     if (!result?.success || !result?.html) {
         detailContainer.innerHTML = `

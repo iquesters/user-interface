@@ -64,20 +64,22 @@ Route::prefix('api')
 });
 
 
-Route::middleware(['api','auth:sanctum'])->group(function () {
-    // Route::get('api/auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
-    //     ->name('auth.table');
+Route::prefix('api')
+    ->middleware([
+        'api',
+        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
+        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+        'auth:sanctum',
+    ])
+    ->group(function () {
+        Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
+            ->name('auth.form');
 
-    Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
-        ->name('auth.form');
+        Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
 
-    Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
-
-    // Route::get('api/entity/list/{entity_name}', [DynamicEntityController::class, 'list']);
-    // Route::get('api/entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show']);
-
-    Route::get('api/hola/{form_schema_id}/{entity_uid?}', [UIController::class, 'getHtmlComponent']);
-});
+        Route::post('components/{component}', [UIController::class, 'getHtmlComponent'])
+            ->name('api.components.show');
+    });
 
 
 // Route::get('form/{slug}', [FormController::class, 'show']);
