@@ -398,6 +398,13 @@ async function setupForm(formElement) {
         schemaMeta = await getFormSchema(formElement.id)
     }
 
+    if (!schemaMeta) {
+        
+        handleSchemaNotFound(formElement);
+        // break the code
+        return;
+    }
+
     const formMeta = mergeFormConfigs(
         DEFAULT_FORM_CONFIG,
         schemaMeta,
@@ -405,12 +412,6 @@ async function setupForm(formElement) {
     );
 
     console.log("formMeta>>>>>>>>>>>", formMeta)
-    if (!schemaMeta) {
-        
-        handleSchemaNotFound(formElement);
-        // break the code
-        return;
-    }
 
 
     //Skeleton remove

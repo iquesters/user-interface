@@ -100,6 +100,8 @@ class EntityCache {
 
 const entityCaches = new Map();
 const inboxViewStates = new Map();
+// In-memory cache only: reused while the current page stays open.
+const detailComponentTemplateCache = new Map();
 
 function clearTableCache(tableElement) {
     const sourceTable = tableElement?.__sourceTable || tableElement;
@@ -460,7 +462,55 @@ async function fetchEntityData(entity, offset = 0, length = 50) {
     };
 }
 
+function isReusableDetailComponent(componentName) {
+    return componentName === 'userinterface::components.lab-form';
+}
+
+function getReusableDetailComponentCacheKey(formSchemaId, componentName) {
+    return `${componentName}::${formSchemaId || ''}`;
+}
+
+function hydrateReusableDetailComponentHtml(templateHtml, formSchemaId, entityUid = null) {
+    if (!templateHtml) {
+        return '';
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = templateHtml.trim();
+
+    const form = template.content.querySelector('.shoz-form');
+    if (form) {
+        if (formSchemaId) {
+            form.id = formSchemaId;
+        }
+
+        if (entityUid) {
+            form.dataset.entityUid = entityUid;
+            form.setAttribute('data-entity-uid', entityUid);
+        } else {
+            delete form.dataset.entityUid;
+            form.removeAttribute('data-entity-uid');
+        }
+    }
+
+    return template.innerHTML;
+}
+
 async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.lab-form') {
+    const reusableCacheKey = getReusableDetailComponentCacheKey(formSchemaId, componentName);
+    // Reuse the cached template and only patch row-specific values such as entity uid.
+    if (isReusableDetailComponent(componentName) && detailComponentTemplateCache.has(reusableCacheKey)) {
+        return {
+            success: true,
+            html: hydrateReusableDetailComponentHtml(
+                detailComponentTemplateCache.get(reusableCacheKey),
+                formSchemaId,
+                entityUid
+            ),
+            component: componentName
+        };
+    }
+
     const payload = {
         schema_id: formSchemaId
     };
@@ -486,6 +536,10 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
 
     // Handle different response types
     if (response.data?.html) {
+        if (isReusableDetailComponent(componentName)) {
+            detailComponentTemplateCache.set(reusableCacheKey, response.data.html);
+        }
+
         return {
             success: true,
             html: response.data.html,
