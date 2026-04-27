@@ -23,7 +23,8 @@
         
         {{-- 
             header-left: replaces inline style="min-width: 250px".
-            No min-width rule needed in CSS — layout works via flexbox naturally.
+            min-width: 250px is defined in 4-userinterface-lg.css under @media (min-width: 992px).
+
         --}}
         <div class="d-flex align-items-center py-2 header-left">
 
@@ -68,7 +69,8 @@
 
         {{-- 
             header-right: replaces inline style="min-width: 250px".
-            No min-width rule needed in CSS — layout works via flexbox naturally.
+            min-width: 250px is defined in 4-userinterface-lg.css under @media (min-width: 992px).
+
         --}}
         <div class="d-flex align-items-center justify-content-end gap-2 header-right">
             {{-- User avatar / profile dropdown --}}
