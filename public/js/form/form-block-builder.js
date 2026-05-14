@@ -47,11 +47,19 @@ async function setupFormBlock(formCol, formMeta) {
         console.log("formData = " + formData)
 
         const entityUId = form.dataset.entityUid;
-        let entityData = null;
+        let entityData = form.__entityDataCache || null;
 
-        if (formMeta.entity && entityUId) {
+        if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
+            entityData = formData;
+        }
+
+        if (!entityData && formMeta.entity && entityUId) {
             const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
             entityData = getentityResponse?.data || null;
+        }
+
+        if (entityData) {
+            form.__entityDataCache = entityData;
         }
 
         // add fields to form

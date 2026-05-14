@@ -207,6 +207,13 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     const entityUid = formElement.dataset.entityUid;
     const route = buildFormRoute(formMeta.id, entityUid, nextMode);
     const detailContainer = formElement.closest('.inbox-detail-content');
+    const currentFormData = formElement.__entityDataCache || (() => {
+        try {
+            return formElement.dataset.formData ? JSON.parse(formElement.dataset.formData) : null;
+        } catch (error) {
+            return null;
+        }
+    })();
 
     if (!detailContainer || !entityUid) {
         if (route) {
@@ -233,6 +240,11 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     const nextForm = detailContainer.querySelector('.shoz-form');
     if (!nextForm) {
         return;
+    }
+
+    if (currentFormData && typeof currentFormData === 'object') {
+        nextForm.dataset.formData = JSON.stringify(currentFormData);
+        nextForm.__entityDataCache = currentFormData;
     }
 
     nextForm.dataset.formMode = nextMode;
@@ -642,11 +654,19 @@ async function renderFormForModal(formElement, formMeta) {
     }
 
     const entityUId = formElement.dataset.entityUid;
-    let entityData = null;
+    let entityData = formElement.__entityDataCache || null;
 
-    if (formMeta.entity && entityUId) {
+    if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
+        entityData = formData;
+    }
+
+    if (!entityData && formMeta.entity && entityUId) {
         const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
         entityData = getentityResponse?.data || null;
+    }
+
+    if (entityData) {
+        formElement.__entityDataCache = entityData;
     }
 
     if (Array.isArray(formMeta.fields)) {

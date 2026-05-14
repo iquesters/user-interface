@@ -102,6 +102,7 @@ const entityCaches = new Map();
 const inboxViewStates = new Map();
 // In-memory cache only: reused while the current page stays open.
 const detailComponentTemplateCache = new Map();
+const componentTemplateCache = new Map();
 
 function clearTableCache(tableElement) {
     const sourceTable = tableElement?.__sourceTable || tableElement;
@@ -186,7 +187,7 @@ class ViewModeManager {
         }
     }
     
-    toggleViewMode() {
+    async toggleViewMode() {
         // Toggle the view mode
         const newMode = this.currentViewMode === VIEW_MODE_TABLE 
             ? VIEW_MODE_INBOX 
@@ -216,10 +217,10 @@ class ViewModeManager {
         document.dispatchEvent(event);
         
         // Re-render the table with new view mode
-        this.reRenderView();
+        await this.reRenderView();
     }
-    
-    reRenderView() {
+
+    async reRenderView() {
         console.log('🔧 Starting view re-render...');
         
         // Destroy existing DataTable if it exists
@@ -284,6 +285,7 @@ class ViewModeManager {
         
         // Re-render based on current view mode
         if (this.currentViewMode === VIEW_MODE_INBOX) {
+            await ensureSummaryComponentTemplate(this.schema);
             renderInboxView(
                 this.tableElement, 
                 this.cache, 
@@ -407,6 +409,7 @@ async function initLabTable(tableElement) {
     removeTableSkeleton(tableElement);
     // Render initial view based on stored preference
     if (viewManager.currentViewMode === VIEW_MODE_INBOX) {
+        await ensureSummaryComponentTemplate(schema);
         renderInboxView(tableElement, cache, mergedConfig, entity, schema);
     } else {
         renderLazyDataTable(tableElement, cache, mergedConfig, entity);
@@ -470,6 +473,10 @@ function getReusableDetailComponentCacheKey(formSchemaId, componentName) {
     return `${componentName}::${formSchemaId || ''}`;
 }
 
+function getComponentTemplateCacheKey(componentName, schemaId = null) {
+    return `${componentName}::${schemaId || ''}`;
+}
+
 function hydrateReusableDetailComponentHtml(templateHtml, formSchemaId, entityUid = null) {
     if (!templateHtml) {
         return '';
@@ -498,7 +505,7 @@ function hydrateReusableDetailComponentHtml(templateHtml, formSchemaId, entityUi
 
 async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName = 'userinterface::components.lab-form') {
     const reusableCacheKey = getReusableDetailComponentCacheKey(formSchemaId, componentName);
-    // Reuse the cached template and only patch row-specific values such as entity uid.
+
     if (isReusableDetailComponent(componentName) && detailComponentTemplateCache.has(reusableCacheKey)) {
         return {
             success: true,
@@ -511,46 +518,94 @@ async function fetchHtmlComponent(formSchemaId, entityUid = null, componentName 
         };
     }
 
-    const payload = {
-        schema_id: formSchemaId
-    };
+    const template = await fetchComponentTemplate(componentName, formSchemaId);
 
-    if (entityUid) {
-        payload.entity_uid = entityUid;
+    if (!template.success || !template.html) {
+        return template;
     }
 
-    const endpoint = `/api/components/${encodeURIComponent(componentName)}`;
-    const response = await apiClient.post(endpoint, { payload });
-
-    if (!response.success) {
-        return {
-            success: false,
-            error: response.message || 'Failed to fetch component'
-        };
-    }
-
-    // Handle ui_context for redirects, modals, etc.
-    if (response.ui_context) {
-        handleUIContext(response.ui_context);
-    }
-
-    // Handle different response types
-    if (response.data?.html) {
-        if (isReusableDetailComponent(componentName)) {
-            detailComponentTemplateCache.set(reusableCacheKey, response.data.html);
-        }
-
-        return {
-            success: true,
-            html: response.data.html,
-            component: response.data.component || null
-        };
+    if (isReusableDetailComponent(componentName)) {
+        detailComponentTemplateCache.set(reusableCacheKey, template.html);
     }
 
     return {
         success: true,
-        html: response.data || ''
+        html: hydrateReusableDetailComponentHtml(template.html, formSchemaId, entityUid),
+        component: template.component || componentName,
     };
+}
+
+async function fetchComponentTemplate(componentName, schemaId = null) {
+    const cacheKey = getComponentTemplateCacheKey(componentName, schemaId);
+
+    if (componentTemplateCache.has(cacheKey)) {
+        return componentTemplateCache.get(cacheKey);
+    }
+
+    const endpoint = `/api/components/templates/${encodeURIComponent(componentName)}`;
+    const response = await apiClient.get(endpoint);
+
+    if (!response.success || !response.data?.html) {
+        return {
+            success: false,
+            error: response.message || 'Failed to fetch component template',
+        };
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = response.data.html.trim();
+
+    let bindings = {};
+    const bindingScript = template.content.querySelector('script[data-component-bindings]');
+
+    if (bindingScript) {
+        try {
+            bindings = JSON.parse(bindingScript.textContent || '{}');
+        } catch (error) {
+            console.warn('Failed to parse component bindings JSON:', error);
+        }
+
+        bindingScript.remove();
+    }
+
+    const templateResult = {
+        success: true,
+        html: template.innerHTML.trim(),
+        bindings,
+        component: response.data.component || componentName,
+    };
+
+    componentTemplateCache.set(cacheKey, templateResult);
+
+    return templateResult;
+}
+
+function getSummaryComponentTemplateCacheKey(schema = {}, componentName = '') {
+    return `${componentName}::${getComponentSchemaIdentifier(schema) || ''}`;
+}
+
+async function ensureSummaryComponentTemplate(schema = {}) {
+    const summaryComponent = getSchemaConfigValue(schema, ['summary_component', 'summary-component']);
+    if (!summaryComponent) {
+        return null;
+    }
+
+    const cacheKey = getSummaryComponentTemplateCacheKey(schema, summaryComponent);
+    if (componentTemplateCache.has(cacheKey)) {
+        schema.__summaryComponentTemplate = componentTemplateCache.get(cacheKey);
+        return schema.__summaryComponentTemplate;
+    }
+
+    const result = await fetchComponentTemplate(summaryComponent, getComponentSchemaIdentifier(schema));
+
+    if (result.success && result.html) {
+        componentTemplateCache.set(cacheKey, result);
+        schema.__summaryComponentTemplate = result;
+        return result;
+    }
+
+    console.warn(`⚠️ Failed to load summary component template: ${summaryComponent}`, result.error || result.message);
+    return null;
 }
 
 /**
@@ -763,7 +818,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         {
             data: null,
             orderable: false,
-            render: (row) => renderInboxRow(row, columns)
+            render: (row) => renderInboxRow(row, columns, schema)
         }
     ];
     
@@ -790,7 +845,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
             className: 'bg-primary bg-opacity-10'
         },
         ajax: (params, callback) =>
-            handleAjaxFetch(params, callback, cache, entityName, listTable),
+            handleAjaxFetch(params, callback, cache, entityName, listTable, schema),
         initComplete: function (...args) {
             if (typeof dtConfig.initComplete === 'function') {
                 dtConfig.initComplete.apply(this, args);
@@ -798,6 +853,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
 
             styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
+            initializeInboxSummaryComponents(listTable);
         },
         drawCallback: function (...args) {
             if (typeof dtConfig.drawCallback === 'function') {
@@ -806,11 +862,13 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
 
             styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
+            initializeInboxSummaryComponents(listTable);
         },
     });
 
     styleInboxRows(listTable);
     applyInboxStickyStyles(leftPanel);
+    initializeInboxSummaryComponents(listTable);
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);
@@ -1072,7 +1130,7 @@ function applyCompactDataTableControls(container) {
 /**
  * Render inbox row with "Label: Value" in one line (Bootstrap only)
  */
-function renderInboxRow(row, columns) {
+function renderFallbackInboxRow(row, columns) {
     const visibleColumns = columns.filter(
         col =>
             col.visible !== false &&
@@ -1117,6 +1175,215 @@ function renderInboxRow(row, columns) {
                 .join('')}
         </div>
     `;
+}
+
+function getSchemaConfigValue(schema = {}, keys = []) {
+    for (const key of keys) {
+        const topLevelValue = schema?.[key];
+        if (topLevelValue !== undefined && topLevelValue !== null && topLevelValue !== '') {
+            return topLevelValue;
+        }
+
+        const dtValue = schema?.["dt-options"]?.[key];
+        if (dtValue !== undefined && dtValue !== null && dtValue !== '') {
+            return dtValue;
+        }
+    }
+
+    return null;
+}
+
+function getComponentSchemaIdentifier(schema = {}) {
+    return schema?.uid
+        || schema?.id
+        || schema?.slug
+        || schema?.table_schema_id
+        || schema?.entity
+        || null;
+}
+
+function getRowMetaMap(row = {}) {
+    const metaEntries = Array.isArray(row?.meta) ? row.meta : [];
+    return metaEntries.reduce((acc, item) => {
+        const key = item?.meta_key || item?.key;
+        if (key) {
+            acc[key] = item?.meta_value ?? item?.value ?? null;
+        }
+        return acc;
+    }, {});
+}
+
+function getFirstRowValue(row = {}, metaMap = {}, paths = [], fallback = '') {
+    for (const path of paths) {
+        let value = '';
+
+        if (path.startsWith('meta:')) {
+            value = metaMap[path.slice(5)];
+        } else if (path.includes('.')) {
+            value = path.split('.').reduce((acc, key) => acc?.[key], row);
+        } else {
+            value = row?.[path];
+        }
+
+        if (value !== null && value !== undefined && value !== '') {
+            return value;
+        }
+    }
+
+    return fallback;
+}
+
+function getInitialsFromValue(value = '') {
+    const initialSource = String(value || 'U').trim();
+    const parts = initialSource.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) {
+        return 'U';
+    }
+
+    return parts
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('');
+}
+
+function resolveAssetUrl(value = '') {
+    if (!value) {
+        return '';
+    }
+
+    if (/^(https?:)?\/\//.test(value) || String(value).startsWith('data:')) {
+        return value;
+    }
+
+    const normalizedPath = String(value).replace(/^\/+/, '');
+    const origin = window.location.origin.replace(/\/$/, '');
+
+    return `${origin}/${normalizedPath}`;
+}
+
+function applyBindingTransform(value, transformName) {
+    if (!transformName) {
+        return value;
+    }
+
+    switch (transformName) {
+        case 'asset_url':
+            return resolveAssetUrl(value);
+        case 'initials':
+            return getInitialsFromValue(value);
+        default:
+            return value;
+    }
+}
+
+function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
+    const rawValue = getFirstRowValue(
+        row,
+        metaMap,
+        Array.isArray(fieldConfig.paths) ? fieldConfig.paths : [],
+        fieldConfig.fallback ?? ''
+    );
+
+    return applyBindingTransform(rawValue, fieldConfig.transform);
+}
+
+function replaceTemplateTokens(template = '', values = {}) {
+    let output = template;
+
+    Object.entries(values).forEach(([key, value]) => {
+        const token = `__${String(key).toUpperCase()}__`;
+        output = output.replaceAll(token, escapeDetailHtml(value ?? ''));
+    });
+
+    return output;
+}
+
+function renderTemplateBinding(binding = {}, row = {}, metaMap = {}) {
+    const values = {};
+
+    Object.entries(binding.fields || {}).forEach(([fieldName, fieldConfig]) => {
+        values[fieldName] = resolveBindingFieldValue(row, metaMap, fieldConfig);
+    });
+
+    const conditionField = binding.condition;
+    const hasConditionValue = !conditionField || (values[conditionField] !== null && values[conditionField] !== undefined && values[conditionField] !== '');
+    const template = hasConditionValue ? (binding.template || '') : (binding.fallback_template || '');
+
+    return replaceTemplateTokens(template, values);
+}
+
+function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
+    const rows = Array.isArray(binding.rows) ? binding.rows : [];
+    const rowTemplate = binding.row_template || '<div><strong>__LABEL__</strong>: __VALUE__</div>';
+    const renderedRows = rows
+        .map((item) => {
+            const value = getFirstRowValue(row, metaMap, item.paths || [], item.fallback ?? '');
+
+            if (value === null || value === undefined || value === '') {
+                return '';
+            }
+
+            return rowTemplate
+                .replaceAll('__LABEL__', escapeDetailHtml(item.label || ''))
+                .replaceAll('__VALUE__', escapeDetailHtml(value));
+        })
+        .filter(Boolean)
+        .join('');
+
+    if (renderedRows) {
+        return renderedRows;
+    }
+
+    return binding.fallback_template || '';
+}
+
+function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
+    switch (binding.type) {
+        case 'template':
+            return renderTemplateBinding(binding, row, metaMap);
+        case 'key_value_rows':
+            return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'text':
+        default:
+            return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
+    }
+}
+
+function hydrateComponentTemplate(templateHtml, bindings = {}, row = {}) {
+    if (!templateHtml) {
+        return '';
+    }
+
+    const metaMap = getRowMetaMap(row);
+    let hydratedHtml = templateHtml;
+
+    Object.entries(bindings || {}).forEach(([placeholder, binding]) => {
+        hydratedHtml = hydratedHtml.replaceAll(placeholder, renderBindingValue(binding, row, metaMap));
+    });
+
+    return hydratedHtml;
+}
+
+function renderInboxRow(row, columns, schema = {}) {
+    const summaryComponent = getSchemaConfigValue(schema, ['summary_component', 'summary-component']);
+    if (!summaryComponent) {
+        return renderFallbackInboxRow(row, columns);
+    }
+
+    if (schema.__summaryComponentTemplate?.html) {
+        return `
+            <div class="inbox-summary-component">
+                ${hydrateComponentTemplate(
+                    schema.__summaryComponentTemplate.html,
+                    schema.__summaryComponentTemplate.bindings || {},
+                    row
+                )}
+            </div>
+        `;
+    }
+
+    return renderFallbackInboxRow(row, columns);
 }
 
 
@@ -1248,13 +1515,12 @@ function resolveDetailConfig(schema = {}) {
     const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
 
     return {
-        detailsComponent: schema["details-component"]
-            || schema?.["dt-options"]?.["details-component"]
-            || null,
-        formSchemaUid: schema["form-schema-uid"]
-            || schema?.["dt-options"]?.["form-schema-uid"]
+        summaryComponent: getSchemaConfigValue(schema, ['summary_component', 'summary-component']),
+        detailsComponent: getSchemaConfigValue(schema, ['details_component', 'details-component']),
+        formSchemaUid: getSchemaConfigValue(schema, ['form_schema_uid', 'form-schema-uid'])
             || columnWithFormSchema?.["form-schema-uid"]
             || null,
+        componentSchemaId: getComponentSchemaIdentifier(schema),
     };
 }
 
@@ -1410,35 +1676,59 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     rightPanelEle.appendChild(contentContainer);
     
     try {
-        let result;
         const detailConfig = resolveDetailConfig(schema);
-        
-        // Priority 1: Custom details component
+        const detailAttempts = [];
+
         if (detailConfig.detailsComponent) {
-            console.log(`📋 Loading custom component: ${detailConfig.detailsComponent}`);
-            result = await fetchHtmlComponent(
-                detailConfig.formSchemaUid || detailConfig.detailsComponent,
-                data.uid, 
-                detailConfig.detailsComponent
-            );
-        } 
-        // Priority 2: Form schema UID
-        else if (detailConfig.formSchemaUid) {
-            console.log(`📝 Loading form component for UID: ${data.uid}`);
-            result = await fetchHtmlComponent(
-                detailConfig.formSchemaUid,
-                data.uid, 
-                'userinterface::components.lab-form'
-            );
-        } 
-        // Priority 3: No configuration found
-        else {
+            detailAttempts.push({
+                type: 'component',
+                componentName: detailConfig.detailsComponent,
+                schemaId: detailConfig.componentSchemaId,
+            });
+        }
+
+        if (detailConfig.formSchemaUid) {
+            detailAttempts.push({
+                type: 'form',
+                componentName: 'userinterface::components.lab-form',
+                schemaId: detailConfig.formSchemaUid,
+            });
+        }
+
+        if (!detailAttempts.length) {
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             return;
         }
-        
-        // Handle successful response
-        if (result.success && result.html) {
+
+        let rendered = false;
+
+        for (const attempt of detailAttempts) {
+            console.log(`📋 Loading detail ${attempt.type}: ${attempt.componentName}`);
+
+            let result = null;
+
+            if (attempt.type === 'component') {
+                const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
+
+                result = template.success
+                    ? {
+                        success: true,
+                        html: hydrateComponentTemplate(template.html, template.bindings || {}, data),
+                    }
+                    : template;
+            } else {
+                result = await fetchHtmlComponent(
+                    attempt.schemaId,
+                    data.uid,
+                    attempt.componentName
+                );
+            }
+
+            if (!result.success || !result.html) {
+                console.warn(`⚠️ Failed detail ${attempt.type}: ${attempt.componentName}`, result.error || result.message);
+                continue;
+            }
+
             contentContainer.innerHTML = result.html;
             
             // Ensure loaded content respects container width using Bootstrap classes
@@ -1450,16 +1740,16 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                 }
             }
             
-            // Initialize forms if present
             const form = contentContainer.querySelector('.shoz-form');
             if (form && typeof setupForm === 'function') {
+                form.dataset.formData = JSON.stringify(data);
+                form.__entityDataCache = data;
                 form.dataset.formMode = 'view';
                 const formMeta = await setupForm(form);
 
                 if (!formMeta && form.dataset.schemaState === 'not-found') {
-                    contentContainer.innerHTML = renderFallbackDetailComponent(data);
-                    initializeDetailViewScripts(contentContainer);
-                    return;
+                    console.warn(`⚠️ Detail ${attempt.type} resolved to a missing form schema`);
+                    continue;
                 }
             }
 
@@ -1467,17 +1757,22 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                 setupCoreFormElement();
             }
             
-            // Re-initialize scripts
             initializeDetailViewScripts(contentContainer);
             
             console.log(`✅ Detail component loaded successfully for UID: ${data.uid}`);
-        } else {
-            showDetailError(contentContainer, result.error || 'Failed to load component content');
+            rendered = true;
+            break;
+        }
+
+        if (!rendered) {
+            contentContainer.innerHTML = renderFallbackDetailComponent(data);
+            initializeDetailViewScripts(contentContainer);
         }
         
     } catch (error) {
         console.error('❌ Error loading detail component:', error);
-        showDetailError(contentContainer, error.message);
+        contentContainer.innerHTML = renderFallbackDetailComponent(data);
+        initializeDetailViewScripts(contentContainer);
     }
 }
 
@@ -1494,7 +1789,25 @@ function showDetailError(container, message) {
     `;
 }
 
+function initializeInboxSummaryComponents(container) {
+    const summaryNodes = container.querySelectorAll('.inbox-summary-component:not([data-summary-initialized="true"])');
+    summaryNodes.forEach((node) => {
+        node.dataset.summaryInitialized = 'true';
+        executeComponentScripts(node);
+    });
+}
+
 function initializeDetailViewScripts(container) {
+    executeComponentScripts(container);
+    
+    const event = new CustomEvent('inboxDetailLoaded', { 
+        bubbles: true,
+        detail: { container }
+    });
+    container.dispatchEvent(event);
+}
+
+function executeComponentScripts(container) {
     const scripts = container.querySelectorAll('script');
     scripts.forEach(oldScript => {
         const newScript = document.createElement('script');
@@ -1504,12 +1817,6 @@ function initializeDetailViewScripts(container) {
         newScript.textContent = oldScript.textContent;
         oldScript.parentNode.replaceChild(newScript, oldScript);
     });
-    
-    const event = new CustomEvent('inboxDetailLoaded', { 
-        bubbles: true,
-        detail: { container }
-    });
-    container.dispatchEvent(event);
 }
 
 function setupResizer(resizer, leftPanel, rightPanel, container) {
@@ -1684,7 +1991,7 @@ function renderCell(col, row, rootFormSchemaUid) {
 // ---------------------------
 // 🔁 ENHANCED AJAX FETCH HANDLER
 // ---------------------------
-async function handleAjaxFetch(params, callback, cache, entityName, tableElement) {
+async function handleAjaxFetch(params, callback, cache, entityName, tableElement, schema = null) {
     const start = params.start || 0;
     const length = params.length || cache.pageSize;
     const page = Math.floor(start / length) + 1;
@@ -1709,7 +2016,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
         });
 
         if (cache.shouldPrefetch(start, length)) {
-            prefetchNextBatch(cache, entityName, start, length);
+            prefetchNextBatch(cache, entityName, start, length, schema);
         }
         
         return;
@@ -1732,7 +2039,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
         });
 
         if (cache.shouldPrefetch(start, length)) {
-            prefetchNextBatch(cache, entityName, start, length);
+            prefetchNextBatch(cache, entityName, start, length, schema);
         }
     } else {
         callback({
@@ -1748,7 +2055,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
 // ---------------------------
 // 🔮 PREDICTIVE PREFETCH
 // ---------------------------
-async function prefetchNextBatch(cache, entityName, currentStart, currentLength) {
+async function prefetchNextBatch(cache, entityName, currentStart, currentLength, schema = null) {
     const nextOffset = currentStart + currentLength;
     const prefetchKey = `${entityName}-${nextOffset}`;
 

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
 use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
@@ -77,8 +78,9 @@ Route::prefix('api')
 
         Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
 
-        Route::post('components/{component}', [UIController::class, 'getHtmlComponent'])
-            ->name('api.components.show');
+        Route::get('components/templates/{component}', [ComponentTemplateController::class, 'show'])
+            ->name('api.components.template');
+
     });
 
 
