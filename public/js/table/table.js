@@ -285,13 +285,15 @@ class ViewModeManager {
         // Re-render based on current view mode
         if (this.currentViewMode === VIEW_MODE_INBOX) {
             renderInboxView(
-                this.tableElement, 
-                this.cache, 
-                this.dtConfig, 
-                this.entity, 
+                this.tableElement,
+                this.cache,
+                this.dtConfig,
+                this.entity,
                 this.schema,
                 targetParent  // Pass the correct parent
-            );
+            ).catch((error) => {
+                console.error('Failed to render inbox view:', error);
+            });
         } else {
             // Make sure table is visible and in DOM for table mode
             this.tableElement.style.display = '';
@@ -407,7 +409,12 @@ async function initLabTable(tableElement) {
     removeTableSkeleton(tableElement);
     // Render initial view based on stored preference
     if (viewManager.currentViewMode === VIEW_MODE_INBOX) {
-        renderInboxView(tableElement, cache, mergedConfig, entity, schema);
+        await loadSchemaComponentTemplate(
+            schema,
+            ['summary_component', 'summary-component'],
+            '__summaryComponentTemplate'
+        );
+        await renderInboxView(tableElement, cache, mergedConfig, entity, schema);
     } else {
         renderLazyDataTable(tableElement, cache, mergedConfig, entity);
     }
@@ -658,10 +665,16 @@ function styleInboxRows(tableElement) {
 // ---------------------------
 // 📧 INBOX VIEW RENDERING
 // ---------------------------
-function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targetParent = null) {
+async function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targetParent = null) {
     console.log('📧 renderInboxView called for:', entityName);
-    
+
     const { columns = [] } = dtConfig;
+
+    await loadSchemaComponentTemplate(
+        schema,
+        ['summary_component', 'summary-component'],
+        '__summaryComponentTemplate'
+    );
     
     // Create inbox container with proper Bootstrap classes
     const container = document.createElement('div');
@@ -763,7 +776,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         {
             data: null,
             orderable: false,
-            render: (row) => renderInboxRow(row, columns)
+            render: (row) => renderInboxRow(row, columns, schema)
         }
     ];
     
@@ -1072,7 +1085,7 @@ function applyCompactDataTableControls(container) {
 /**
  * Render inbox row with "Label: Value" in one line (Bootstrap only)
  */
-function renderInboxRow(row, columns) {
+function renderFallbackInboxRow(row, columns) {
     const visibleColumns = columns.filter(
         col =>
             col.visible !== false &&
@@ -1117,6 +1130,355 @@ function renderInboxRow(row, columns) {
                 .join('')}
         </div>
     `;
+}
+
+const DEFAULT_ENTITY_COMPONENTS = {
+    completed_jobs: {
+        summary_component: 'userinterface::components.lab-completed-job-summary',
+        details_component: 'userinterface::components.lab-completed-job-details',
+    },
+};
+
+function normalizeEntityConfigKey(value = '') {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function getDefaultSchemaConfigValue(schema = {}, keys = []) {
+    const entityKey = normalizeEntityConfigKey(schema?.entity || schema?.table || schema?.name);
+    const defaults = DEFAULT_ENTITY_COMPONENTS[entityKey];
+
+    if (!defaults) {
+        return null;
+    }
+
+    for (const key of keys) {
+        const normalizedKey = normalizeEntityConfigKey(key);
+        const value = defaults[key] ?? defaults[normalizedKey];
+
+        if (value !== undefined && value !== null && value !== '') {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function getSchemaConfigValue(schema = {}, keys = []) {
+    for (const key of keys) {
+        const topLevelValue = schema?.[key];
+        if (topLevelValue !== undefined && topLevelValue !== null && topLevelValue !== '') {
+            return topLevelValue;
+        }
+
+        const dtValue = schema?.["dt-options"]?.[key];
+        if (dtValue !== undefined && dtValue !== null && dtValue !== '') {
+            return dtValue;
+        }
+    }
+
+    return getDefaultSchemaConfigValue(schema, keys);
+}
+
+function getComponentSchemaIdentifier(schema = {}) {
+    return schema?.uid
+        || schema?.id
+        || schema?.slug
+        || schema?.table_schema_id
+        || schema?.entity
+        || null;
+}
+
+function getRowMetaMap(row = {}) {
+    const metaEntries = Array.isArray(row?.meta) ? row.meta : [];
+    return metaEntries.reduce((acc, item) => {
+        const key = item?.meta_key || item?.key;
+        if (key) {
+            acc[key] = item?.meta_value ?? item?.value ?? null;
+        }
+        return acc;
+    }, {});
+}
+
+function getFirstRowValue(row = {}, metaMap = {}, paths = [], fallback = '') {
+    for (const path of paths) {
+        let value = '';
+
+        if (path.startsWith('meta:')) {
+            value = metaMap[path.slice(5)];
+        } else if (path.includes('.')) {
+            value = path.split('.').reduce((acc, key) => acc?.[key], row);
+        } else {
+            value = row?.[path];
+        }
+
+        if (value !== null && value !== undefined && value !== '') {
+            return value;
+        }
+    }
+
+    return fallback;
+}
+
+function getInitialsFromValue(value = '') {
+    const initialSource = String(value || 'U').trim();
+    const parts = initialSource.split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) {
+        return 'U';
+    }
+
+    return parts
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('');
+}
+
+function resolveAssetUrl(value = '') {
+    if (!value) {
+        return '';
+    }
+
+    if (/^(https?:)?\/\//.test(value) || String(value).startsWith('data:')) {
+        return value;
+    }
+
+    const normalizedPath = String(value).replace(/^\/+/, '');
+    const origin = window.location.origin.replace(/\/$/, '');
+
+    return `${origin}/${normalizedPath}`;
+}
+
+function applyBindingTransform(value, transformName) {
+    if (!transformName) {
+        return value;
+    }
+
+    switch (transformName) {
+        case 'asset_url':
+            return resolveAssetUrl(value);
+        case 'initials':
+            return getInitialsFromValue(value);
+        default:
+            return value;
+    }
+}
+
+function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
+    const rawValue = getFirstRowValue(
+        row,
+        metaMap,
+        Array.isArray(fieldConfig.paths) ? fieldConfig.paths : [],
+        fieldConfig.fallback ?? ''
+    );
+
+    return applyBindingTransform(rawValue, fieldConfig.transform);
+}
+
+function replaceTemplateTokens(template = '', values = {}) {
+    let output = template;
+
+    Object.entries(values).forEach(([key, value]) => {
+        const token = `__${String(key).toUpperCase()}__`;
+        output = output.replaceAll(token, escapeDetailHtml(value ?? ''));
+    });
+
+    return output;
+}
+
+function parseBindingDateValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    const normalizedValue = String(value).trim().replace(' ', 'T');
+    const date = new Date(normalizedValue);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDurationMilliseconds(milliseconds) {
+    if (!Number.isFinite(milliseconds) || milliseconds < 0) {
+        return '';
+    }
+
+    const totalSeconds = Math.round(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const parts = [];
+
+    if (hours) {
+        parts.push(`${hours} hr`);
+    }
+
+    if (minutes) {
+        parts.push(`${minutes} min`);
+    }
+
+    if (seconds || parts.length === 0) {
+        parts.push(`${seconds} sec`);
+    }
+
+    return parts.join(' ');
+}
+
+function renderDurationBinding(binding = {}, row = {}, metaMap = {}) {
+    const directValue = getFirstRowValue(row, metaMap, binding.paths || [], '');
+    if (directValue !== '') {
+        return escapeDetailHtml(directValue);
+    }
+
+    const startValue = getFirstRowValue(row, metaMap, binding.start_paths || [], '');
+    const endValue = getFirstRowValue(row, metaMap, binding.end_paths || [], '');
+    const startDate = parseBindingDateValue(startValue);
+    const endDate = parseBindingDateValue(endValue);
+
+    if (!startDate || !endDate) {
+        return escapeDetailHtml(binding.fallback ?? '');
+    }
+
+    return escapeDetailHtml(formatDurationMilliseconds(endDate.getTime() - startDate.getTime()) || binding.fallback || '');
+}
+
+function renderTemplateBinding(binding = {}, row = {}, metaMap = {}) {
+    const values = {};
+
+    Object.entries(binding.fields || {}).forEach(([fieldName, fieldConfig]) => {
+        values[fieldName] = resolveBindingFieldValue(row, metaMap, fieldConfig);
+    });
+
+    const conditionField = binding.condition;
+    const hasConditionValue = !conditionField || (values[conditionField] !== null && values[conditionField] !== undefined && values[conditionField] !== '');
+    const template = hasConditionValue ? (binding.template || '') : (binding.fallback_template || '');
+
+    return replaceTemplateTokens(template, values);
+}
+
+function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
+    const rows = Array.isArray(binding.rows) ? binding.rows : [];
+    const rowTemplate = binding.row_template || '<div><strong>__LABEL__</strong>: __VALUE__</div>';
+    const renderedRows = rows
+        .map((item) => {
+            const value = getFirstRowValue(row, metaMap, item.paths || [], item.fallback ?? '');
+
+            if (value === null || value === undefined || value === '') {
+                return '';
+            }
+
+            return rowTemplate
+                .replaceAll('__LABEL__', escapeDetailHtml(item.label || ''))
+                .replaceAll('__VALUE__', escapeDetailHtml(value));
+        })
+        .filter(Boolean)
+        .join('');
+
+    if (renderedRows) {
+        return renderedRows;
+    }
+
+    return binding.fallback_template || '';
+}
+
+function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
+    switch (binding.type) {
+        case 'template':
+            return renderTemplateBinding(binding, row, metaMap);
+        case 'key_value_rows':
+            return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'duration':
+            return renderDurationBinding(binding, row, metaMap);
+        case 'text':
+        default:
+            return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
+    }
+}
+
+function hydrateComponentTemplate(templateHtml, bindings = {}, row = {}) {
+    if (!templateHtml) {
+        return '';
+    }
+
+    const metaMap = getRowMetaMap(row);
+    let hydratedHtml = templateHtml;
+
+    Object.entries(bindings || {}).forEach(([placeholder, binding]) => {
+        hydratedHtml = hydratedHtml.replaceAll(placeholder, renderBindingValue(binding, row, metaMap));
+    });
+
+    return hydratedHtml;
+}
+
+function parseComponentTemplateHtml(html = '') {
+    const template = document.createElement('template');
+    template.innerHTML = String(html || '').trim();
+
+    let bindings = {};
+    const bindingsScript = template.content.querySelector('script[data-component-bindings]');
+
+    if (bindingsScript) {
+        try {
+            bindings = JSON.parse(bindingsScript.textContent || '{}');
+        } catch (error) {
+            console.warn('Failed to parse component bindings:', error);
+        }
+
+        bindingsScript.remove();
+    }
+
+    return {
+        html: template.innerHTML,
+        bindings,
+    };
+}
+
+async function loadSchemaComponentTemplate(schema = {}, configKeys = [], targetProperty) {
+    const componentName = getSchemaConfigValue(schema, configKeys);
+
+    if (!componentName || schema?.[targetProperty]?.html) {
+        return;
+    }
+
+    const schemaIdentifier = getComponentSchemaIdentifier(schema) || componentName;
+    let result;
+
+    try {
+        result = await fetchHtmlComponent(schemaIdentifier, null, componentName);
+    } catch (error) {
+        console.warn(`Failed to load component template: ${componentName}`, error);
+        return;
+    }
+
+    if (!result?.success || !result?.html) {
+        console.warn(`Failed to load component template: ${componentName}`, result?.error);
+        return;
+    }
+
+    schema[targetProperty] = parseComponentTemplateHtml(result.html);
+}
+
+function renderInboxRow(row, columns, schema = {}) {
+    const summaryComponent = getSchemaConfigValue(schema, ['summary_component', 'summary-component']);
+    if (!summaryComponent) {
+        return renderFallbackInboxRow(row, columns);
+    }
+
+    if (schema.__summaryComponentTemplate?.html) {
+        return `
+            <div class="inbox-summary-component">
+                ${hydrateComponentTemplate(
+                    schema.__summaryComponentTemplate.html,
+                    schema.__summaryComponentTemplate.bindings || {},
+                    row
+                )}
+            </div>
+        `;
+    }
+
+    return renderFallbackInboxRow(row, columns);
 }
 
 
@@ -1248,9 +1610,7 @@ function resolveDetailConfig(schema = {}) {
     const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
 
     return {
-        detailsComponent: schema["details-component"]
-            || schema?.["dt-options"]?.["details-component"]
-            || null,
+        detailsComponent: getSchemaConfigValue(schema, ['details_component', 'details-component']),
         formSchemaUid: schema["form-schema-uid"]
             || schema?.["dt-options"]?.["form-schema-uid"]
             || columnWithFormSchema?.["form-schema-uid"]
@@ -1439,7 +1799,14 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         
         // Handle successful response
         if (result.success && result.html) {
-            contentContainer.innerHTML = result.html;
+            let componentHtml = result.html;
+
+            if (detailConfig.detailsComponent) {
+                const parsedTemplate = parseComponentTemplateHtml(result.html);
+                componentHtml = hydrateComponentTemplate(parsedTemplate.html, parsedTemplate.bindings, data);
+            }
+
+            contentContainer.innerHTML = componentHtml;
             
             // Ensure loaded content respects container width using Bootstrap classes
             const contentChildren = contentContainer.children;
