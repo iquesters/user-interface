@@ -5,7 +5,7 @@
     'class' => ''
 ])
 
-<span {{ $attributes->merge(['class' => "badge text-bg-$variant $class"]) }}>
+<span {{ $attributes->merge(['class' => "badge fw-normal text-bg-$variant $class"]) }}>
 
     @if($icon)
         <i class="{{ $icon }} {{ $text ? 'me-1' : '' }}"></i>

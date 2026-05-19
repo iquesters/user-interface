@@ -1326,6 +1326,16 @@ function formatDurationMilliseconds(milliseconds) {
     return parts.join(' ');
 }
 
+function formatTimelineDuration(milliseconds) {
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+        return '0 sec';
+    }
+
+    const seconds = Math.round(milliseconds / 1000);
+
+    return `${seconds} sec`;
+}
+
 function renderDurationBinding(binding = {}, row = {}, metaMap = {}) {
     const directValue = getFirstRowValue(row, metaMap, binding.paths || [], '');
     if (directValue !== '') {
@@ -1383,12 +1393,120 @@ function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
     return binding.fallback_template || '';
 }
 
+function renderTimelineBinding(binding = {}, row = {}, metaMap = {}) {
+    const stages = Array.isArray(binding.stages) ? binding.stages : [];
+    const points = stages
+        .map((stage) => {
+            const value = getFirstRowValue(row, metaMap, stage.paths || [], '');
+            const date = parseBindingDateValue(value);
+            const time = date ? date.getTime() : null;
+
+            return {
+                label: stage.label || '',
+                className: stage.class || 'bg-secondary',
+                rawValue: value,
+                time,
+                second: time !== null ? Math.floor(time / 1000) : null,
+            };
+        })
+        .filter((stage) => stage.time !== null);
+
+    if (points.length < 2) {
+        return binding.fallback_template || '';
+    }
+
+    const getPointByLabel = (label) => points.find((point) => point.label.toLowerCase() === label);
+    const availablePoint = getPointByLabel('available');
+    const startedPoint = getPointByLabel('started');
+    const completedPoint = getPointByLabel('completed');
+    const totalDurationMs = availablePoint && completedPoint
+        ? Math.max(completedPoint.time - availablePoint.time, 0)
+        : 0;
+    const activeDurationMs = startedPoint && completedPoint
+        ? Math.max(completedPoint.time - startedPoint.time, 0)
+        : 0;
+    const waitingDurationMs = Math.max(totalDurationMs - activeDurationMs, 0);
+
+    const buckets = new Map();
+
+    points.forEach((point) => {
+        if (!buckets.has(point.second)) {
+            buckets.set(point.second, []);
+        }
+
+        buckets.get(point.second).push(point);
+    });
+
+    const groupedSeconds = Array.from(buckets.keys()).sort((a, b) => a - b);
+    const groupedDurations = groupedSeconds.map((second, index) => {
+        const nextSecond = groupedSeconds[index + 1];
+
+        if (nextSecond === undefined) {
+            return 1;
+        }
+
+        return Math.max(nextSecond - second, 1);
+    });
+    const totalDuration = groupedDurations.reduce((total, duration) => total + duration, 0);
+    const segments = [];
+
+    groupedSeconds.forEach((second, index) => {
+        const bucketPoints = buckets.get(second) || [];
+        const bucketWidth = (groupedDurations[index] / totalDuration) * 100;
+        const segmentWidth = bucketWidth / bucketPoints.length;
+
+        bucketPoints.forEach((point) => {
+            segments.push({
+                ...point,
+                width: segmentWidth,
+            });
+        });
+    });
+
+    const getSegmentTitle = (segment) => {
+        const label = String(segment.label || '').toLowerCase();
+
+        if (totalDurationMs <= 0) {
+            return `${escapeDetailHtml(segment.label)}: 0 sec`;
+        }
+
+        if (label === 'queued' || label === 'available') {
+            return `${escapeDetailHtml(segment.label)}: ${formatTimelineDuration(waitingDurationMs)}`;
+        }
+
+        if (label === 'reserved' || label === 'started') {
+            return `${escapeDetailHtml(segment.label)}: ${formatTimelineDuration(activeDurationMs)}`;
+        }
+
+        if (label === 'completed') {
+            return `${escapeDetailHtml(segment.label)}: ${formatTimelineDuration(totalDurationMs)}`;
+        }
+
+        return segment.rawValue
+            ? `${escapeDetailHtml(segment.label)}: ${escapeDetailHtml(segment.rawValue)}`
+            : escapeDetailHtml(segment.label);
+    };
+
+    return segments.map((segment) => {
+        const width = Math.max(segment.width, 0);
+        const title = getSegmentTitle(segment);
+
+        return `
+            <div class="progress-bar ${segment.className}" role="progressbar" style="width: ${width}%;" aria-valuenow="${width.toFixed(2)}" aria-valuemin="0" aria-valuemax="100" title="${title}">
+                <span class="visually-hidden">${title}</span>
+            </div>
+        `;
+    }).join('');
+}
+
 function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
     switch (binding.type) {
         case 'template':
             return renderTemplateBinding(binding, row, metaMap);
         case 'key_value_rows':
             return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'timeline':
+            return renderTimelineBinding(binding, row, metaMap);
         case 'duration':
             return renderDurationBinding(binding, row, metaMap);
         case 'text':
