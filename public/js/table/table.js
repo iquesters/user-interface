@@ -1787,7 +1787,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     // Try to get a meaningful title from the data
     let titleText = 'Details';
-    const titleFields = ['title', 'name', 'subject', 'uid', 'id'];
+    const titleFields = ['title', 'name', 'subject', 'queue', 'uid', 'id'];
     if (data) {
         const matchedField = titleFields.find((field) => data[field]);
         if (matchedField) titleText = `${data[matchedField]}`;
@@ -1803,11 +1803,15 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     metaUser.className = 'small text-muted';
     metaUser.style.fontSize = '0.7rem';
     metaUser.style.display = 'none';
+    metaUser.style.width = '10.75rem';
+    metaUser.style.textAlign = 'left';
 
     const metaDate = document.createElement('small');
     metaDate.className = 'small text-muted';
     metaDate.style.fontSize = '0.7rem';
     metaDate.style.display = 'none';
+    metaDate.style.width = '10.75rem';
+    metaDate.style.textAlign = 'left';
     
     // Cross icon on right - using Bootstrap btn-close
     const closeButton = document.createElement('button');
@@ -1870,8 +1874,8 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     ]);
 
     if (displayBy || displayAt) {
-        metaUser.textContent = displayBy || '-';
-        metaDate.textContent = displayAt || '-';
+        metaUser.textContent = `created/updated by: ${displayBy || '-'}`;
+        metaDate.textContent = `created/updated at: ${displayAt || '-'}`;
         metaUser.style.display = 'block';
         metaDate.style.display = 'block';
         metaWrapper.appendChild(metaUser);
