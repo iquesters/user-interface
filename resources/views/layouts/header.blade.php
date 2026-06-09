@@ -57,15 +57,7 @@
             </div>
         </div>
 
-<<<<<<< Updated upstream
         {{-- Centre module tabs: only rendered on desktop when nav style is 'header' --}}
-        @if(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'header')
-            <div class="d-none d-lg-flex h-100 flex-grow-1 overflow-x-auto overflow-y-hidden">
-                @include('userinterface::components.module-tabs', [
-                    'installedModules' => $installedModules,
-                    'viewMode' => 'desktop'
-                ])
-=======
         <!-- Display header nav bar based of configuration -->
         @if(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar')
             <div class="d-none d-lg-flex flex-grow-1 justify-content-center px-3">
@@ -97,7 +89,6 @@
                         <small class="global-search-label">Filter</small>
                     </button>
                 </div>
->>>>>>> Stashed changes
             </div>
         @endif
 
