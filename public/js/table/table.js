@@ -485,7 +485,7 @@ function hydrateReusableDetailComponentHtml(templateHtml, formSchemaId, entityUi
     const template = document.createElement('template');
     template.innerHTML = templateHtml.trim();
 
-    const form = template.content.querySelector('.shoz-form');
+    const form = template.content.querySelector('.lab-form, .shoz-form');
     if (form) {
         if (formSchemaId) {
             form.id = formSchemaId;
@@ -882,6 +882,10 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     $(listTable).on('click', 'tbody tr', function(e) {
         // Don't trigger if clicking checkbox
         if ($(e.target).hasClass('row-checkbox') || $(e.target).closest('.checkbox-column').length) {
+            return;
+        }
+
+        if (!confirmDetailReplacement(rightPanelEle)) {
             return;
         }
         
@@ -1740,7 +1744,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
                 }
             }
             
-            const form = contentContainer.querySelector('.shoz-form');
+            const form = contentContainer.querySelector('.lab-form, .shoz-form');
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
@@ -1805,6 +1809,19 @@ function initializeDetailViewScripts(container) {
         detail: { container }
     });
     container.dispatchEvent(event);
+}
+
+function shouldWarnBeforeReplacingDetail(rightPanelEle) {
+    const activeEditForm = rightPanelEle?.querySelector('.inbox-detail-content .lab-form[data-form-mode="edit"], .inbox-detail-content .shoz-form[data-form-mode="edit"]');
+    return !!activeEditForm;
+}
+
+function confirmDetailReplacement(rightPanelEle) {
+    if (!shouldWarnBeforeReplacingDetail(rightPanelEle)) {
+        return true;
+    }
+
+    return window.confirm('You have unsaved changes in edit mode. Switch rows and lose those changes?');
 }
 
 function executeComponentScripts(container) {

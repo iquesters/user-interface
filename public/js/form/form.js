@@ -237,7 +237,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
 
     detailContainer.innerHTML = result.html;
 
-    const nextForm = detailContainer.querySelector('.shoz-form');
+    const nextForm = detailContainer.querySelector('.lab-form, .shoz-form');
     if (!nextForm) {
         return;
     }
@@ -399,7 +399,7 @@ function appendViewModeActions(container, formMeta, formElement) {
 }
 
 async function setupForm(formElement) {
-    console.log("setuping shoz-form...")
+    console.log("setuping lab-form...")
     console.log("formId = " + formElement.id)
 
     let schemaMeta = formElement.dataset.formMeta
@@ -716,6 +716,14 @@ function bindDynamicFormSubmit(formElement, formMeta) {
 
 function dispatchDynamicFormEvent(eventName, detail = {}) {
     window.dispatchEvent(new CustomEvent(eventName, { detail }));
+
+    if (eventName === 'lab-form:submitted') {
+        window.dispatchEvent(new CustomEvent('shoz-form:submitted', { detail }));
+    }
+
+    if (eventName === 'lab-form:submit-failed') {
+        window.dispatchEvent(new CustomEvent('shoz-form:submit-failed', { detail }));
+    }
 }
 
 function resolveDynamicFormMessage(result, fallbackMessage) {
@@ -764,7 +772,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 window.formErrors = errors;
             }
 
-            dispatchDynamicFormEvent('shoz-form:submit-failed', {
+            dispatchDynamicFormEvent('lab-form:submit-failed', {
                 formId: form.id,
                 endpoint,
                 method,
@@ -777,7 +785,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
             return;
         }
 
-        dispatchDynamicFormEvent('shoz-form:submitted', {
+        dispatchDynamicFormEvent('lab-form:submitted', {
             formId: form.id,
             endpoint,
             method,
@@ -788,7 +796,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
     } catch (error) {
         console.error('Dynamic form submit error.', error);
 
-        dispatchDynamicFormEvent('shoz-form:submit-failed', {
+        dispatchDynamicFormEvent('lab-form:submit-failed', {
             formId: form.id,
             endpoint,
             method,
@@ -1269,7 +1277,7 @@ function addFieldFeedback(feedback, addTo) {
 
 
 function setupCoreFormElement() {
-    console.log("setuping shoz-form-elements ...")
+    console.log("setuping lab-form-elements ...")
     $('.shoz-form-element').each(function (e) {
         setupOneCoreFormElement(this)
     })
@@ -1476,8 +1484,8 @@ function checkFormAccess(formMeta, formElement) {
     document.addEventListener('readystatechange', () => {
         console.log("document.readyState>>>>>>>>>>>>>>", document.readyState);
         if (document.readyState === "complete") {
-            // Fetch all the forms marked as shoz-form
-            const forms = document.querySelectorAll('.shoz-form')
+            // Fetch all the forms marked as lab-form
+            const forms = document.querySelectorAll('.lab-form, .shoz-form')
             // console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {

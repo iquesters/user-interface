@@ -99,7 +99,7 @@ function buildSchemaModalForm(formId, values = {}) {
     const form = document.createElement('form')
     form.id = formId
     form.method = 'POST'
-    form.classList.add('shoz-form')
+    form.classList.add('lab-form')
     form.dataset.renderMode = 'modal'
 
     Object.entries(values || {}).forEach(([key, value]) => {
@@ -250,7 +250,7 @@ function showModalSnackbar(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${text}`)
 }
 
-window.addEventListener('shoz-form:submitted', event => {
+function handleSchemaFormSubmitted(event) {
     const { formId, message } = event.detail || {}
 
     if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
@@ -262,9 +262,9 @@ window.addEventListener('shoz-form:submitted', event => {
     if (activeSchemaFormModalState.closeOnSuccess) {
         bootstrap.Modal.getInstance(document.getElementById('labModal'))?.hide()
     }
-})
+}
 
-window.addEventListener('shoz-form:submit-failed', event => {
+function handleSchemaFormSubmitFailed(event) {
     const { formId, message } = event.detail || {}
 
     if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
@@ -272,6 +272,11 @@ window.addEventListener('shoz-form:submit-failed', event => {
     }
 
     showModalSnackbar(message, 'error')
-})
+}
+
+window.addEventListener('lab-form:submitted', handleSchemaFormSubmitted)
+window.addEventListener('shoz-form:submitted', handleSchemaFormSubmitted)
+window.addEventListener('lab-form:submit-failed', handleSchemaFormSubmitFailed)
+window.addEventListener('shoz-form:submit-failed', handleSchemaFormSubmitFailed)
 
 resetModalState()
