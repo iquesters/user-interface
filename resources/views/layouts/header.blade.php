@@ -57,6 +57,7 @@
             </div>
         </div>
 
+<<<<<<< Updated upstream
         {{-- Centre module tabs: only rendered on desktop when nav style is 'header' --}}
         @if(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'header')
             <div class="d-none d-lg-flex h-100 flex-grow-1 overflow-x-auto overflow-y-hidden">
@@ -64,6 +65,39 @@
                     'installedModules' => $installedModules,
                     'viewMode' => 'desktop'
                 ])
+=======
+        <!-- Display header nav bar based of configuration -->
+        @if(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar')
+            <div class="d-none d-lg-flex flex-grow-1 justify-content-center px-3">
+                <div class="global-search global-search-expanded global-search-minibar d-flex align-items-center" role="search">
+                    <button class="btn global-search-icon" type="button" aria-label="Search" title="Search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                    <input class="form-control global-search-input" type="search" placeholder="Search (Coming Soon)" aria-label="Global search">
+                    <button class="btn global-search-filter" type="button" aria-label="Filter" title="Filter">
+                        <i class="fa-solid fa-sliders"></i>
+                    </button>
+                </div>
+            </div>
+        @elseif(ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'header')
+            <div class="d-none d-lg-flex h-100 flex-grow-1 align-items-center overflow-hidden">
+                <div class="global-search-module-tabs d-flex h-100 overflow-x-auto overflow-y-hidden">
+                    @include('userinterface::components.module-tabs', [
+                        'installedModules' => $installedModules,
+                        'viewMode' => 'desktop'
+                    ])
+                </div>
+                <div class="global-search-header-actions d-flex align-items-center">
+                    <button class="btn global-search-action" type="button" aria-label="Search" title="Search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <small class="global-search-label">Search</small>
+                    </button>
+                    <button class="btn global-search-action" type="button" aria-label="Filter" title="Filter">
+                        <i class="fa-solid fa-sliders"></i>
+                        <small class="global-search-label">Filter</small>
+                    </button>
+                </div>
+>>>>>>> Stashed changes
             </div>
         @endif
 
