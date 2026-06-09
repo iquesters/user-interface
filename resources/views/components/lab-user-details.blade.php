@@ -1,24 +1,31 @@
-<div class="card border-0 shadow-sm">
-    <div class="card-body p-3 p-lg-4">
-        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3 mb-4">
-            <div
-                class="d-flex align-items-center justify-content-center overflow-hidden rounded-circle bg-light border flex-shrink-0"
-                style="width: 72px; height: 72px;"
-            >
-                __LAB_AVATAR_BLOCK__
-            </div>
+@php
+    // Render the shared status component once and preserve the placeholder token for client-side binding replacement.
+    $labStatusTemplate = trim(preg_replace(
+        '/\s+/',
+        ' ',
+        \Illuminate\Support\Facades\Blade::render('<x-userinterface::status status="__VALUE__" class="mt-2">__VALUE__</x-userinterface::status>')
+    ));
+@endphp
 
-            <div class="min-w-0">
-                <h4 class="mb-1 fw-semibold text-break">__LAB_NAME__</h4>
-                __LAB_ROLE_BLOCK__
-                __LAB_EMAIL_BLOCK__
-                __LAB_STATUS_BLOCK__
-            </div>
+<div class="px-3 px-lg-4 pb-3 pb-lg-4">
+    <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-3 mb-4">
+        <div
+            class="d-flex align-items-center justify-content-center overflow-hidden rounded-circle bg-light border flex-shrink-0"
+            style="width: 72px; height: 72px;"
+        >
+            __LAB_AVATAR_BLOCK__
         </div>
 
-        <div class="d-flex flex-column gap-2">
-            __LAB_INFO_ROWS__
+        <div class="min-w-0">
+            <h4 class="mb-1 fw-semibold text-break">__LAB_NAME__</h4>
+            __LAB_ROLE_BLOCK__
+            __LAB_EMAIL_BLOCK__
+            __LAB_STATUS_BLOCK__
         </div>
+    </div>
+
+    <div class="d-flex flex-column gap-2">
+        __LAB_INFO_ROWS__
     </div>
 </div>
 <script type="application/json" data-component-bindings>
@@ -79,7 +86,7 @@
             }
         },
         "condition": "value",
-        "template": "<span class=\"badge text-bg-light border mt-2\">__VALUE__</span>",
+        "template": @json($labStatusTemplate),
         "fallback_template": ""
     },
     "__LAB_INFO_ROWS__": {

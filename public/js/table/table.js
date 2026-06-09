@@ -38,6 +38,8 @@ const VIEW_MODE_TABLE = 'table';
 const VIEW_MODE_INBOX = 'inbox';
 const MIN_PANEL_WIDTH = 250;
 const DEFAULT_LEFT_PANEL_WIDTH = 40;
+const DETAIL_RENDER_MODE_COMPONENT = 'component';
+const DETAIL_RENDER_MODE_FORM = 'form';
 
 // ---------------------------
 // 📦 ENHANCED ENTITY CACHE
@@ -95,6 +97,27 @@ class EntityCache {
         this.cache.clear();
         this.prefetchPromises.clear();
         console.log(`🧹 Cache cleared for ${this.entity}`);
+    }
+
+    updateRowByUid(entityUid, nextRow) {
+        if (!entityUid || !nextRow) {
+            return false;
+        }
+
+        for (const [offset, cachedRow] of this.cache.entries()) {
+            const cachedUid = cachedRow?.uid || cachedRow?.id || null;
+            if (cachedUid === entityUid) {
+                this.cache.set(offset, nextRow);
+                console.log('🔄 Updated cached row by uid.', {
+                    entity: this.entity,
+                    entityUid,
+                    offset,
+                });
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
@@ -1528,6 +1551,341 @@ function resolveDetailConfig(schema = {}) {
     };
 }
 
+function resolvePreferredDetailRenderMode(detailConfig = {}, requestedMode = null) {
+    if (requestedMode === DETAIL_RENDER_MODE_FORM && detailConfig.formSchemaUid) {
+        return DETAIL_RENDER_MODE_FORM;
+    }
+
+    if (requestedMode === DETAIL_RENDER_MODE_COMPONENT && detailConfig.detailsComponent) {
+        return DETAIL_RENDER_MODE_COMPONENT;
+    }
+
+    if (detailConfig.detailsComponent) {
+        return DETAIL_RENDER_MODE_COMPONENT;
+    }
+
+    if (detailConfig.formSchemaUid) {
+        return DETAIL_RENDER_MODE_FORM;
+    }
+
+    return null;
+}
+
+function buildDetailAttempts(detailConfig = {}, preferredMode = null) {
+    const attempts = [];
+    const orderedModes = preferredMode === DETAIL_RENDER_MODE_FORM
+        ? [DETAIL_RENDER_MODE_FORM, DETAIL_RENDER_MODE_COMPONENT]
+        : [DETAIL_RENDER_MODE_COMPONENT, DETAIL_RENDER_MODE_FORM];
+
+    orderedModes.forEach((mode) => {
+        if (mode === DETAIL_RENDER_MODE_COMPONENT && detailConfig.detailsComponent) {
+            attempts.push({
+                type: DETAIL_RENDER_MODE_COMPONENT,
+                componentName: detailConfig.detailsComponent,
+                schemaId: detailConfig.componentSchemaId,
+            });
+        }
+
+        if (mode === DETAIL_RENDER_MODE_FORM && detailConfig.formSchemaUid) {
+            attempts.push({
+                type: DETAIL_RENDER_MODE_FORM,
+                componentName: 'userinterface::components.lab-form',
+                schemaId: detailConfig.formSchemaUid,
+            });
+        }
+    });
+
+    return attempts;
+}
+
+function createDetailContext(rightPanelEle, contentContainer, schema, data, detailConfig, preferredMode, requestedFormMode = 'view') {
+    const context = {
+        rightPanelEle,
+        contentContainer,
+        schema,
+        data,
+        detailConfig,
+        preferredMode,
+        requestedFormMode,
+        componentBackedEdit: !!detailConfig.detailsComponent && !!detailConfig.formSchemaUid,
+    };
+
+    contentContainer.__detailContext = context;
+
+    return context;
+}
+
+function syncInboxSummaryRow(detailContext, nextRowData) {
+    const entity = detailContext?.schema?.entity;
+    const entityUid = nextRowData?.uid || detailContext?.data?.uid || null;
+    if (!entity || !entityUid || !nextRowData) {
+        console.warn('⚠️ Skipping inbox summary sync because detail context is incomplete.', {
+            entity,
+            entityUid,
+            hasNextRowData: !!nextRowData,
+        });
+        return;
+    }
+
+    const cache = entityCaches.get(entity);
+    cache?.updateRowByUid(entityUid, nextRowData);
+
+    const listTable = detailContext.rightPanelEle
+        ?.closest('.inbox-view-container')
+        ?.querySelector('.inbox-list-table');
+
+    if (!listTable || typeof $ === 'undefined' || !$.fn.DataTable || !$.fn.DataTable.isDataTable(listTable)) {
+        console.warn('⚠️ Inbox summary sync skipped DataTable row update because the inbox list table is unavailable.', {
+            entity,
+            entityUid,
+        });
+        return;
+    }
+
+    const dt = $(listTable).DataTable();
+    let updatedRow = false;
+
+    dt.rows().every(function () {
+        const rowData = this.data();
+        const rowUid = rowData?.uid || rowData?.id || null;
+        if (rowUid === entityUid) {
+            this.data(nextRowData);
+            updatedRow = true;
+        }
+    });
+
+    if (updatedRow) {
+        dt.draw(false);
+        console.log('✅ Synced inbox summary row after detail update.', {
+            entity,
+            entityUid,
+        });
+        return;
+    }
+
+    console.warn('⚠️ Inbox summary sync could not find the selected row in the current DataTable page.', {
+        entity,
+        entityUid,
+    });
+}
+
+async function openDetailInPreferredMode(context, overrides = {}) {
+    if (!context?.rightPanelEle || !context?.schema || !context?.data) {
+        console.warn('⚠️ Skipping detail mode switch because detail context is incomplete.', { context, overrides });
+        return;
+    }
+
+    const nextPreferredMode = overrides.preferredMode || context.preferredMode;
+    const nextFormMode = overrides.formMode || 'view';
+
+    console.log('🔁 Switching inbox detail mode.', {
+        entity: context.schema?.entity,
+        uid: context.data?.uid || context.data?.id || null,
+        preferredMode: nextPreferredMode,
+        formMode: nextFormMode,
+    });
+
+    return loadDetailComponent(context.rightPanelEle, context.schema, context.data, {
+        preferredMode: nextPreferredMode,
+        formMode: nextFormMode,
+    });
+}
+
+function appendHybridDetailEditButton(header, detailContext) {
+    if (!detailContext?.componentBackedEdit) {
+        return;
+    }
+
+    const actionWrapper = document.createElement('div');
+    actionWrapper.className = 'd-flex align-items-center ms-auto me-2';
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0';
+    editButton.innerHTML = '<i class="fas fa-pencil-alt"></i><span>Edit</span>';
+    editButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        console.log('📝 Opening inbox detail form editor from component view.', {
+            entity: detailContext.schema?.entity,
+            uid: detailContext.data?.uid || detailContext.data?.id || null,
+            formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
+        });
+
+        await openDetailInPreferredMode(detailContext, {
+            preferredMode: DETAIL_RENDER_MODE_FORM,
+            formMode: 'edit',
+        });
+    });
+
+    header.insertBefore(actionWrapper, header.lastElementChild);
+    actionWrapper.appendChild(editButton);
+}
+
+function createDetailHeaderActionButton(iconClasses, title, buttonClasses, clickHandler, label = '') {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = buttonClasses;
+    button.title = title;
+
+    const icon = document.createElement('i');
+    icon.className = iconClasses;
+    button.appendChild(icon);
+
+    if (label) {
+        const text = document.createElement('span');
+        text.textContent = label;
+        button.appendChild(text);
+    }
+
+    button.addEventListener('click', clickHandler);
+    return button;
+}
+
+async function handleHybridDetailDelete(detailContext) {
+    const entity = detailContext?.schema?.entity;
+    const entityUid = detailContext?.data?.uid;
+
+    if (!entity || !entityUid) {
+        console.warn('⚠️ Skipping inbox detail delete because entity context is incomplete.', {
+            entity,
+            entityUid,
+        });
+        return;
+    }
+
+    const confirmed = window.confirm('Delete this record? This action cannot be undone.');
+    if (!confirmed) {
+        console.log('ℹ️ Inbox detail delete canceled by user.', { entity, entityUid });
+        return;
+    }
+
+    const endpoint = `/api/entity/delete/${entity}/${entityUid}`;
+    console.log('🗑️ Deleting inbox detail record from component view.', {
+        entity,
+        entityUid,
+        endpoint,
+    });
+
+    try {
+        const result = typeof apiClient !== 'undefined' && apiClient
+            ? await apiClient.delete(endpoint)
+            : await fetch(endpoint, {
+                method: 'DELETE',
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            }).then((response) => response.json().catch(() => ({
+                success: response.ok,
+                status: response.status,
+            })));
+
+        if (!result?.success) {
+            console.error('❌ Inbox detail delete failed.', {
+                entity,
+                entityUid,
+                endpoint,
+                result,
+            });
+            return;
+        }
+
+        const rightPanelEle = detailContext.rightPanelEle;
+        const parentContainer = rightPanelEle?.closest('.inbox-view-container');
+        const listTable = parentContainer?.querySelector('.inbox-list-table');
+        const rootTable = document.querySelector('.lab-table');
+
+        if (rootTable && typeof window.clearLabTableCache === 'function') {
+            window.clearLabTableCache(rootTable);
+        }
+
+        if (rightPanelEle) {
+            rightPanelEle.innerHTML = '';
+            rightPanelEle.className = rightPanelEle.className
+                .split(' ')
+                .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white' && cls !== 'bg-light')
+                .join(' ');
+            rightPanelEle.classList.add('d-flex', 'flex-column', 'overflow-hidden', 'p-0', 'm-0');
+
+            const emptyState = document.createElement('div');
+            emptyState.className = 'd-flex align-items-center justify-content-center h-100 w-100 text-center text-muted';
+            emptyState.innerHTML = 'Select an item to view details';
+            rightPanelEle.appendChild(emptyState);
+        }
+
+        if (listTable) {
+            clearInboxRowSelection(listTable);
+
+            if (typeof $ !== 'undefined' && $.fn.DataTable && $.fn.DataTable.isDataTable(listTable)) {
+                $(listTable).DataTable().ajax.reload(null, false);
+            }
+        }
+
+        console.log('✅ Inbox detail record deleted successfully from component view.', {
+            entity,
+            entityUid,
+        });
+    } catch (error) {
+        console.error('❌ Inbox detail delete request failed.', {
+            entity,
+            entityUid,
+            endpoint,
+            error,
+        });
+    }
+}
+
+function appendHybridDetailActions(rightPanelEle, contentContainer, detailContext) {
+    if (!detailContext?.componentBackedEdit) {
+        return;
+    }
+
+    const existingActionRow = rightPanelEle?.querySelector('.inbox-detail-actions');
+    if (existingActionRow) {
+        existingActionRow.remove();
+    }
+
+    // Keep component-backed detail actions aligned with lab-form view actions, but render them below the shared header.
+    const actionWrapper = document.createElement('div');
+    actionWrapper.className = 'inbox-detail-actions d-flex align-items-center justify-content-end gap-3 px-3 pt-3 flex-shrink-0';
+
+    const editButton = createDetailHeaderActionButton(
+        'fas fa-pencil-alt',
+        'Edit',
+        'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+        async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            console.log('📝 Opening inbox detail form editor from component view.', {
+                entity: detailContext.schema?.entity,
+                uid: detailContext.data?.uid || detailContext.data?.id || null,
+                formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
+            });
+
+            await openDetailInPreferredMode(detailContext, {
+                preferredMode: DETAIL_RENDER_MODE_FORM,
+                formMode: 'edit',
+            });
+        }
+    );
+
+    const deleteButton = createDetailHeaderActionButton(
+        'fas fa-trash',
+        'Delete',
+        'btn btn-sm btn-link text-danger text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+        async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            await handleHybridDetailDelete(detailContext);
+        }
+    );
+
+    actionWrapper.appendChild(editButton);
+    actionWrapper.appendChild(deleteButton);
+    rightPanelEle.insertBefore(actionWrapper, contentContainer);
+}
+
 function getNestedDetailValue(source, paths = []) {
     for (const path of paths) {
         let value = source;
@@ -1541,7 +1899,14 @@ function getNestedDetailValue(source, paths = []) {
     return null;
 }
 
-async function loadDetailComponent(rightPanelEle, schema, data) {
+async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
+    console.log('📥 Loading inbox detail panel.', {
+        entity: schema?.entity,
+        uid: data?.uid || data?.id || null,
+        requestedPreferredMode: options?.preferredMode || null,
+        requestedFormMode: options?.formMode || null,
+    });
+
     // Store the current width/percentage before modifying
     const currentWidth = rightPanelEle.style.width;
     const currentFlex = rightPanelEle.style.flex;
@@ -1681,26 +2046,33 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
     
     try {
         const detailConfig = resolveDetailConfig(schema);
-        const detailAttempts = [];
+        const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
+        const detailContext = createDetailContext(
+            rightPanelEle,
+            contentContainer,
+            schema,
+            data,
+            detailConfig,
+            preferredMode,
+            options.formMode || 'view'
+        );
+        const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
-        if (detailConfig.detailsComponent) {
-            detailAttempts.push({
-                type: 'component',
-                componentName: detailConfig.detailsComponent,
-                schemaId: detailConfig.componentSchemaId,
-            });
-        }
-
-        if (detailConfig.formSchemaUid) {
-            detailAttempts.push({
-                type: 'form',
-                componentName: 'userinterface::components.lab-form',
-                schemaId: detailConfig.formSchemaUid,
-            });
-        }
+        console.log('🧭 Resolved inbox detail strategy.', {
+            entity: schema?.entity,
+            uid: data?.uid || data?.id || null,
+            preferredMode,
+            requestedFormMode: detailContext.requestedFormMode,
+            attempts: detailAttempts.map((attempt) => `${attempt.type}:${attempt.componentName}`),
+        });
 
         if (!detailAttempts.length) {
+            console.warn('⚠️ No configured inbox detail renderer was found; using fallback detail view.', {
+                entity: schema?.entity,
+                uid: data?.uid || data?.id || null,
+            });
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
+            initializeDetailViewScripts(contentContainer);
             return;
         }
 
@@ -1711,7 +2083,7 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
 
             let result = null;
 
-            if (attempt.type === 'component') {
+            if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
                 const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
 
                 result = template.success
@@ -1748,13 +2120,19 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
-                form.dataset.formMode = 'view';
+                form.dataset.formMode = attempt.type === DETAIL_RENDER_MODE_FORM
+                    ? detailContext.requestedFormMode
+                    : 'view';
                 const formMeta = await setupForm(form);
 
                 if (!formMeta && form.dataset.schemaState === 'not-found') {
                     console.warn(`⚠️ Detail ${attempt.type} resolved to a missing form schema`);
                     continue;
                 }
+            }
+
+            if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
+                appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
             }
 
             if (typeof setupCoreFormElement === 'function') {
@@ -1769,12 +2147,21 @@ async function loadDetailComponent(rightPanelEle, schema, data) {
         }
 
         if (!rendered) {
+            console.warn('⚠️ All configured inbox detail renderers failed; using fallback detail view.', {
+                entity: schema?.entity,
+                uid: data?.uid || data?.id || null,
+                preferredMode,
+            });
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             initializeDetailViewScripts(contentContainer);
         }
         
     } catch (error) {
-        console.error('❌ Error loading detail component:', error);
+        console.error('❌ Error loading inbox detail component.', {
+            entity: schema?.entity,
+            uid: data?.uid || data?.id || null,
+            error,
+        });
         contentContainer.innerHTML = renderFallbackDetailComponent(data);
         initializeDetailViewScripts(contentContainer);
     }
@@ -2215,4 +2602,7 @@ function getSelectedRows(tableElement) {
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
 
+window.loadInboxDetailComponent = loadDetailComponent;
+window.openInboxDetailInPreferredMode = openDetailInPreferredMode;
+window.syncInboxSummaryRow = syncInboxSummaryRow;
 window.clearLabTableCache = clearTableCache;

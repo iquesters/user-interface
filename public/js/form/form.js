@@ -203,10 +203,54 @@ function getInlineLoaderHtml() {
     `;
 }
 
+function resolveInboxDetailContext(formElement) {
+    return formElement.closest('.inbox-detail-content')?.__detailContext || null;
+}
+
+function extractResultRecord(result) {
+    return result?.data
+        || result?.response_schema?.data
+        || result?.response_schema?.record
+        || null;
+}
+
+function mergeSubmittedDetailData(currentData, payload, result) {
+    const resultRecord = extractResultRecord(result);
+    if (resultRecord && typeof resultRecord === 'object') {
+        return resultRecord;
+    }
+
+    const currentMeta = Array.isArray(currentData?.meta) ? currentData.meta : [];
+    const payloadMeta = payload?.meta && typeof payload.meta === 'object' ? payload.meta : null;
+    const mergedMeta = payloadMeta
+        ? Object.entries(payloadMeta).map(([meta_key, meta_value]) => ({ meta_key, meta_value }))
+        : currentMeta;
+
+    return {
+        ...(currentData || {}),
+        ...(payload || {}),
+        meta: mergedMeta,
+    };
+}
+
+async function returnToPreferredInboxDetail(detailContext, overrides = {}) {
+    if (!detailContext || typeof window.openInboxDetailInPreferredMode !== 'function') {
+        console.warn('⚠️ Unable to return to preferred inbox detail mode because the shared detail bridge is unavailable.', {
+            detailContext,
+            overrides,
+        });
+        return false;
+    }
+
+    await window.openInboxDetailInPreferredMode(detailContext, overrides);
+    return true;
+}
+
 async function switchFormMode(formElement, nextMode, formMeta) {
     const entityUid = formElement.dataset.entityUid;
     const route = buildFormRoute(formMeta.id, entityUid, nextMode);
     const detailContainer = formElement.closest('.inbox-detail-content');
+    const detailContext = resolveInboxDetailContext(formElement);
     const currentFormData = formElement.__entityDataCache || (() => {
         try {
             return formElement.dataset.formData ? JSON.parse(formElement.dataset.formData) : null;
@@ -219,6 +263,21 @@ async function switchFormMode(formElement, nextMode, formMeta) {
         if (route) {
             window.location.href = route;
         }
+        return;
+    }
+
+    if (detailContext?.componentBackedEdit && nextMode === 'view') {
+        console.log('🔁 Returning inbox detail to component view from form mode.', {
+            entity: detailContext.schema?.entity,
+            uid: detailContext.data?.uid || detailContext.data?.id || null,
+            nextMode,
+        });
+
+        detailContext.data = currentFormData || detailContext.data;
+        await returnToPreferredInboxDetail(detailContext, {
+            preferredMode: 'component',
+            formMode: 'view',
+        });
         return;
     }
 
@@ -316,6 +375,20 @@ async function handleFormDeleteAction(formElement, formMeta) {
 async function handleFormCancelAction(formElement, formMeta) {
     const entityUid = formElement.dataset.entityUid;
     const detailContainer = formElement.closest('.inbox-detail-content');
+    const detailContext = resolveInboxDetailContext(formElement);
+
+    if (detailContext?.componentBackedEdit && formMeta.formMode === 'edit') {
+        console.log('↩️ Canceling inbox detail edit and restoring component view.', {
+            entity: detailContext.schema?.entity,
+            uid: detailContext.data?.uid || detailContext.data?.id || null,
+        });
+
+        await returnToPreferredInboxDetail(detailContext, {
+            preferredMode: 'component',
+            formMode: 'view',
+        });
+        return;
+    }
 
     if (detailContainer && entityUid && formMeta.formMode === 'edit') {
         await switchFormMode(formElement, 'view', formMeta);
@@ -759,6 +832,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
     try {
         const result = await submitDynamicFormRequest(endpoint, method, payload, form);
         const errors = result?.errors || result?.response_schema?.errors || null;
+        const detailContext = resolveInboxDetailContext(form);
 
         if (!result?.success) {
             console.error('Dynamic form submit failed.', {
@@ -793,6 +867,29 @@ async function handleDynamicFormSubmit(event, formMeta) {
             response: result,
             message: resolveDynamicFormMessage(result, 'Form submitted successfully.'),
         });
+
+        if (detailContext?.componentBackedEdit && method !== 'DELETE') {
+            const nextDetailData = mergeSubmittedDetailData(
+                form.__entityDataCache || detailContext.data || null,
+                payload,
+                result
+            );
+
+            console.log('✅ Form submitted from inbox detail; restoring component-backed detail view.', {
+                entity: detailContext.schema?.entity,
+                uid: nextDetailData?.uid || detailContext.data?.uid || null,
+                method,
+            });
+
+            detailContext.data = nextDetailData;
+            if (typeof window.syncInboxSummaryRow === 'function') {
+                window.syncInboxSummaryRow(detailContext, nextDetailData);
+            }
+            await returnToPreferredInboxDetail(detailContext, {
+                preferredMode: 'component',
+                formMode: 'view',
+            });
+        }
     } catch (error) {
         console.error('Dynamic form submit error.', error);
 
