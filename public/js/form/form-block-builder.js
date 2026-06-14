@@ -89,6 +89,11 @@ async function setupFormBlock(formCol, formMeta) {
 
 
 async function addField(field, addTo,formMeta) {
+    if (isSpacerField(field)) {
+        renderFormSpacer(field, addTo);
+        return;
+    }
+
     if (field.type === INPUT_TYPE.HIDDEN) {
         const input = document.createElement(HTML_TAG.INPUT);
         input.type = INPUT_TYPE.HIDDEN;
@@ -290,6 +295,28 @@ async function addField(field, addTo,formMeta) {
 
 }
 
+function isSpacerField(field = {}) {
+    return field?.type === INPUT_TYPE.SPACER || field?.type === CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+}
+
+function renderFormSpacer(field, addTo) {
+    const spacerField = {
+        ...field,
+        _resolvedSize: resolveSpacerSizeConfig(field),
+    };
+    const spacer = createFieldFragment(spacerField, addTo, STYLE_CLASS.FORM_SPACER);
+    const spacerHeight = typeof field.height === 'string' && field.height.trim()
+        ? field.height.trim()
+        : CONSTANT.DEFAULT_FORM_SPACER_HEIGHT;
+
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.dataset.layoutType = CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+
+    if (spacerHeight !== CONSTANT.DEFAULT_FORM_SPACER_HEIGHT) {
+        spacer.style.minHeight = spacerHeight;
+    }
+}
+
 function renderReadOnlyField(field, addTo) {
     const fragment = createFieldFragment(field, addTo);
     const fieldDomId = getFieldDomId(field);
@@ -394,6 +421,15 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
     return formDefaultSize || CONSTANT.DEFAULT_FORM_FIELD_SIZE;
 }
 
+function resolveSpacerSizeConfig(field = {}) {
+    const spacerSize = getUsableSizeConfig(field.size ?? field.gridSize);
+    if (spacerSize !== null) {
+        return spacerSize;
+    }
+
+    return CONSTANT.DEFAULT_FORM_SPACER_SIZE;
+}
+
 function getUsableSizeConfig(sizeConfig) {
     if (typeof sizeConfig === 'number') {
         return sizeConfig;
@@ -411,7 +447,7 @@ function getUsableSizeConfig(sizeConfig) {
 
 function createFieldFragment(field, addTo, addClass = null) {
     const fragment = document.createElement(HTML_TAG.DIV);
-    fragment.id = addTo.id + SUFFIX.FIELD;
+    fragment.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
     addFieldSize(field, fragment);
     fragment.classList.add(STYLE_CLASS.MB_2);
     
@@ -611,7 +647,10 @@ function appendBackendError(field, container, input = null) {
 
 function buildFieldDomId(formMeta, field, index) {
     const formId = formMeta?.id || 'form';
-    const fieldId = field?.id || 'field';
+    const fallbackFieldId = field?.type === INPUT_TYPE.SPACER
+        ? `${CONSTANT.FORM_LAYOUT_SPACER_TYPE}-${index + 1}`
+        : 'field';
+    const fieldId = field?.id || fallbackFieldId;
     return `${sanitizeDomIdSegment(formId)}-${sanitizeDomIdSegment(fieldId)}-${index + 1}`;
 }
 

@@ -15,6 +15,7 @@ const STYLE_CLASS = {
     FORM_CHECK_INPUT:"form-check-input",
     FORM_CHECK_LABEL:"form-check-label",
     FORM_BLOCK:'form-block',
+    FORM_SPACER:'form-spacer',
     ROW_COLS_1:'row-cols-1', 
     G_2:'g-2', 
     NEEDS_VALIDATION:'needs-validation',
