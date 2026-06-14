@@ -67,6 +67,7 @@ async function setupFormBlock(formCol, formMeta) {
             formMeta.fields.forEach((field, index) => {
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
+                field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
                 field.value = resolveFieldValue(field.id, formData, entityData);
                 addField(field, form, formMeta);
             });
@@ -340,61 +341,69 @@ function getReadOnlyFieldDisplayValue(field) {
 
 
 function addFieldSize(field, elementToSize) {
-    let sizeClasses = []
-    if (field.size) {
-        if (typeof field.size === 'number') {
-            if (field.size >= 1 && field.size <= 12) {
-                sizeClasses.push("col-" + field.size)
+    let sizeClasses = [];
+    const resolvedSize = field._resolvedSize ?? field.size ?? field.gridSize;
+
+    if (typeof resolvedSize === 'number') {
+        if (resolvedSize >= 1 && resolvedSize <= 12) {
+            sizeClasses.push(`col-${resolvedSize}`);
+        }
+    } else if (resolvedSize && resolvedSize.constructor?.name === 'Object') {
+        Object.keys(resolvedSize).forEach((sizeKey) => {
+            const value = resolvedSize[sizeKey];
+            if (value < 1 || value > 12) {
+                return;
             }
-        } else if (field.size.constructor.name === 'Object') {
-            Object.keys(field.size).forEach((sizeKey) => {
-                // console.log(sizeKey);
-                if ('xs' === sizeKey) {
-                    sizeClasses.push("col-" + field.size[sizeKey])
-                } else if ('sm' === sizeKey || 'md' === sizeKey || 'lg' === sizeKey || 'xl' === sizeKey || 'xxl' === sizeKey) {
-                    sizeClasses.push("col-" + sizeKey + "-" + field.size[sizeKey])
-                } else {
 
-                }
-            })
-        } else {
-            console.log();
-            sizeClasses.push("col")
-        }
-    } else if (field.gridSize) { //Schema has gridSize property
-        // if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
-        //     sizeClasses.push("col-" + field.gridSize)
-        // } else {
-        //     sizeClasses.push("col")
-        // }
+            if (sizeKey === 'xs') {
+                sizeClasses.push(`col-${value}`);
+                return;
+            }
 
-        if (typeof field.gridSize === "number" && field.gridSize >= 1 && field.gridSize <= 12) {
-            // ✅ Numeric grid size (e.g. 12)
-            sizeClasses.push("col-" + field.gridSize);
-        } 
-        else if (typeof field.gridSize === "object") {
-            // ✅ Responsive grid size (e.g. { sm: 4, xs: 12 })
-            Object.keys(field.gridSize).forEach((breakpoint) => {
-                const value = field.gridSize[breakpoint];
-                if (value >= 1 && value <= 12) {
-                    sizeClasses.push(`col-${breakpoint}-${value}`);
-                }
-            });
-        } 
-        else {
-            // ✅ Fallback if invalid
-            sizeClasses.push("col");
-        }
+            if (['sm', 'md', 'lg', 'xl', 'xxl'].includes(sizeKey)) {
+                sizeClasses.push(`col-${sizeKey}-${value}`);
+            }
+        });
+    }
 
-
-
-
-    } else {
-        console.log();
-        sizeClasses.push("col")
+    if (sizeClasses.length === 0) {
+        sizeClasses.push('col-12');
     }
 
     elementToSize.classList.add(...sizeClasses);
+}
+
+function resolveFieldSizeConfig(field = {}, formMeta = {}) {
+    const fieldSize = getUsableSizeConfig(field.size);
+    if (fieldSize !== null) {
+        return fieldSize;
+    }
+
+    const gridSize = getUsableSizeConfig(field.gridSize);
+    if (gridSize !== null) {
+        return gridSize;
+    }
+
+    const formDefaultSize = getUsableSizeConfig(
+        formMeta.defaultFieldSize
+        || formMeta.default_field_size
+        || formMeta.fieldDefaultSize
+        || formMeta.field_default_size
+    );
+
+    return formDefaultSize || CONSTANT.DEFAULT_FORM_FIELD_SIZE;
+}
+
+function getUsableSizeConfig(sizeConfig) {
+    if (typeof sizeConfig === 'number') {
+        return sizeConfig;
+    }
+
+    if (!sizeConfig || sizeConfig.constructor?.name !== 'Object') {
+        return null;
+    }
+
+    return Object.keys(sizeConfig).length > 0 ? sizeConfig : null;
 }
 
 
