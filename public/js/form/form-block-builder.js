@@ -47,11 +47,19 @@ async function setupFormBlock(formCol, formMeta) {
         console.log("formData = " + formData)
 
         const entityUId = form.dataset.entityUid;
-        let entityData = null;
+        let entityData = form.__entityDataCache || null;
 
-        if (formMeta.entity && entityUId) {
+        if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
+            entityData = formData;
+        }
+
+        if (!entityData && formMeta.entity && entityUId) {
             const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
             entityData = getentityResponse?.data || null;
+        }
+
+        if (entityData) {
+            form.__entityDataCache = entityData;
         }
 
         // add fields to form
@@ -59,6 +67,7 @@ async function setupFormBlock(formCol, formMeta) {
             formMeta.fields.forEach((field, index) => {
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
+                field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
                 field.value = resolveFieldValue(field.id, formData, entityData);
                 addField(field, form, formMeta);
             });
@@ -80,6 +89,11 @@ async function setupFormBlock(formCol, formMeta) {
 
 
 async function addField(field, addTo,formMeta) {
+    if (isSpacerField(field)) {
+        renderFormSpacer(field, addTo);
+        return;
+    }
+
     if (field.type === INPUT_TYPE.HIDDEN) {
         const input = document.createElement(HTML_TAG.INPUT);
         input.type = INPUT_TYPE.HIDDEN;
@@ -281,6 +295,28 @@ async function addField(field, addTo,formMeta) {
 
 }
 
+function isSpacerField(field = {}) {
+    return field?.type === INPUT_TYPE.SPACER || field?.type === CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+}
+
+function renderFormSpacer(field, addTo) {
+    const spacerField = {
+        ...field,
+        _resolvedSize: resolveSpacerSizeConfig(field),
+    };
+    const spacer = createFieldFragment(spacerField, addTo, STYLE_CLASS.FORM_SPACER);
+    const spacerHeight = typeof field.height === 'string' && field.height.trim()
+        ? field.height.trim()
+        : CONSTANT.DEFAULT_FORM_SPACER_HEIGHT;
+
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.dataset.layoutType = CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+
+    if (spacerHeight !== CONSTANT.DEFAULT_FORM_SPACER_HEIGHT) {
+        spacer.style.minHeight = spacerHeight;
+    }
+}
+
 function renderReadOnlyField(field, addTo) {
     const fragment = createFieldFragment(field, addTo);
     const fieldDomId = getFieldDomId(field);
@@ -332,61 +368,78 @@ function getReadOnlyFieldDisplayValue(field) {
 
 
 function addFieldSize(field, elementToSize) {
-    let sizeClasses = []
-    if (field.size) {
-        if (typeof field.size === 'number') {
-            if (field.size >= 1 && field.size <= 12) {
-                sizeClasses.push("col-" + field.size)
+    let sizeClasses = [];
+    const resolvedSize = field._resolvedSize ?? field.size ?? field.gridSize;
+
+    if (typeof resolvedSize === 'number') {
+        if (resolvedSize >= 1 && resolvedSize <= 12) {
+            sizeClasses.push(`col-${resolvedSize}`);
+        }
+    } else if (resolvedSize && resolvedSize.constructor?.name === 'Object') {
+        Object.keys(resolvedSize).forEach((sizeKey) => {
+            const value = resolvedSize[sizeKey];
+            if (value < 1 || value > 12) {
+                return;
             }
-        } else if (field.size.constructor.name === 'Object') {
-            Object.keys(field.size).forEach((sizeKey) => {
-                // console.log(sizeKey);
-                if ('xs' === sizeKey) {
-                    sizeClasses.push("col-" + field.size[sizeKey])
-                } else if ('sm' === sizeKey || 'md' === sizeKey || 'lg' === sizeKey || 'xl' === sizeKey || 'xxl' === sizeKey) {
-                    sizeClasses.push("col-" + sizeKey + "-" + field.size[sizeKey])
-                } else {
 
-                }
-            })
-        } else {
-            console.log();
-            sizeClasses.push("col")
-        }
-    } else if (field.gridSize) { //Schema has gridSize property
-        // if (typeof field.gridSize === 'number' && field.gridSize >= 1 && field.gridSize <= 12) {
-        //     sizeClasses.push("col-" + field.gridSize)
-        // } else {
-        //     sizeClasses.push("col")
-        // }
+            if (sizeKey === 'xs') {
+                sizeClasses.push(`col-${value}`);
+                return;
+            }
 
-        if (typeof field.gridSize === "number" && field.gridSize >= 1 && field.gridSize <= 12) {
-            // ✅ Numeric grid size (e.g. 12)
-            sizeClasses.push("col-" + field.gridSize);
-        } 
-        else if (typeof field.gridSize === "object") {
-            // ✅ Responsive grid size (e.g. { sm: 4, xs: 12 })
-            Object.keys(field.gridSize).forEach((breakpoint) => {
-                const value = field.gridSize[breakpoint];
-                if (value >= 1 && value <= 12) {
-                    sizeClasses.push(`col-${breakpoint}-${value}`);
-                }
-            });
-        } 
-        else {
-            // ✅ Fallback if invalid
-            sizeClasses.push("col");
-        }
+            if (['sm', 'md', 'lg', 'xl', 'xxl'].includes(sizeKey)) {
+                sizeClasses.push(`col-${sizeKey}-${value}`);
+            }
+        });
+    }
 
-
-
-
-    } else {
-        console.log();
-        sizeClasses.push("col")
+    if (sizeClasses.length === 0) {
+        sizeClasses.push('col-12');
     }
 
     elementToSize.classList.add(...sizeClasses);
+}
+
+function resolveFieldSizeConfig(field = {}, formMeta = {}) {
+    const fieldSize = getUsableSizeConfig(field.size);
+    if (fieldSize !== null) {
+        return fieldSize;
+    }
+
+    const gridSize = getUsableSizeConfig(field.gridSize);
+    if (gridSize !== null) {
+        return gridSize;
+    }
+
+    const formDefaultSize = getUsableSizeConfig(
+        formMeta.defaultFieldSize
+        || formMeta.default_field_size
+        || formMeta.fieldDefaultSize
+        || formMeta.field_default_size
+    );
+
+    return formDefaultSize || CONSTANT.DEFAULT_FORM_FIELD_SIZE;
+}
+
+function resolveSpacerSizeConfig(field = {}) {
+    const spacerSize = getUsableSizeConfig(field.size ?? field.gridSize);
+    if (spacerSize !== null) {
+        return spacerSize;
+    }
+
+    return CONSTANT.DEFAULT_FORM_SPACER_SIZE;
+}
+
+function getUsableSizeConfig(sizeConfig) {
+    if (typeof sizeConfig === 'number') {
+        return sizeConfig;
+    }
+
+    if (!sizeConfig || sizeConfig.constructor?.name !== 'Object') {
+        return null;
+    }
+
+    return Object.keys(sizeConfig).length > 0 ? sizeConfig : null;
 }
 
 
@@ -394,7 +447,7 @@ function addFieldSize(field, elementToSize) {
 
 function createFieldFragment(field, addTo, addClass = null) {
     const fragment = document.createElement(HTML_TAG.DIV);
-    fragment.id = addTo.id + SUFFIX.FIELD;
+    fragment.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
     addFieldSize(field, fragment);
     fragment.classList.add(STYLE_CLASS.MB_2);
     
@@ -414,11 +467,17 @@ function createFieldFragment(field, addTo, addClass = null) {
 
 function createHelperText(field, container) {
     if (field.helpertext || field.helperText) {
+        const helperText = field.helpertext || field.helperText;
         const helper = document.createElement(HTML_TAG.DIV);
-        helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL);
+        helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_MUTED);
         helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
+        helper.style.display = 'block';
+        helper.style.overflow = 'hidden';
+        helper.style.textOverflow = 'ellipsis';
+        helper.style.whiteSpace = 'nowrap';
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
-        helper.textContent = field.helpertext || field.helperText;
+        helper.textContent = helperText;
+        helper.title = helperText;
         container.appendChild(helper);
     }
 }
@@ -588,7 +647,10 @@ function appendBackendError(field, container, input = null) {
 
 function buildFieldDomId(formMeta, field, index) {
     const formId = formMeta?.id || 'form';
-    const fieldId = field?.id || 'field';
+    const fallbackFieldId = field?.type === INPUT_TYPE.SPACER
+        ? `${CONSTANT.FORM_LAYOUT_SPACER_TYPE}-${index + 1}`
+        : 'field';
+    const fieldId = field?.id || fallbackFieldId;
     return `${sanitizeDomIdSegment(formId)}-${sanitizeDomIdSegment(fieldId)}-${index + 1}`;
 }
 

@@ -10,9 +10,9 @@
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
 @section('content')
-<!-- <form id="{{$data->parent->uid}}" class="shoz-form"></form> -->
+<!-- <form id="{{$data->parent->uid}}" class="lab-form"></form> -->
  <!-- action="{{ route('form.submitAndSave', ['uid' => $data->parent->uid ?? '']) }}" -->
-<form id="{{$data->parent->uid}}" class="shoz-form" 
+<form id="{{$data->parent->uid}}" class="lab-form" 
        
       method="POST" 
       enctype="multipart/form-data"

@@ -19,6 +19,7 @@ const INPUT_TYPE = {
     CHECKBOX: "checkbox",
     DATALIST: "datalist",
     HIDDEN:"hidden",
+    SPACER: "spacer",
     FORMID:"formId",
     
 

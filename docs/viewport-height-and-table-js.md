@@ -62,6 +62,7 @@ The main table behavior lives in `public/js/table/table.js`.
 - fetches row data from `/api/entity/list/{entity_name}`
 - supports manual refresh through shared cache clearing
 - supports fallback detail rendering in inbox view when no detail component is configured
+- supports hybrid inbox detail behavior where a custom detail component is the default view and a schema form is used for edit mode
 
 ### Main flow
 
@@ -83,6 +84,8 @@ The main table behavior lives in `public/js/table/table.js`.
   - Split inbox view.
 - `loadDetailComponent(rightPanelEle, schema, data)`
   - Loads configured detail UI or fallback details.
+  - Prefers `details_component` for inbox detail view when present.
+  - Uses `form_schema_uid` as the edit renderer when both component and form are configured.
 - `renderFallbackDetailComponent(data)`
   - Renders all available record fields when no detail component exists.
 - `handleAjaxFetch(params, callback, cache, entityName, tableElement)`
@@ -90,10 +93,29 @@ The main table behavior lives in `public/js/table/table.js`.
 - `clearTableCache(tableElement)`
   - Clears the entity cache for refresh flows.
 
+### File structure
+
+- `public/js/table/00-table-constant.js`
+  - Table constants, cache state, and shared globals.
+- `public/js/table/01-table-bootstrap.js`
+  - `ViewModeManager`, bootstrap flow, and table initialization.
+- `public/js/table/02-table-data-providers.js`
+  - Schema fetch helpers, component template helpers, and shared config merging.
+- `public/js/table/03-table-inbox-view.js`
+  - Inbox list rendering, sticky layout behavior, and compact DataTables controls.
+- `public/js/table/04-table-component-renderers.js`
+  - Summary/detail rendering, template bindings, and component-backed detail helpers.
+- `public/js/table/05-table-core.js`
+  - Standard DataTable rendering, AJAX fetch flow, loaders, resizer, and selection helpers.
+- `public/js/table/table.js`
+  - Compatibility entrypoint only; real logic lives in the ordered module files above.
+
 ### Notes for future changes
 
 - `.lab-table` is the selector used for automatic initialization.
 - The list page skeleton is removed by `removeTableSkeleton(tableElement)` when initialization succeeds or fails.
 - Inbox mode hides the original `.lab-table` and creates a separate `.inbox-list-table` for DataTables.
 - Refresh flows should clear cache before calling DataTables reload.
+- If a schema has both `details_component` and `form_schema_uid`, inbox detail opens in component mode, the header edit button opens the form in edit mode, and cancel/save returns to the component-backed detail view.
+- Asset discovery sorts JavaScript files alphabetically, so table module filenames intentionally use numeric prefixes to preserve dependency order.
 - If a page needs full-height behavior, prefer the viewport data attributes instead of page-specific inline scripts.
