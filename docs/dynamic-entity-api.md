@@ -87,6 +87,8 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - Main table fields are sent as top-level keys.
 - Meta fields are sent inside the `meta` object.
 - The frontend uses the shared `apiClient` so submit requests follow the same auth and credential handling as dynamic table requests.
+- When the API returns validation errors, the rendered form should surface them inline on matching fields and also show a short form-level summary for any generic or unmapped backend messages.
+- A generic backend key such as `meta_value` is treated as a metadata validation failure on the frontend, and the UI highlights the submitted empty meta fields with a clearer user-facing message.
 
 ## Defense In Depth
 - The controller keeps a separate writable main-column guard in addition to entity-definition validation.

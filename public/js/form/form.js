@@ -806,8 +806,240 @@ function resolveDynamicFormMessage(result, fallbackMessage) {
         || fallbackMessage;
 }
 
+function escapeFieldSelector(fieldName) {
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(fieldName);
+    }
+
+    return String(fieldName).replace(/"/g, '\\"');
+}
+
+function normalizeFieldErrorMessages(messages, fieldLabel) {
+    const list = Array.isArray(messages) ? messages : [messages];
+
+    return list
+        .filter(Boolean)
+        .map((message) => {
+            const rawMessage = String(message).trim();
+
+            if (!rawMessage) {
+                return `${fieldLabel} is invalid.`;
+            }
+
+            if (/^the\s+/i.test(rawMessage)) {
+                return rawMessage.replace(/^the\s+[\w.]+\s+field/i, fieldLabel);
+            }
+
+            if (/meta_value/i.test(rawMessage)) {
+                return `${fieldLabel} cannot be empty. Fill it in before submitting.`;
+            }
+
+            return rawMessage;
+        });
+}
+
+function buildFriendlySubmitMessage(message, generalErrors = []) {
+    if (generalErrors.length > 0) {
+        return generalErrors[0];
+    }
+
+    if (/meta_value/i.test(message || '')) {
+        return 'Some metadata fields are empty. Fill them in before submitting again.';
+    }
+
+    return message || 'Unable to submit the form. Please review the highlighted fields and try again.';
+}
+
+function normalizeDynamicFormErrors(errors, formMeta, payload = {}) {
+    const normalizedErrors = {};
+    const generalErrors = [];
+    const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
+    const metaPayload = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
+
+    Object.entries(errors || {}).forEach(([errorKey, messages]) => {
+        const field = fields.find((item) => item?.id === errorKey);
+
+        if (field) {
+            normalizedErrors[errorKey] = normalizeFieldErrorMessages(messages, field.label || errorKey);
+            return;
+        }
+
+        if (errorKey === 'meta_value') {
+            const emptyMetaFields = fields.filter((item) => {
+                if (item?.meta !== true || !Object.prototype.hasOwnProperty.call(metaPayload, item.id)) {
+                    return false;
+                }
+
+                const value = metaPayload[item.id];
+                return value === null || value === undefined || value === '';
+            });
+
+            if (emptyMetaFields.length > 0) {
+                emptyMetaFields.forEach((item) => {
+                    normalizedErrors[item.id] = [
+                        `${item.label || item.id} cannot be empty. Fill it in before submitting.`,
+                    ];
+                });
+                return;
+            }
+        }
+
+        const fallbackLabel = errorKey.replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+        generalErrors.push(...normalizeFieldErrorMessages(messages, fallbackLabel));
+    });
+
+    return {
+        fieldErrors: normalizedErrors,
+        generalErrors,
+    };
+}
+
+function clearDynamicFormSubmitErrors(form) {
+    if (!form) {
+        return;
+    }
+
+    form.querySelectorAll('[data-server-error="true"]').forEach((node) => node.remove());
+
+    form.querySelectorAll('.is-invalid').forEach((input) => {
+        input.classList.remove('is-invalid');
+
+        if (typeof input.setCustomValidity === 'function') {
+            input.setCustomValidity('');
+        }
+    });
+}
+
+function clearDynamicFormValidationState(form) {
+    if (!form) {
+        return;
+    }
+
+    form.classList.remove(STYLE_CLASS.WAS_VALIDATED);
+
+    form.querySelectorAll('.is-valid').forEach((input) => {
+        input.classList.remove('is-valid');
+    });
+}
+
+function getDynamicFormFieldElements(form, fieldId) {
+    const escapedFieldId = escapeFieldSelector(fieldId);
+    const inputs = Array.from(form.querySelectorAll(`[name="${escapedFieldId}"], [name="${escapedFieldId}[]"]`));
+
+    if (inputs.length > 0) {
+        return inputs;
+    }
+
+    const byId = form.querySelector(`#${escapedFieldId}`);
+    return byId ? [byId] : [];
+}
+
+function createDynamicFormErrorNode(message) {
+    const errorNode = document.createElement('div');
+    errorNode.classList.add(STYLE_CLASS.INVALID_FEEDBACK, STYLE_CLASS.SMALL);
+    errorNode.classList.add('d-block');
+    errorNode.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
+    errorNode.dataset.serverError = 'true';
+    errorNode.textContent = message;
+
+    return errorNode;
+}
+
+function appendDynamicFormFieldError(form, field, message) {
+    const fieldElements = getDynamicFormFieldElements(form, field.id);
+
+    if (fieldElements.length === 0) {
+        console.warn('Unable to map backend validation error to a rendered field.', {
+            formId: form.id,
+            fieldId: field.id,
+            message,
+        });
+        return false;
+    }
+
+    fieldElements.forEach((element) => {
+        element.classList.add('is-invalid');
+        if (typeof element.setCustomValidity === 'function') {
+            element.setCustomValidity(message);
+        }
+
+        const clearServerErrorState = () => {
+            element.classList.remove('is-invalid');
+            if (typeof element.setCustomValidity === 'function') {
+                element.setCustomValidity('');
+            }
+
+            const feedback = form.querySelector(`[data-server-error="true"][data-field-error="${field.id}"]`);
+            if (feedback) {
+                feedback.remove();
+            }
+        };
+
+        element.addEventListener('input', clearServerErrorState, { once: true });
+        element.addEventListener('change', clearServerErrorState, { once: true });
+    });
+
+    const fieldContainer = fieldElements[0].closest('.form-floating')
+        || fieldElements[0].closest('.form-check-group')
+        || fieldElements[0].parentElement
+        || fieldElements[0].closest('.col');
+
+    if (!fieldContainer) {
+        return false;
+    }
+
+    const errorNode = createDynamicFormErrorNode(message);
+    errorNode.dataset.fieldError = field.id;
+    fieldContainer.appendChild(errorNode);
+    return true;
+}
+
+function appendDynamicFormSubmitSummary(form, message, generalErrors = []) {
+    const summary = document.createElement('div');
+    summary.classList.add(STYLE_CLASS.ALERT, STYLE_CLASS.ALERT_DANGER, STYLE_CLASS.MB_3);
+    summary.dataset.serverError = 'true';
+
+    const lines = [message, ...generalErrors.filter((item) => item && item !== message)];
+    summary.innerHTML = lines
+        .map((line) => `<div>${line}</div>`)
+        .join('');
+
+    form.prepend(summary);
+}
+
+function applyDynamicFormSubmitErrors(form, formMeta, errors, message, payload) {
+    clearDynamicFormSubmitErrors(form);
+
+    const { fieldErrors, generalErrors } = normalizeDynamicFormErrors(errors, formMeta, payload);
+    const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
+    const unresolvedMessages = [];
+    const mappedFieldErrorKeys = Object.keys(fieldErrors);
+
+    window.formErrors = fieldErrors;
+
+    Object.entries(fieldErrors).forEach(([fieldId, fieldMessages]) => {
+        const field = fields.find((item) => item?.id === fieldId);
+        const errorMessage = Array.isArray(fieldMessages) ? fieldMessages[0] : fieldMessages;
+
+        if (!field || !appendDynamicFormFieldError(form, field, errorMessage)) {
+            unresolvedMessages.push(errorMessage);
+        }
+    });
+
+    const summaryLines = [...generalErrors, ...unresolvedMessages];
+    const shouldShowSummary = summaryLines.length > 0 || mappedFieldErrorKeys.length === 0;
+
+    if (shouldShowSummary) {
+        const summaryMessage = buildFriendlySubmitMessage(message, summaryLines);
+        appendDynamicFormSubmitSummary(form, summaryMessage, summaryLines);
+    }
+}
+
 async function handleDynamicFormSubmit(event, formMeta) {
     const form = event.currentTarget;
+    clearDynamicFormValidationState(form);
+    clearDynamicFormSubmitErrors(form);
+    window.formErrors = {};
 
     if (!form.checkValidity()) {
         event.preventDefault();
@@ -818,7 +1050,6 @@ async function handleDynamicFormSubmit(event, formMeta) {
 
     event.preventDefault();
     event.stopPropagation();
-        form.classList.add(STYLE_CLASS.WAS_VALIDATED);
 
     const method = resolveDynamicFormMethod(formMeta, form);
     const endpoint = resolveDynamicFormEndpoint(formMeta, form, method);
@@ -843,7 +1074,19 @@ async function handleDynamicFormSubmit(event, formMeta) {
             });
 
             if (errors) {
-                window.formErrors = errors;
+                applyDynamicFormSubmitErrors(
+                    form,
+                    formMeta,
+                    errors,
+                    resolveDynamicFormMessage(result, 'Unable to submit the form. Please review the highlighted fields and try again.'),
+                    payload
+                );
+            } else {
+                appendDynamicFormSubmitSummary(
+                    form,
+                    resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.'),
+                    []
+                );
             }
 
             dispatchDynamicFormEvent('lab-form:submit-failed', {
@@ -892,6 +1135,12 @@ async function handleDynamicFormSubmit(event, formMeta) {
         }
     } catch (error) {
         console.error('Dynamic form submit error.', error);
+        clearDynamicFormSubmitErrors(form);
+        appendDynamicFormSubmitSummary(
+            form,
+            error?.message || 'Something went wrong while submitting the form.',
+            []
+        );
 
         dispatchDynamicFormEvent('lab-form:submit-failed', {
             formId: form.id,

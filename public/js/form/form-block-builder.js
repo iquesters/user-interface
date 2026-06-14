@@ -423,7 +423,7 @@ function createFieldFragment(field, addTo, addClass = null) {
 function createHelperText(field, container) {
     if (field.helpertext || field.helperText) {
         const helper = document.createElement(HTML_TAG.DIV);
-        helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL);
+        helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_MUTED);
         helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = field.helpertext || field.helperText;
