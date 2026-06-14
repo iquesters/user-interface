@@ -228,21 +228,6 @@ async function initLabTable(tableElement) {
     const entity = schema.entity;
     const dtSchemaConfig = schema["dt-options"] || {};
     const entriesPerPage = schema.entries_per_page || 10;
-    
-    // Check localStorage first for view mode preference
-    const storageKey = `view_mode_${entity}_${slug}`;
-    let viewMode = null;
-    
-    try {
-        viewMode = localStorage.getItem(storageKey);
-    } catch (e) {
-            console.warn(TABLE_MESSAGE_FAILED_LOCALSTORAGE_READ, e);
-    }
-    
-    // If no stored preference, use schema default
-    if (!viewMode) {
-        viewMode = schema.default_view_mode || VIEW_MODE_TABLE;
-    }
 
     if (!entity || !dtSchemaConfig.columns) {
         removeTableSkeleton(tableElement);

@@ -811,7 +811,9 @@ function escapeFieldSelector(fieldName) {
         return CSS.escape(fieldName);
     }
 
-    return String(fieldName).replace(/"/g, '\\"');
+    return String(fieldName)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
 }
 
 function normalizeFieldErrorMessages(messages, fieldLabel) {
