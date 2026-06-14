@@ -3,24 +3,24 @@ function applyCompactDataTableControls(container) {
         return;
     }
 
-    container.querySelectorAll('.dt-paging .pagination').forEach((pagination) => {
-        pagination.classList.add('pagination-sm', 'mb-0');
+    container.querySelectorAll(TABLE_SELECTOR_DT_PAGING_PAGINATION).forEach((pagination) => {
+        pagination.classList.add('pagination-sm', TABLE_CLASS_MB_0);
     });
 
-    container.querySelectorAll('.dt-paging .page-link').forEach((link) => {
-        link.classList.add('py-1', 'px-2', 'small');
+    container.querySelectorAll(TABLE_SELECTOR_DT_PAGE_LINK).forEach((link) => {
+        link.classList.add('py-1', TABLE_CLASS_PX_2, TABLE_CLASS_SMALL);
     });
 
-    container.querySelectorAll('.dt-length select').forEach((select) => {
+    container.querySelectorAll(TABLE_SELECTOR_DT_LENGTH_SELECT).forEach((select) => {
         select.classList.add('form-select-sm');
     });
 
-    container.querySelectorAll('.dt-search input[type="search"]').forEach((input) => {
+    container.querySelectorAll(TABLE_SELECTOR_DT_SEARCH_INPUT).forEach((input) => {
         input.classList.add('form-control-sm');
     });
 
-    container.querySelectorAll('.dt-info, .dt-length, .dt-search').forEach((element) => {
-        element.classList.add('small');
+    container.querySelectorAll(TABLE_SELECTOR_DT_INFO_BLOCKS).forEach((element) => {
+        element.classList.add(TABLE_CLASS_SMALL);
     });
 }
 
@@ -318,10 +318,10 @@ function renderInboxListCell(col, row) {
 
 function getLoaderComponentHTML() {
     return `
-        <div class="d-flex justify-content-center align-items-center" style="height: 100%;">
-            <div class="text-center">
-                <div class="spinner-border text-primary mb-2" role="status"></div>
-                <div class="text-muted">${TABLE_MESSAGE_LOADING_DETAILS}</div>
+        <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER}" style="height: 100%;">
+            <div class="${TABLE_CLASS_TEXT_CENTER}">
+                <div class="spinner-border text-primary ${TABLE_CLASS_MB_2}" role="status"></div>
+                <div class="${TABLE_CLASS_TEXT_MUTED}">${TABLE_MESSAGE_LOADING_DETAILS}</div>
             </div>
         </div>
     `;
@@ -344,7 +344,7 @@ function formatDetailLabel(key) {
 
 function formatFallbackDetailValue(value) {
     if (value === null || value === undefined || value === '') {
-        return '<span class="text-muted">-</span>';
+        return `<span class="${TABLE_CLASS_TEXT_MUTED}">-</span>`;
     }
 
     if (typeof value === 'boolean') {
@@ -352,7 +352,7 @@ function formatFallbackDetailValue(value) {
     }
 
     if (typeof value === 'object') {
-        return `<pre class="mb-0 small text-wrap">${escapeDetailHtml(JSON.stringify(value, null, 2))}</pre>`;
+        return `<pre class="${TABLE_CLASS_MB_0} ${TABLE_CLASS_SMALL} text-wrap">${escapeDetailHtml(JSON.stringify(value, null, 2))}</pre>`;
     }
 
     return escapeDetailHtml(value);
@@ -365,7 +365,7 @@ function renderFallbackDetailComponent(data = {}) {
     recordEntries.forEach(([key, value]) => {
         rows.push(`
             <tr>
-                <th scope="row" class="text-muted fw-semibold" style="width: 32%;">${escapeDetailHtml(formatDetailLabel(key))}</th>
+                <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(formatDetailLabel(key))}</th>
                 <td class="text-break">${formatFallbackDetailValue(value)}</td>
             </tr>
         `);
@@ -378,7 +378,7 @@ function renderFallbackDetailComponent(data = {}) {
 
         rows.push(`
             <tr>
-                <th scope="row" class="text-muted fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
                 <td class="text-break">${formatFallbackDetailValue(metaValue)}</td>
             </tr>
         `);
@@ -387,17 +387,17 @@ function renderFallbackDetailComponent(data = {}) {
     if (rows.length === 0) {
         rows.push(`
             <tr>
-                <td colspan="2" class="text-center text-muted py-4">No details available</td>
+                <td colspan="2" class="${TABLE_CLASS_TEXT_CENTER} ${TABLE_CLASS_TEXT_MUTED} py-4">${TABLE_MESSAGE_NO_DETAILS_AVAILABLE}</td>
             </tr>
         `);
     }
 
     return `
-        <div class="d-flex align-items-center justify-content-between mb-2 pt-3 px-2">
-            <h6 class="mb-0 fw-semibold text-muted">${TABLE_MESSAGE_RECORD_INFO}</h6>
+        <div class="${TABLE_CLASS_D_FLEX} ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_JUSTIFY_CONTENT_BETWEEN} ${TABLE_CLASS_MB_2} ${TABLE_CLASS_PT_3} ${TABLE_CLASS_PX_2}">
+            <h6 class="${TABLE_CLASS_MB_0} fw-semibold ${TABLE_CLASS_TEXT_MUTED}">${TABLE_MESSAGE_RECORD_INFO}</h6>
         </div>
-        <div class="table-responsive rounded p-1">
-            <table class="table table-sm table-hover mb-0 align-middle" style="--bs-table-bg: transparent;">
+        <div class="table-responsive ${TABLE_CLASS_ROUNDED} ${TABLE_CLASS_P_1}">
+            <table class="table table-sm table-hover ${TABLE_CLASS_MB_0} align-middle" style="--bs-table-bg: transparent;">
                 <colgroup><col style="width: 32%;"><col></colgroup>
                 <tbody>
                     ${rows.join('')}
@@ -489,7 +489,7 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
     const entity = detailContext?.schema?.entity;
     const entityUid = nextRowData?.uid || detailContext?.data?.uid || null;
     if (!entity || !entityUid || !nextRowData) {
-        console.warn('⚠️ Skipping inbox summary sync because detail context is incomplete.', {
+        console.warn(TABLE_LOG_SKIP_SUMMARY_SYNC, {
             entity,
             entityUid,
             hasNextRowData: !!nextRowData,
@@ -501,11 +501,11 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
     cache?.updateRowByUid(entityUid, nextRowData);
 
     const listTable = detailContext.rightPanelEle
-        ?.closest('.inbox-view-container')
+        ?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)
         ?.querySelector(TABLE_SELECTOR_INBOX_LIST);
 
     if (!listTable || typeof $ === 'undefined' || !$.fn.DataTable || !$.fn.DataTable.isDataTable(listTable)) {
-        console.warn('⚠️ Inbox summary sync skipped DataTable row update because the inbox list table is unavailable.', {
+        console.warn(TABLE_LOG_SKIP_SUMMARY_DT_UPDATE, {
             entity,
             entityUid,
         });
@@ -526,14 +526,14 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
 
     if (updatedRow) {
         dt.draw(false);
-        console.log('✅ Synced inbox summary row after detail update.', {
+        console.log(TABLE_LOG_SUMMARY_SYNC_COMPLETE, {
             entity,
             entityUid,
         });
         return;
     }
 
-    console.warn('⚠️ Inbox summary sync could not find the selected row in the current DataTable page.', {
+    console.warn(TABLE_LOG_SUMMARY_ROW_NOT_FOUND, {
         entity,
         entityUid,
     });
@@ -541,14 +541,14 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
 
 async function openDetailInPreferredMode(context, overrides = {}) {
     if (!context?.rightPanelEle || !context?.schema || !context?.data) {
-        console.warn('⚠️ Skipping detail mode switch because detail context is incomplete.', { context, overrides });
+        console.warn(TABLE_LOG_SKIP_DETAIL_MODE_SWITCH, { context, overrides });
         return;
     }
 
     const nextPreferredMode = overrides.preferredMode || context.preferredMode;
     const nextFormMode = overrides.formMode || 'view';
 
-    console.log('🔁 Switching inbox detail mode.', {
+    console.log(TABLE_LOG_SWITCHING_DETAIL_MODE, {
         entity: context.schema?.entity,
         uid: context.data?.uid || context.data?.id || null,
         preferredMode: nextPreferredMode,
@@ -567,17 +567,17 @@ function appendHybridDetailEditButton(header, detailContext) {
     }
 
     const actionWrapper = document.createElement('div');
-    actionWrapper.className = 'd-flex align-items-center ms-auto me-2';
+    actionWrapper.className = `${TABLE_CLASS_D_FLEX} ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ms-auto me-2`;
 
     const editButton = document.createElement('button');
     editButton.type = 'button';
-    editButton.className = 'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0';
+    editButton.className = TABLE_CLASS_BTN_LINK_EDIT;
     editButton.innerHTML = '<i class="fas fa-pencil-alt"></i><span>Edit</span>';
     editButton.addEventListener('click', async (event) => {
         event.preventDefault();
         event.stopPropagation();
 
-        console.log('📝 Opening inbox detail form editor from component view.', {
+        console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
             formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -618,21 +618,21 @@ async function handleHybridDetailDelete(detailContext) {
     const entityUid = detailContext?.data?.uid;
 
     if (!entity || !entityUid) {
-        console.warn('⚠️ Skipping inbox detail delete because entity context is incomplete.', {
+        console.warn(TABLE_LOG_SKIP_DETAIL_DELETE, {
             entity,
             entityUid,
         });
         return;
     }
 
-    const confirmed = window.confirm('Delete this record? This action cannot be undone.');
+    const confirmed = window.confirm(TABLE_MESSAGE_CONFIRM_DELETE);
     if (!confirmed) {
-        console.log('ℹ️ Inbox detail delete canceled by user.', { entity, entityUid });
+        console.log(TABLE_LOG_DETAIL_DELETE_CANCELLED, { entity, entityUid });
         return;
     }
 
     const endpoint = `/api/entity/delete/${entity}/${entityUid}`;
-    console.log('🗑️ Deleting inbox detail record from component view.', {
+    console.log(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
         endpoint,
@@ -651,7 +651,7 @@ async function handleHybridDetailDelete(detailContext) {
             })));
 
         if (!result?.success) {
-            console.error('❌ Inbox detail delete failed.', {
+            console.error(TABLE_LOG_DETAIL_DELETE_FAILED, {
                 entity,
                 entityUid,
                 endpoint,
@@ -661,7 +661,7 @@ async function handleHybridDetailDelete(detailContext) {
         }
 
         const rightPanelEle = detailContext.rightPanelEle;
-        const parentContainer = rightPanelEle?.closest('.inbox-view-container');
+        const parentContainer = rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const listTable = parentContainer?.querySelector(TABLE_SELECTOR_INBOX_LIST);
         const rootTable = document.querySelector(TABLE_SELECTOR_LAB_TABLE);
 
@@ -675,10 +675,10 @@ async function handleHybridDetailDelete(detailContext) {
                 .split(' ')
                 .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white' && cls !== 'bg-light')
                 .join(' ');
-            rightPanelEle.classList.add('d-flex', 'flex-column', 'overflow-hidden', 'p-0', 'm-0');
+            rightPanelEle.classList.add(TABLE_CLASS_D_FLEX, TABLE_CLASS_FLEX_COLUMN, TABLE_CLASS_OVERFLOW_HIDDEN, TABLE_CLASS_P_0, TABLE_CLASS_M_0);
 
             const emptyState = document.createElement('div');
-            emptyState.className = 'd-flex align-items-center justify-content-center h-100 w-100 text-center text-muted';
+            emptyState.className = TABLE_CLASS_EMPTY_STATE;
             emptyState.innerHTML = TABLE_MESSAGE_EMPTY_DETAIL;
             rightPanelEle.appendChild(emptyState);
         }
@@ -691,12 +691,12 @@ async function handleHybridDetailDelete(detailContext) {
             }
         }
 
-        console.log('✅ Inbox detail record deleted successfully from component view.', {
+        console.log(TABLE_LOG_DETAIL_DELETE_SUCCESS, {
             entity,
             entityUid,
         });
     } catch (error) {
-        console.error('❌ Inbox detail delete request failed.', {
+        console.error(TABLE_LOG_DETAIL_DELETE_REQUEST_FAILED, {
             entity,
             entityUid,
             endpoint,
@@ -717,17 +717,17 @@ function appendHybridDetailActions(rightPanelEle, contentContainer, detailContex
 
     // Keep component-backed detail actions aligned with lab-form view actions, but render them below the shared header.
     const actionWrapper = document.createElement('div');
-    actionWrapper.className = 'inbox-detail-actions d-flex align-items-center justify-content-end gap-3 px-3 pt-3 flex-shrink-0';
+    actionWrapper.className = TABLE_CLASS_DETAIL_ACTIONS;
 
     const editButton = createDetailHeaderActionButton(
         'fas fa-pencil-alt',
         'Edit',
-        'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+        TABLE_CLASS_BTN_LINK_EDIT,
         async (event) => {
             event.preventDefault();
             event.stopPropagation();
 
-            console.log('📝 Opening inbox detail form editor from component view.', {
+            console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
                 entity: detailContext.schema?.entity,
                 uid: detailContext.data?.uid || detailContext.data?.id || null,
                 formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -743,7 +743,7 @@ function appendHybridDetailActions(rightPanelEle, contentContainer, detailContex
     const deleteButton = createDetailHeaderActionButton(
         'fas fa-trash',
         'Delete',
-        'btn btn-sm btn-link text-danger text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+        TABLE_CLASS_BTN_LINK_DELETE,
         async (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -770,7 +770,7 @@ function getNestedDetailValue(source, paths = []) {
 }
 
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
-    console.log('📥 Loading inbox detail panel.', {
+    console.log(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
         requestedPreferredMode: options?.preferredMode || null,
@@ -790,7 +790,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         .filter(cls => !cls.includes('inbox-') && cls !== 'd-flex' && cls !== 'flex-column')
         .join(' ');
     
-    rightPanelEle.classList.add('d-flex', 'flex-column', 'h-100', 'overflow-hidden', 'p-0', 'm-0');
+    rightPanelEle.classList.add(TABLE_CLASS_D_FLEX, TABLE_CLASS_FLEX_COLUMN, 'h-100', TABLE_CLASS_OVERFLOW_HIDDEN, TABLE_CLASS_P_0, TABLE_CLASS_M_0);
     
     // Restore width settings if they existed
     if (currentWidth) rightPanelEle.style.width = currentWidth;
@@ -798,22 +798,22 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     
     // Create header - using Bootstrap classes
     const header = document.createElement('div');
-    header.className = 'inbox-detail-header d-flex justify-content-between align-items-center w-100 pt-2 pb-1 px-3 flex-shrink-0 border-bottom';
+    header.className = `inbox-detail-header ${TABLE_CLASS_D_FLEX} ${TABLE_CLASS_JUSTIFY_CONTENT_BETWEEN} ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_W_100} pt-2 pb-1 px-3 flex-shrink-0 border-bottom`;
     
     // Title on left
     const titleWrapper = document.createElement('div');
-    titleWrapper.className = 'd-flex flex-column';
+    titleWrapper.className = `${TABLE_CLASS_D_FLEX} flex-column`;
 
     const entityLabel = document.createElement('small');
-    entityLabel.className = 'small text-muted';
+    entityLabel.className = `${TABLE_CLASS_SMALL} ${TABLE_CLASS_TEXT_MUTED}`;
     entityLabel.style.fontSize = '0.7rem';
     entityLabel.textContent = formatDetailLabel(schema?.entity || 'Details');
 
     const title = document.createElement('p');
-    title.className = 'mb-0 fw-medium text-primary';
+    title.className = `${TABLE_CLASS_MB_0} fw-medium text-primary`;
     
     // Try to get a meaningful title from the data
-    let titleText = 'Details';
+    let titleText = TABLE_MESSAGE_DETAILS;
     if (data) {
         const matchedField = TABLE_DETAIL_TITLE_FIELDS.find((field) => data[field]);
         if (matchedField) titleText = `${data[matchedField]}`;
@@ -823,28 +823,28 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     titleWrapper.appendChild(entityLabel);
 
     const metaWrapper = document.createElement('div');
-    metaWrapper.className = 'd-flex flex-column align-items-end';
+    metaWrapper.className = `${TABLE_CLASS_D_FLEX} flex-column align-items-end`;
 
     const metaUser = document.createElement('small');
-    metaUser.className = 'small text-muted';
+    metaUser.className = `${TABLE_CLASS_SMALL} ${TABLE_CLASS_TEXT_MUTED}`;
     metaUser.style.fontSize = '0.7rem';
     metaUser.style.display = 'none';
 
     const metaDate = document.createElement('small');
-    metaDate.className = 'small text-muted';
+    metaDate.className = `${TABLE_CLASS_SMALL} ${TABLE_CLASS_TEXT_MUTED}`;
     metaDate.style.fontSize = '0.7rem';
     metaDate.style.display = 'none';
     
     // Cross icon on right - using Bootstrap btn-close
     const closeButton = document.createElement('button');
     closeButton.type = 'button';
-    closeButton.className = 'btn btn-sm btn-close opacity-50-hover';
-    closeButton.setAttribute('aria-label', 'Close');
+    closeButton.className = `${TABLE_CLASS_BTN} ${TABLE_CLASS_BTN_SM} btn-close opacity-50-hover`;
+    closeButton.setAttribute('aria-label', TABLE_MESSAGE_CLOSE);
     closeButton.onclick = (e) => {
         e.stopPropagation();
         
         // Clear the right panel content but PRESERVE WIDTH
-        const parentContainer = rightPanelEle.closest('.inbox-view-container');
+        const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const currentWidth = rightPanelEle.style.width;
         const currentFlex = rightPanelEle.style.flex;
         
@@ -854,14 +854,14 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             .filter(cls => !cls.includes('inbox-') && cls !== 'bg-white' && cls !== 'bg-light')
             .join(' ');
         
-        rightPanelEle.classList.add('d-flex', 'flex-column', 'overflow-hidden', 'p-0', 'm-0');
+        rightPanelEle.classList.add(TABLE_CLASS_D_FLEX, TABLE_CLASS_FLEX_COLUMN, TABLE_CLASS_OVERFLOW_HIDDEN, TABLE_CLASS_P_0, TABLE_CLASS_M_0);
         
         // Restore width settings
         if (currentWidth) rightPanelEle.style.width = currentWidth;
         if (currentFlex) rightPanelEle.style.flex = currentFlex;
         
         const emptyState = document.createElement('div');
-        emptyState.className = 'd-flex align-items-center justify-content-center h-100 w-100 text-center text-muted';
+        emptyState.className = TABLE_CLASS_EMPTY_STATE;
         emptyState.innerHTML = TABLE_MESSAGE_EMPTY_DETAIL;
         rightPanelEle.appendChild(emptyState);
         
@@ -906,7 +906,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     
     // Content container - using Bootstrap classes
     const contentContainer = document.createElement('div');
-    contentContainer.className = `${TABLE_SELECTOR_DETAIL_CONTENT.slice(1)} flex-grow-1 w-100 overflow-auto p-2`;
+    contentContainer.className = `${TABLE_SELECTOR_DETAIL_CONTENT.slice(1)} flex-grow-1 ${TABLE_CLASS_W_100} overflow-auto p-2`;
     contentContainer.innerHTML = getLoaderComponentHTML();
     
     // Assemble the panel
@@ -927,7 +927,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
-        console.log('🧭 Resolved inbox detail strategy.', {
+        console.log(TABLE_LOG_RESOLVED_DETAIL_STRATEGY, {
             entity: schema?.entity,
             uid: data?.uid || data?.id || null,
             preferredMode,
@@ -936,7 +936,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         });
 
         if (!detailAttempts.length) {
-            console.warn('⚠️ No configured inbox detail renderer was found; using fallback detail view.', {
+            console.warn(TABLE_LOG_NO_DETAIL_RENDERER, {
                 entity: schema?.entity,
                 uid: data?.uid || data?.id || null,
             });
@@ -948,7 +948,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         let rendered = false;
 
         for (const attempt of detailAttempts) {
-            console.log(`📋 Loading detail ${attempt.type}: ${attempt.componentName}`);
+            console.log(`${TABLE_LOG_LOADING_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`);
 
             let result = null;
 
@@ -970,7 +970,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             }
 
             if (!result.success || !result.html) {
-                console.warn(`⚠️ Failed detail ${attempt.type}: ${attempt.componentName}`, result.error || result.message);
+                console.warn(`${TABLE_LOG_FAILED_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`, result.error || result.message);
                 continue;
             }
 
@@ -980,7 +980,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             const contentChildren = contentContainer.children;
             for (let child of contentChildren) {
                 if (child.style) {
-                    child.classList.add('w-100');
+                    child.classList.add(TABLE_CLASS_W_100);
                     child.style.boxSizing = 'border-box'; // Bootstrap doesn't have a class for this
                 }
             }
@@ -995,7 +995,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
                 const formMeta = await setupForm(form);
 
                 if (!formMeta && form.dataset.schemaState === 'not-found') {
-                    console.warn(`⚠️ Detail ${attempt.type} resolved to a missing form schema`);
+                    console.warn(`${TABLE_LOG_MISSING_FORM_SCHEMA} ${attempt.type}`);
                     continue;
                 }
             }
@@ -1010,13 +1010,13 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             
             initializeDetailViewScripts(contentContainer);
             
-            console.log(`✅ Detail component loaded successfully for UID: ${data.uid}`);
+            console.log(`${TABLE_LOG_DETAIL_COMPONENT_LOADED} ${data.uid}`);
             rendered = true;
             break;
         }
 
         if (!rendered) {
-            console.warn('⚠️ All configured inbox detail renderers failed; using fallback detail view.', {
+            console.warn(TABLE_LOG_ALL_DETAIL_RENDERERS_FAILED, {
                 entity: schema?.entity,
                 uid: data?.uid || data?.id || null,
                 preferredMode,
@@ -1026,7 +1026,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         }
         
     } catch (error) {
-        console.error('❌ Error loading inbox detail component.', {
+        console.error(TABLE_LOG_DETAIL_COMPONENT_ERROR, {
             entity: schema?.entity,
             uid: data?.uid || data?.id || null,
             error,
@@ -1039,10 +1039,10 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 // Update showDetailError to use Bootstrap classes
 function showDetailError(container, message) {
     container.innerHTML = `
-        <div class="alert alert-danger m-0 w-100">
+        <div class="${TABLE_CLASS_ALERT} ${TABLE_CLASS_ALERT_DANGER} m-0 ${TABLE_CLASS_W_100}">
             <h5>${TABLE_MESSAGE_ERROR_LOADING_DETAILS}</h5>
-            <p class="mb-2">${message}</p>
-            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">
+            <p class="${TABLE_CLASS_MB_2}">${message}</p>
+            <button class="${TABLE_CLASS_BTN} ${TABLE_CLASS_BTN_SM} btn-outline-danger" onclick="location.reload()">
                 ${TABLE_MESSAGE_RELOAD_PAGE}
             </button>
         </div>
@@ -1050,7 +1050,7 @@ function showDetailError(container, message) {
 }
 
 function initializeInboxSummaryComponents(container) {
-    const summaryNodes = container.querySelectorAll('.inbox-summary-component:not([data-summary-initialized="true"])');
+    const summaryNodes = container.querySelectorAll(TABLE_SELECTOR_SUMMARY_NODES);
     summaryNodes.forEach((node) => {
         node.dataset.summaryInitialized = 'true';
         executeComponentScripts(node);
@@ -1077,6 +1077,6 @@ function confirmDetailReplacement(rightPanelEle) {
         return true;
     }
 
-    return window.confirm('You have unsaved changes in edit mode. Switch rows and lose those changes?');
+    return window.confirm(TABLE_MESSAGE_CONFIRM_UNSAVED);
 }
 

@@ -1,5 +1,5 @@
 function executeComponentScripts(container) {
-    const scripts = container.querySelectorAll('script');
+    const scripts = container.querySelectorAll(TABLE_SELECTOR_SCRIPTS);
     scripts.forEach(oldScript => {
         const newScript = document.createElement('script');
         Array.from(oldScript.attributes).forEach(attr => {
@@ -16,10 +16,10 @@ function setupResizer(resizer, leftPanel, rightPanel, container) {
     let startWidth = 0;
 
     const setResizerState = (isActive) => {
-        resizer.classList.toggle('bg-info', isActive);
-        resizer.classList.toggle('border-info', isActive);
-        resizer.classList.toggle('bg-light', !isActive);
-        resizer.classList.toggle('border-light-subtle', !isActive);
+        resizer.classList.toggle(TABLE_CLASS_BG_INFO, isActive);
+        resizer.classList.toggle(TABLE_CLASS_BORDER_INFO, isActive);
+        resizer.classList.toggle(TABLE_CLASS_BG_LIGHT, !isActive);
+        resizer.classList.toggle(TABLE_CLASS_BORDER_LIGHT_SUBTLE, !isActive);
     };
 
     setResizerState(false);
@@ -86,11 +86,11 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         "table-hover",
     );
     tableElement.innerHTML = `<thead><tr></tr></thead><tbody></tbody>`;
-    const theadRow = tableElement.querySelector("thead tr");
+    const theadRow = tableElement.querySelector(TABLE_SELECTOR_THEAD_ROWS);
 
     // Add checkbox column header
     const checkboxTh = document.createElement("th");
-    checkboxTh.className = "checkbox-column";
+    checkboxTh.className = TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1);
     checkboxTh.innerHTML = `<input type="checkbox" id="${TABLE_ID_SELECT_ALL}" style="cursor: pointer;">`;
     theadRow.appendChild(checkboxTh);
 
@@ -108,7 +108,7 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         data: null,
         orderable: false,  // ✅ Make checkbox column non-sortable
         searchable: false, // ✅ Exclude from search
-        className: 'checkbox-column',
+        className: TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1),
         width: '40px',
         render: (row) => `<input type="checkbox" class="${TABLE_SELECTOR_ROW_CHECKBOX.slice(1)}" data-uid="${row.uid || row.id}" style="cursor: pointer;">`
     },
@@ -157,7 +157,7 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
 
-    console.log(`✅ DataTable ready for: ${entityName}`);
+    console.log(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
 }
 
 function renderCell(col, row, rootFormSchemaUid) {
@@ -174,7 +174,7 @@ function renderCell(col, row, rootFormSchemaUid) {
 
     if (col.link && row.uid) {
         const formSchemaUid = col["form-schema-uid"] || rootFormSchemaUid;
-        return `<a href="/edit/${formSchemaUid}/${row.uid}" class="datatable-link text-primary" style="text-decoration:none;">${val}</a>`;
+        return `<a href="${TABLE_ROUTE_EDIT_PREFIX}${formSchemaUid}/${row.uid}" class="datatable-link text-primary" style="text-decoration:none;">${val}</a>`;
     }
     return val;
 }
@@ -187,17 +187,17 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     const length = params.length || cache.pageSize;
     const page = Math.floor(start / length) + 1;
 
-    console.log(`📄 Request: page ${page} (offset=${start}, length=${length})`);
+    console.log(`${TABLE_LOG_REQUEST_PAGE} ${page} (offset=${start}, length=${length})`);
 
     if (cache.pageSize !== length) {
-        console.log(`🔄 Page size changed: ${cache.pageSize} → ${length}`);
+        console.log(`${TABLE_LOG_PAGE_SIZE_CHANGED} ${cache.pageSize} → ${length}`);
         cache.pageSize = length;
     }
 
     // Check cache first
     if (cache.hasRange(start, length)) {
         const cachedData = cache.get(start, length);
-        console.log(`✨ Serving from cache (${start}-${start + length})`);
+        console.log(`${TABLE_LOG_SERVING_FROM_CACHE} (${start}-${start + length})`);
         
         callback({
             draw: params.draw,
@@ -214,7 +214,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     }
 
     // Fetch from API
-    console.log(`🌐 Cache miss - fetching from API`);
+    console.log(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
     const result = await fetchEntityData(entityName, start, length);
@@ -254,16 +254,16 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
     if (nextOffset >= cache.total) return;
     if (cache.hasRange(nextOffset, currentLength)) return;
 
-    console.log(`🔮 Prefetching next batch at offset ${nextOffset}`);
+    console.log(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
     
     const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength)
         .then(result => {
             if (result.success && result.data?.length) {
                 cache.set(nextOffset, result.data, result.total);
-                console.log(`✅ Prefetch complete: ${result.data.length} rows`);
+                console.log(`${TABLE_LOG_PREFETCH_COMPLETE} ${result.data.length} rows`);
             }
         })
-        .catch(err => console.warn('Prefetch failed:', err))
+        .catch(err => console.warn(`${TABLE_MESSAGE_FAILED_LOAD_DATA} (prefetch):`, err))
         .finally(() => cache.prefetchPromises.delete(prefetchKey));
 
     cache.prefetchPromises.set(prefetchKey, prefetchPromise);
@@ -273,15 +273,15 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
 // 🌀 UI HELPERS
 // ---------------------------
 function showTableLoader(tableElement) {
-    const tbody = tableElement.querySelector("tbody");
+    const tbody = tableElement.querySelector(TABLE_SELECTOR_TBODY);
     if (!tbody) return;
 
     if (tableElement.classList.contains(TABLE_SELECTOR_INBOX_LIST.slice(1))) {
         tbody.innerHTML = `
-            <tr class="border-bottom border-2 border-light-subtle">
-                <td class="checkbox-column border-bottom border-light-subtle"></td>
-                <td class="border-bottom border-light-subtle">
-                    <div class="d-flex justify-content-center align-items-center gap-2 text-muted py-4">
+            <tr class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_2} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
+                <td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)} ${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}"></td>
+                <td class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
+                    <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED} py-4">
                         <div class="spinner-border spinner-border-sm" role="status"></div>
                         <span>${TABLE_MESSAGE_LOADING}</span>
                     </div>
@@ -292,8 +292,8 @@ function showTableLoader(tableElement) {
 
     tbody.innerHTML = `
         <tr>
-            <td colspan="100%" class="text-center py-4">
-                <div class="d-flex justify-content-center align-items-center gap-2 text-muted">
+            <td colspan="100%" class="${TABLE_CLASS_TEXT_CENTER} py-4">
+                <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED}">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
                     <span>${TABLE_MESSAGE_LOADING}</span>
                 </div>
@@ -306,11 +306,11 @@ function showAuthWarning() {
         removeTableSkeleton(t);
         t.innerHTML = `
         <tr>
-            <td colspan="10" class="text-center py-4">
-                <div class="alert alert-warning">
+            <td colspan="10" class="${TABLE_CLASS_TEXT_CENTER} py-4">
+                <div class="${TABLE_CLASS_ALERT} ${TABLE_CLASS_ALERT_WARNING}">
                     <h5>${TABLE_MESSAGE_AUTH_REQUIRED}</h5>
                     <p>${TABLE_MESSAGE_LOGIN_REQUIRED}</p>
-                    <a href="${TABLE_ROUTE_LOGIN}" class="btn btn-primary">Login</a>
+                    <a href="${TABLE_ROUTE_LOGIN}" class="${TABLE_CLASS_BTN} ${TABLE_CLASS_BTN_PRIMARY}">Login</a>
                 </div>
             </td>
         </tr>`;
@@ -319,7 +319,7 @@ function showAuthWarning() {
 
 function showErrorMessage(table, msg) {
     removeTableSkeleton(table);
-    table.innerHTML = `<tr><td colspan="10" class="text-center py-4 text-muted">${msg}</td></tr>`;
+    table.innerHTML = `<tr><td colspan="10" class="${TABLE_CLASS_TEXT_CENTER} py-4 ${TABLE_CLASS_TEXT_MUTED}">${msg}</td></tr>`;
 }
 
 // ---------------------------
@@ -362,14 +362,14 @@ function setupCheckboxHandlers(tableElement, isInboxView = false) {
 
 function updateSelectionCount(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`);
-    console.log(`📋 Selected rows: ${checkedBoxes.length}`);
+    console.log(`${TABLE_LOG_SELECTED_ROWS} ${checkedBoxes.length}`);
     
     // Get selected UIDs
     const selectedUids = Array.from(checkedBoxes).map(cb => cb.dataset.uid);
-    console.log('Selected UIDs:', selectedUids);
+    console.log(TABLE_MESSAGE_SELECTED_UIDS, selectedUids);
     
     // Dispatch event on document for bulk actions to catch
-    const event = new CustomEvent('rowSelectionChanged', {
+    const event = new CustomEvent(TABLE_EVENT_ROW_SELECTION_CHANGED, {
         detail: { 
             count: checkedBoxes.length, 
             uids: selectedUids,

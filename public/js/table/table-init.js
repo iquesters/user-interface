@@ -12,7 +12,7 @@ class ViewModeManager {
         // This is crucial because DataTables wraps the table in its own divs
         this.originalParent = tableElement.parentNode;
         
-        console.log('💾 Stored original parent:', this.originalParent?.className);
+        console.log(TABLE_LOG_STORED_ORIGINAL_PARENT, this.originalParent?.className);
         
         // Initialize view mode from local storage or use default
         this.currentViewMode = this.getStoredViewMode() || this.defaultViewMode;
@@ -26,7 +26,7 @@ class ViewModeManager {
             const stored = localStorage.getItem(this.storageKey);
             return stored || null;
         } catch (e) {
-            console.warn('Failed to read from localStorage:', e);
+            console.warn(TABLE_MESSAGE_FAILED_LOCALSTORAGE_READ, e);
             return null;
         }
     }
@@ -34,16 +34,16 @@ class ViewModeManager {
     storeViewMode(mode) {
         try {
             localStorage.setItem(this.storageKey, mode);
-            console.log(`💾 Stored view mode for ${this.entity}: ${mode}`);
+            console.log(`${TABLE_LOG_STORED_VIEW_MODE} ${this.entity}: ${mode}`);
         } catch (e) {
-            console.warn('Failed to write to localStorage:', e);
+            console.warn(TABLE_MESSAGE_FAILED_LOCALSTORAGE_WRITE, e);
         }
     }
     
     setupToggleButton() {
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (!toggleBtn) {
-            console.warn('Toggle button not found');
+            console.warn(TABLE_MESSAGE_TOGGLE_BUTTON_NOT_FOUND);
             return;
         }
         
@@ -74,7 +74,7 @@ class ViewModeManager {
             ? VIEW_MODE_INBOX 
             : VIEW_MODE_TABLE;
         
-        console.log(`🔄 Switching view mode: ${this.currentViewMode} → ${newMode}`);
+        console.log(`${TABLE_LOG_SWITCHING_VIEW_MODE} ${this.currentViewMode} → ${newMode}`);
         
         // Store in localStorage
         this.storeViewMode(newMode);
@@ -87,7 +87,7 @@ class ViewModeManager {
         if (toggleBtn) this.updateToggleButton(toggleBtn);
         
         // Dispatch view mode changed event
-        const event = new CustomEvent('viewModeChanged', {
+        const event = new CustomEvent(TABLE_EVENT_VIEW_MODE_CHANGED, {
             detail: { 
                 entity: this.entity,
                 oldMode: this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE,
@@ -102,11 +102,11 @@ class ViewModeManager {
     }
 
     async reRenderView() {
-        console.log('🔧 Starting view re-render...');
+        console.log(TABLE_LOG_START_VIEW_RERENDER);
         
         // Destroy existing DataTable if it exists
         if ($.fn.DataTable && $.fn.DataTable.isDataTable(this.tableElement)) {
-            console.log('🗑️ Destroying existing DataTable');
+            console.log(TABLE_LOG_DESTROYING_DATATABLE);
             $(this.tableElement).DataTable().destroy(true);
         }
         
@@ -117,7 +117,7 @@ class ViewModeManager {
         
         // If table is still wrapped in DataTables divs, unwrap it
         if (targetParent && targetParent.classList.contains('dt-layout-full')) {
-            console.log('🔍 Table still in DataTables wrapper, finding original parent');
+            console.log(TABLE_LOG_FINDING_ORIGINAL_PARENT);
             // Find the original parent (should be the col-md-12 div or similar)
             let current = targetParent;
             while (current.parentNode && current.classList.contains('dt-layout-full')) {
@@ -127,34 +127,34 @@ class ViewModeManager {
             
             // Move table back to original parent
             if (targetParent) {
-                console.log('📤 Moving table back to original parent');
+                console.log(TABLE_LOG_MOVING_TABLE_TO_ORIGINAL_PARENT);
                 targetParent.appendChild(this.tableElement);
             }
         }
         
         // Use stored original parent as fallback
         if (!targetParent || targetParent.classList.contains('dt-layout-full')) {
-            console.log('⚠️ Using stored original parent as fallback');
+            console.log(TABLE_LOG_USING_ORIGINAL_PARENT_FALLBACK);
             targetParent = this.originalParent;
         }
         
         if (!targetParent) {
-            console.error('❌ Cannot find valid parent element');
+            console.error(TABLE_LOG_MISSING_PARENT);
             return;
         }
         
-        console.log('✅ Using parent:', targetParent.className);
+        console.log(TABLE_LOG_USING_PARENT, targetParent.className);
         
         // Find and remove inbox container if it exists
-        const existingInboxContainer = targetParent.querySelector('.inbox-view-container');
+        const existingInboxContainer = targetParent.querySelector(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         if (existingInboxContainer) {
-            console.log('🗑️ Removing existing inbox container');
+            console.log(TABLE_LOG_REMOVING_EXISTING_INBOX);
             existingInboxContainer.remove();
         }
         
         // Ensure table is in the correct parent
         if (this.tableElement.parentNode !== targetParent) {
-            console.log('📌 Attaching table to parent');
+            console.log(TABLE_LOG_ATTACHING_TABLE_TO_PARENT);
             targetParent.appendChild(this.tableElement);
         }
         
@@ -162,7 +162,7 @@ class ViewModeManager {
         this.tableElement.innerHTML = '';
         this.tableElement.style.display = ''; // Reset display to default
         
-        console.log(`🎨 Rendering ${this.currentViewMode} view...`);
+        console.log(`${TABLE_LOG_RENDERING_VIEW} ${this.currentViewMode}`);
         
         // Re-render based on current view mode
         if (this.currentViewMode === VIEW_MODE_INBOX) {
@@ -184,8 +184,8 @@ class ViewModeManager {
                 targetParent.appendChild(this.tableElement);
             }
             
-            console.log('📊 Table element visible:', this.tableElement.style.display);
-            console.log('📊 Table in DOM:', !!this.tableElement.parentNode);
+            console.log(TABLE_LOG_TABLE_VISIBLE, this.tableElement.style.display);
+            console.log(TABLE_LOG_TABLE_IN_DOM, !!this.tableElement.parentNode);
             
             renderLazyDataTable(
                 this.tableElement, 
@@ -195,7 +195,7 @@ class ViewModeManager {
             );
         }
         
-        console.log('✅ View re-render complete');
+        console.log(TABLE_LOG_VIEW_RERENDER_COMPLETE);
         
         // Re-attach bulk action handlers
         if (typeof setupBulkActions === 'function') {
@@ -212,16 +212,16 @@ class ViewModeManager {
 // ---------------------------
 async function initLabTable(tableElement) {
     const slug = tableElement.id;
-    if (!slug) return console.warn("❌ Missing table id");
+    if (!slug) return console.warn(TABLE_LOG_MISSING_TABLE_ID);
 
-    console.log(`📋 Initializing table: ${slug}`);
+    console.log(`${TABLE_LOG_INITIALIZING_TABLE} ${slug}`);
     
     // Fetch schema using API client
     const schemaResponse = await apiClient.get(`/api/auth/table/${slug}`);
     
     if (!schemaResponse.success || !schemaResponse.data) {
         removeTableSkeleton(tableElement);
-        return showErrorMessage(tableElement, schemaResponse.message || "Table Schema not found");
+        return showErrorMessage(tableElement, schemaResponse.message || TABLE_MESSAGE_TABLE_SCHEMA_NOT_FOUND);
     }
 
     const schema = schemaResponse.data;
@@ -236,7 +236,7 @@ async function initLabTable(tableElement) {
     try {
         viewMode = localStorage.getItem(storageKey);
     } catch (e) {
-        console.warn('Failed to read from localStorage:', e);
+            console.warn(TABLE_MESSAGE_FAILED_LOCALSTORAGE_READ, e);
     }
     
     // If no stored preference, use schema default
@@ -286,7 +286,7 @@ async function initLabTable(tableElement) {
     // Listen for view mode changes to clear selections
     document.addEventListener('viewModeChanged', function(e) {
         if (e.detail && e.detail.entity === entity) {
-            console.log('👁️ View mode changed, clearing selections');
+            console.log(TABLE_LOG_VIEW_MODE_SELECTION_CLEAR);
             if (window.bulkActionsManager) {
                 window.bulkActionsManager.clearAllSelections();
             }
