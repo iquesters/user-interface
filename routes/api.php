@@ -5,6 +5,7 @@ use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
 use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
+use Iquesters\UserInterface\Http\Controllers\DynamicBusinessEntityController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
 
 /*
@@ -40,7 +41,7 @@ Route::prefix('api')
         // Public API (No Sanctum)
         Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
             ->name('noauth.form');
-        
+
         // Protected APIs (Require Sanctum)
         Route::middleware('auth:sanctum')->group(function () {
 
@@ -49,6 +50,9 @@ Route::prefix('api')
 
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
                 ->name('api.entity.list');
+
+            Route::get('business-entity/list/{business_entity_name}', [DynamicBusinessEntityController::class, 'list'])
+                ->name('api.business-entity.list');
 
             Route::post('entity/store/{entity_name}', [DynamicEntityController::class, 'store'])
                 ->name('api.entity.store');
@@ -61,8 +65,12 @@ Route::prefix('api')
 
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
+                
+            Route::get(
+                'business-entity/show/{business_entity_name}/{data_uid}', [DynamicBusinessEntityController::class, 'show'])
+                ->name('api.business-entity.show');
         });
-});
+    });
 
 
 Route::prefix('api')
