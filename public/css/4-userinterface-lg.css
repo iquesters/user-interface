@@ -51,4 +51,10 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    /* Header left and right sections maintain min-width on large screens */
+    .header-left,
+    .header-right {
+        min-width: 250px;
+    }
 }

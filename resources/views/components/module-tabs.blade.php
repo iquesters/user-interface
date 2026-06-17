@@ -234,7 +234,8 @@
                                href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($menu[0]['url'] ?? '#') }}"
                                data-menu='@json($menu)'
                                data-name="{{ ucfirst($module->name) }}"
-                               data-index="{{ $maxVisible + $idx }}">
+                               data-index="{{ $maxVisible + $idx }}"
+                               @if($viewMode === 'mobile') data-mobile-navigate="true" @endif>
                                 <i class="{{ $module->getMeta('module_icon') }} me-2"></i>
                                 <span class="text-truncate" style="max-width: calc(100% - 20px);">
                                     {{ ucfirst($module->name) }}
@@ -255,6 +256,20 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(e) {
+        const mobileDropdownItem = e.target.closest(
+            '.dropdown-item[data-mobile-navigate="true"][data-view-mode="mobile"]'
+        );
+
+        if (!mobileDropdownItem) return;
+
+        const href = mobileDropdownItem.getAttribute('href');
+        if (!href || href === '#' || href.startsWith('javascript:')) return;
+
+        localStorage.setItem('activeModuleIndex', mobileDropdownItem.dataset.index);
+        e.stopImmediatePropagation();
+    }, true);
+
     ['Desktop', 'Vertical', 'Mobile'].forEach(mode => {
         const dropdownBtn = document.getElementById('modulesDropdown' + mode);
         

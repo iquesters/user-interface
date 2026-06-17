@@ -3,15 +3,11 @@
  * example:
  * HTML_TAG.DIV = 'div'
  */
+const SHARED_HTML_TAG = window.USER_INTERFACE_SHARED?.HTML_TAG || {};
+
 const HTML_TAG = {
-    DIV: "div",
-    LABEL: "label",
-    INPUT:"input",
-    SELECT:"select",
+    ...SHARED_HTML_TAG,
     OPTION:"option",
     TEXTAREA:"textarea",
     DATALIST:"datalist",
-    BUTTON:"button",
-    SPAN:"span",
-    P:"p"
 }
