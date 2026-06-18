@@ -1,7 +1,8 @@
 @extends(app('app.layout'))
 
 @php
-    $entity = ucwords(str_replace('_', ' ', $table_schema->schema['entity']));
+    $schemaEntity = $table_schema->schema['entity'] ?? $table_schema->schema['business_entity'] ?? '';
+    $entity = ucwords(str_replace('_', ' ', $schemaEntity));
     $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
 
     $tabs = [
