@@ -217,7 +217,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     console.log(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
-    const result = await fetchEntityData(entityName, start, length);
+    const result = await fetchEntityData(entityName, start, length, schema);
     
     if (result.success && result.data) {
         cache.set(start, result.data, result.total);
@@ -256,7 +256,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
 
     console.log(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
     
-    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength)
+    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, schema)
         .then(result => {
             if (result.success && result.data?.length) {
                 cache.set(nextOffset, result.data, result.total);

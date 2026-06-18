@@ -37,6 +37,7 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 const TABLE_API_ENTITY_LIST_PREFIX = '/api/entity/list/';
+const TABLE_API_BUSINESS_ENTITY_LIST_PREFIX = '/api/business-entity/list/';
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = '/api/components/templates/';
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
