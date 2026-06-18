@@ -87,6 +87,12 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - Main table fields are sent as top-level keys.
 - Meta fields are sent inside the `meta` object.
 - The frontend uses the shared `apiClient` so submit requests follow the same auth and credential handling as dynamic table requests.
+- When the API returns validation errors, the rendered form should surface them inline on matching fields and also show a short form-level summary for any generic or unmapped backend messages.
+- A generic backend key such as `meta_value` is treated as a metadata validation failure on the frontend, and the UI highlights the submitted empty meta fields with a clearer user-facing message.
+- The rendered form schema also supports layout spacer items inside `fields`.
+- A spacer behaves like an empty responsive grid block, so `{ "id": "break-1", "type": "spacer" }` uses the default full-width spacer and pushes the next item to a new row.
+- A spacer can also use responsive `size` values to behave like an empty layout column at larger breakpoints, for example `{ "id": "desktop-gap", "type": "spacer", "size": { "xs": 12, "lg": 2 } }`.
+- A spacer may include `height`, for example `{ "id": "group-gap", "type": "spacer", "height": "0.75rem" }`, to add extra vertical gap between field groups.
 
 ## Defense In Depth
 - The controller keeps a separate writable main-column guard in addition to entity-definition validation.

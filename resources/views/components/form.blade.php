@@ -13,7 +13,7 @@
 
 {{-- The class should be named as the final named decide --}}
 <form id="{{ $id }}"
-      class="shoz-form" 
+      class="lab-form" 
       method="{{ strtoupper($method) }}"
       enctype="{{ $enctype }}"
       data-form-meta="{{ $meta }}"
