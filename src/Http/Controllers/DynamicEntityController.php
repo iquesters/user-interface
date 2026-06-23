@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Iquesters\Foundation\Helpers\DateTimeHelper;
+use Iquesters\Foundation\Constants\HttpStatusCode;
 use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
@@ -168,7 +169,7 @@ class DynamicEntityController extends Controller
             if (! $record) {
                 return ApiResponse::error(
                     'Record not found',
-                    404,
+                    HttpStatusCode::HTTP_NOT_FOUND,
                     ['entity' => $entity, 'data_uid' => $data_uid]
                 );
             }
@@ -215,7 +216,7 @@ class DynamicEntityController extends Controller
             $record = $this->attachMetaData($entity, collect([$record]));
             $record = $this->transformRecordsForResponse($record)->first();
 
-            return ApiResponse::success($record, 'Record created successfully');
+            return ApiResponse::created($record, 'Record created successfully');
         } catch (Throwable $e) {
             return $this->handleException($e, $entity);
         }
@@ -1109,11 +1110,11 @@ class DynamicEntityController extends Controller
     protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)
     {
         [$status, $message, $errors] = match (true) {
-            $e instanceof \InvalidArgumentException => [400, $e->getMessage(), null],
+            $e instanceof \InvalidArgumentException => [HttpStatusCode::HTTP_BAD_REQUEST, $e->getMessage(), null],
             $e instanceof UniqueConstraintViolationException,
             $e instanceof QueryException => $this->mapQueryException($e),
-            $e instanceof \RuntimeException => [404, $e->getMessage(), null],
-            default => [500, 'Something went wrong while processing entity data.', null],
+            $e instanceof \RuntimeException => [HttpStatusCode::HTTP_NOT_FOUND, $e->getMessage(), null],
+            default => [HttpStatusCode::HTTP_INTERNAL_SERVER_ERROR, 'Something went wrong while processing entity data.', null],
         };
 
         if (! $e instanceof \InvalidArgumentException
@@ -1166,21 +1167,21 @@ class DynamicEntityController extends Controller
                 $message = $field ? ucfirst($field) . ' already exists.' : 'Duplicate value already exists.';
                 $errors = $field ? [$field => ["The {$field} has already been taken."]] : null;
 
-                return [409, $message, $errors];
+                return [HttpStatusCode::HTTP_CONFLICT, $message, $errors];
 
             // Surface common relational integrity failures as client errors instead of leaking SQL details.
             case $sqlState === '23000' && in_array($driverCode, [1451, 1452], true):
-                return [409, 'Related record does not exist or cannot be modified because it is in use.', null];
+                return [HttpStatusCode::HTTP_CONFLICT, 'Related record does not exist or cannot be modified because it is in use.', null];
 
             case $sqlState === '23000' && $driverCode === 1048:
                 $field = $this->extractFieldFromNotNullMessage($driverMessage);
                 $message = $field ? ucfirst($field) . ' is required.' : 'A required field is missing.';
                 $errors = $field ? [$field => ["The {$field} field is required."]] : null;
 
-                return [422, $message, $errors];
+                return [HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY, $message, $errors];
         }
 
-        return [500, 'Unable to save the record due to a database constraint.', null];
+        return [HttpStatusCode::HTTP_INTERNAL_SERVER_ERROR, 'Unable to save the record due to a database constraint.', null];
     }
 
     protected function extractFieldFromDuplicateKeyMessage(string $message): ?string

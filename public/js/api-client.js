@@ -22,6 +22,95 @@ const API_CONFIG = {
     followRedirects: true, // Auto-follow 3xx redirects
 };
 
+const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
+    CONTINUE: 100,
+    SWITCHING_PROTOCOLS: 101,
+    PROCESSING: 102,
+    EARLY_HINTS: 103,
+    OK: 200,
+    CREATED: 201,
+    ACCEPTED: 202,
+    NON_AUTHORITATIVE_INFORMATION: 203,
+    NO_CONTENT: 204,
+    RESET_CONTENT: 205,
+    PARTIAL_CONTENT: 206,
+    MULTI_STATUS: 207,
+    ALREADY_REPORTED: 208,
+    IM_USED: 226,
+    MULTIPLE_CHOICES: 300,
+    MOVED_PERMANENTLY: 301,
+    FOUND: 302,
+    SEE_OTHER: 303,
+    NOT_MODIFIED: 304,
+    USE_PROXY: 305,
+    BAD_REQUEST: 400,
+    UNAUTHORIZED: 401,
+    PAYMENT_REQUIRED: 402,
+    FORBIDDEN: 403,
+    NOT_FOUND: 404,
+    METHOD_NOT_ALLOWED: 405,
+    NOT_ACCEPTABLE: 406,
+    PROXY_AUTHENTICATION_REQUIRED: 407,
+    REQUEST_TIMEOUT: 408,
+    CONFLICT: 409,
+    GONE: 410,
+    LENGTH_REQUIRED: 411,
+    PRECONDITION_FAILED: 412,
+    CONTENT_TOO_LARGE: 413,
+    URI_TOO_LONG: 414,
+    UNSUPPORTED_MEDIA_TYPE: 415,
+    RANGE_NOT_SATISFIABLE: 416,
+    EXPECTATION_FAILED: 417,
+    I_AM_A_TEAPOT: 418,
+    MISDIRECTED_REQUEST: 421,
+    UNPROCESSABLE_ENTITY: 422,
+    LOCKED: 423,
+    FAILED_DEPENDENCY: 424,
+    TOO_EARLY: 425,
+    UPGRADE_REQUIRED: 426,
+    PRECONDITION_REQUIRED: 428,
+    TOO_MANY_REQUESTS: 429,
+    REQUEST_HEADER_FIELDS_TOO_LARGE: 431,
+    UNAVAILABLE_FOR_LEGAL_REASONS: 451,
+    INTERNAL_SERVER_ERROR: 500,
+    NOT_IMPLEMENTED: 501,
+    BAD_GATEWAY: 502,
+    SERVICE_UNAVAILABLE: 503,
+    GATEWAY_TIMEOUT: 504,
+    HTTP_VERSION_NOT_SUPPORTED: 505,
+    VARIANT_ALSO_NEGOTIATES: 506,
+    INSUFFICIENT_STORAGE: 507,
+    LOOP_DETECTED: 508,
+    NOT_EXTENDED: 510,
+    NETWORK_AUTHENTICATION_REQUIRED: 511,
+    TEMPORARY_REDIRECT: 307,
+    PERMANENT_REDIRECT: 308,
+});
+
+const UI_HTTP_STATUS_HELPER = window.USER_INTERFACE_SHARED?.httpStatus || Object.freeze({
+    isInformational(status) {
+        return status >= UI_HTTP_STATUS.CONTINUE && status < UI_HTTP_STATUS.OK;
+    },
+    isSuccess(status) {
+        return status >= UI_HTTP_STATUS.OK && status < UI_HTTP_STATUS.MULTIPLE_CHOICES;
+    },
+    isRedirect(status) {
+        return status >= UI_HTTP_STATUS.MULTIPLE_CHOICES && status < UI_HTTP_STATUS.BAD_REQUEST;
+    },
+    isClientError(status) {
+        return status >= UI_HTTP_STATUS.BAD_REQUEST && status < UI_HTTP_STATUS.INTERNAL_SERVER_ERROR;
+    },
+    isServerError(status) {
+        return status >= UI_HTTP_STATUS.INTERNAL_SERVER_ERROR;
+    },
+    isError(status) {
+        return this.isClientError(status) || this.isServerError(status);
+    },
+    getMessage(status) {
+        return `Request failed with status ${status}`;
+    },
+});
+
 // ---------------------------
 // 📋 REQUEST/RESPONSE TYPES
 // ---------------------------
@@ -435,23 +524,44 @@ class ApiClient {
         const errorResponse = {
             ...parsed,
             success: false,
-            error: new Error(parsed.message || `HTTP ${response.status}`),
+            error: new Error(parsed.message || UI_HTTP_STATUS_HELPER.getMessage(response.status)),
         };
 
         // Log error details
         console.error(`❌ API Error [${response.status}]:`, errorResponse);
 
         // Handle specific status codes
-        if (response.status === 401) {
-            this._handleUnauthorized();
-        }
+        this._handleErrorStatus(response.status, errorResponse);
 
-        // Handle 3xx redirects
-        if (response.status >= 300 && response.status < 400) {
+        if (UI_HTTP_STATUS_HELPER.isRedirect(response.status)) {
             return this._handleRedirect(response, request, errorResponse);
         }
 
         return errorResponse;
+    }
+
+    _handleErrorStatus(status, errorResponse) {
+        window.dispatchEvent(new CustomEvent('api-http-error', { detail: errorResponse }));
+
+        switch (status) {
+            case UI_HTTP_STATUS.UNAUTHORIZED:
+                this._handleUnauthorized();
+                break;
+            case UI_HTTP_STATUS.FORBIDDEN:
+                window.dispatchEvent(new CustomEvent('api-forbidden', { detail: errorResponse }));
+                break;
+            case UI_HTTP_STATUS.UNPROCESSABLE_ENTITY:
+                window.dispatchEvent(new CustomEvent('api-validation-error', { detail: errorResponse }));
+                break;
+            case UI_HTTP_STATUS.TOO_MANY_REQUESTS:
+                window.dispatchEvent(new CustomEvent('api-rate-limited', { detail: errorResponse }));
+                break;
+            default:
+                if (UI_HTTP_STATUS_HELPER.isServerError(status)) {
+                    window.dispatchEvent(new CustomEvent('api-server-error', { detail: errorResponse }));
+                }
+                break;
+        }
     }
 
     /**
@@ -477,7 +587,10 @@ class ApiClient {
             console.log('🔄 Following redirect...');
             
             // Preserve method for 307/308, use GET for others
-            const newMethod = (response.status === 307 || response.status === 308) 
+            const newMethod = (
+                response.status === UI_HTTP_STATUS.TEMPORARY_REDIRECT
+                || response.status === UI_HTTP_STATUS.PERMANENT_REDIRECT
+            )
                 ? request.method 
                 : 'GET';
 
@@ -504,31 +617,7 @@ class ApiClient {
      * @returns {string}
      */
     _getErrorMessageByStatus(status) {
-        const messages = {
-            // 3xx Redirects
-            301: 'Resource moved permanently',
-            302: 'Resource found at new location',
-            303: 'See other resource',
-            304: 'Resource not modified',
-            307: 'Temporary redirect',
-            308: 'Permanent redirect',
-            
-            // 4xx Client Errors
-            400: 'Bad request',
-            401: 'Unauthorized - Please log in',
-            403: 'Forbidden - Access denied',
-            404: 'Resource not found',
-            405: 'Method not allowed',
-            409: 'Conflict',
-            422: 'Validation failed',
-            429: 'Too many requests',
-            
-            // 5xx Server Errors
-            500: 'Internal server error',
-            503: 'Service unavailable',
-        };
-
-        return messages[status] || `Request failed with status ${status}`;
+        return UI_HTTP_STATUS_HELPER.getMessage(status);
     }
 
     /**
@@ -590,12 +679,11 @@ class ApiClient {
             const modifiedResponse = await this._executeResponseInterceptors(response, modifiedRequest);
 
             // Handle response
-            if (!modifiedResponse.ok && modifiedResponse.status < 300) {
+            if (!modifiedResponse.ok && (UI_HTTP_STATUS_HELPER.isInformational(modifiedResponse.status) || UI_HTTP_STATUS_HELPER.isSuccess(modifiedResponse.status))) {
                 return await this._handleError(modifiedResponse, modifiedRequest);
             }
 
-            // Handle 3xx redirects
-            if (modifiedResponse.status >= 300 && modifiedResponse.status < 400) {
+            if (UI_HTTP_STATUS_HELPER.isRedirect(modifiedResponse.status)) {
                 return await this._handleRedirect(modifiedResponse, modifiedRequest, 
                     await this._parseResponse(modifiedResponse, modifiedRequest));
             }
