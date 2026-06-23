@@ -42,6 +42,19 @@
                 <i class="fas fa-sync-alt"></i>
             </button>
 
+            {{-- Selection Count Badge (Visible when items selected) --}}
+            <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
+                <span class="selected-count">0</span> Selected
+            </span>
+
+            {{-- Clear Selection Button (Visible when items selected) --}}
+            <button type="button"
+                    id="bulkClearSelectionBtn"
+                    class="btn btn-sm btn-link text-decoration-none p-0 d-none"
+                    style="min-width: 40px;">
+                Clear
+            </button>
+
             {{-- Select Hint (Visible when nothing selected) --}}
             <span id="selectHint" class="text-muted small">
                 <i class="fas fa-info-circle me-1"></i>
@@ -208,21 +221,8 @@
             </div>
         </div>
 
-        {{-- Right side: Selection Count, Clear Button, and View Toggle --}}
+        {{-- Right side: View Toggle --}}
         <div class="d-flex align-items-center gap-2">
-            {{-- Selection Count Badge (Visible when items selected) --}}
-            <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
-                <span class="selected-count">0</span> Selected
-            </span>
-
-            {{-- Clear Selection Button (Visible when items selected) --}}
-            <button type="button"
-                    id="bulkClearSelectionBtn"
-                    class="btn btn-sm btn-link text-decoration-none p-0 d-none"
-                    style="min-width: 40px;">
-                Clear
-            </button>
-
             {{-- View Toggle Button (Always visible) --}}
             <button type="button"
                     class="btn btn-sm btn-outline-secondary text-muted border-0"

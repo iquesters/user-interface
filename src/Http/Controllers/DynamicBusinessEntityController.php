@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\Models\BusinessEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
@@ -108,6 +109,21 @@ class DynamicBusinessEntityController extends Controller
         }
     }
 
+    public function store(Request $request, string $business_entity_name)
+    {
+        try {
+            return $this->renderBusinessEntityAction($request, $business_entity_name, 'created');
+        } catch (Throwable $e) {
+            $this->logError(sprintf(
+                'DynamicBusinessEntityController@store error | business_entity=%s | message=%s',
+                $business_entity_name,
+                $e->getMessage()
+            ));
+
+            return ApiResponse::error('Something went wrong while processing business entity data.', 500);
+        }
+    }
+
     public function show(
         Request $request,
         string $business_entity_name,
@@ -135,9 +151,15 @@ class DynamicBusinessEntityController extends Controller
             );
 
             if (! $record) {
-                return ApiResponse::error(
-                    'Record not found',
-                    404
+                return ApiResponse::success(
+                    [
+                        'business_entity' => $businessEntity->slug,
+                        'business_entity_name' => $businessEntity->business_entity_name,
+                        'data_uid' => $data_uid,
+                        'record' => null,
+                        'field_mapping' => $mapping,
+                    ],
+                    'Request successful'
                 );
             }
 
@@ -157,8 +179,13 @@ class DynamicBusinessEntityController extends Controller
                 [$mapping['primary_entity']]
             );
 
+            $record = $this->aliasBusinessEntityRecordForForm($records->first(), $mapping);
+            $formData = $this->buildBusinessEntityFormData($record, $mapping);
+            $record = $this->applyBusinessEntityFormDataAliases($record, $formData);
+            $record->form_data = $formData;
+
             return ApiResponse::success(
-                $records->first(),
+                $record,
                 'Request successful'
             );
         } catch (Throwable $e) {
@@ -174,6 +201,44 @@ class DynamicBusinessEntityController extends Controller
                 'Something went wrong while processing business entity data.',
                 500
             );
+        }
+    }
+
+    public function update(
+        Request $request,
+        string $business_entity_name,
+        string $data_uid
+    ) {
+        try {
+            return $this->renderBusinessEntityAction($request, $business_entity_name, 'updated', $data_uid);
+        } catch (Throwable $e) {
+            $this->logError(sprintf(
+                'DynamicBusinessEntityController@update error | business_entity=%s | data_uid=%s | message=%s',
+                $business_entity_name,
+                $data_uid,
+                $e->getMessage()
+            ));
+
+            return ApiResponse::error('Something went wrong while processing business entity data.', 500);
+        }
+    }
+
+    public function delete(
+        Request $request,
+        string $business_entity_name,
+        string $data_uid
+    ) {
+        try {
+            return $this->renderBusinessEntityAction($request, $business_entity_name, 'deleted', $data_uid);
+        } catch (Throwable $e) {
+            $this->logError(sprintf(
+                'DynamicBusinessEntityController@delete error | business_entity=%s | data_uid=%s | message=%s',
+                $business_entity_name,
+                $data_uid,
+                $e->getMessage()
+            ));
+
+            return ApiResponse::error('Something went wrong while processing business entity data.', 500);
         }
     }
 
@@ -193,6 +258,213 @@ class DynamicBusinessEntityController extends Controller
         }
 
         return $record;
+    }
+
+    /**
+     * Business entity forms are generated with prefixed field ids such as
+     * "users_name" or "users_m_session_token". The show endpoint keeps the
+     * original record shape for compatibility, but we add these aliases so the
+     * form renderer can hydrate fields without special-casing business entities.
+     */
+    protected function aliasBusinessEntityRecordForForm(object $record, array $mapping): object
+    {
+        $aliasRecord = clone $record;
+        $primaryEntity = (string) ($mapping['primary_entity'] ?? '');
+
+        foreach ($mapping['entity_config_map'] ?? [] as $entityConfig) {
+            $sourceEntity = (string) ($entityConfig['entity'] ?? '');
+
+            foreach (($entityConfig['fields'] ?? []) as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $alias = $field['name'] ?? null;
+                $sourceField = $field['source_field'] ?? $field['field'] ?? null;
+
+                if (! $alias || ! $sourceField) {
+                    continue;
+                }
+
+                if ($sourceEntity === $primaryEntity && isset($record->{$sourceField})) {
+                    $aliasRecord->{$alias} = $record->{$sourceField};
+                    continue;
+                }
+
+                $aliasRecord->{$alias} = $this->resolveBusinessEntityFieldValue($record, $sourceEntity, $sourceField);
+            }
+
+            foreach (($entityConfig['meta_fields'] ?? []) as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $alias = $field['meta_key'] ?? null;
+                $sourceMetaKey = $field['source_meta_key'] ?? null;
+
+                if (! $alias || ! $sourceMetaKey) {
+                    continue;
+                }
+
+                $aliasRecord->{$alias} = $this->resolveBusinessEntityMetaValue($record, $sourceEntity, $sourceMetaKey);
+            }
+        }
+
+        return $aliasRecord;
+    }
+
+    protected function buildBusinessEntityFormData(object $record, array $mapping): array
+    {
+        $formData = [];
+        $primaryEntity = (string) ($mapping['primary_entity'] ?? '');
+
+        foreach ($mapping['entity_config_map'] ?? [] as $entityConfig) {
+            $sourceEntity = (string) ($entityConfig['entity'] ?? '');
+
+            foreach (($entityConfig['fields'] ?? []) as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $alias = $field['name'] ?? null;
+                $sourceField = $field['source_field'] ?? $field['field'] ?? null;
+
+                if (! $alias || ! $sourceField) {
+                    continue;
+                }
+
+                $formData[$alias] = $this->resolveBusinessEntityFieldValue($record, $sourceEntity, $sourceField);
+
+                if ($sourceEntity === $primaryEntity && isset($record->{$sourceField})) {
+                    $formData[$alias] = $record->{$sourceField};
+                }
+            }
+
+            foreach (($entityConfig['meta_fields'] ?? []) as $field) {
+                if (! is_array($field)) {
+                    continue;
+                }
+
+                $alias = $field['meta_key'] ?? null;
+                $sourceMetaKey = $field['source_meta_key'] ?? null;
+
+                if (! $alias || ! $sourceMetaKey) {
+                    continue;
+                }
+
+                $formData[$alias] = $this->resolveBusinessEntityMetaValue($record, $sourceEntity, $sourceMetaKey);
+            }
+        }
+
+        return $formData;
+    }
+
+    protected function applyBusinessEntityFormDataAliases(object $record, array $formData): object
+    {
+        $aliasedRecord = clone $record;
+
+        foreach ($formData as $key => $value) {
+            $aliasedRecord->{$key} = $value;
+        }
+
+        return $aliasedRecord;
+    }
+
+    protected function resolveBusinessEntityFieldValue(object $record, string $sourceEntity, string $sourceField): mixed
+    {
+        if (isset($record->{$sourceField})) {
+            return $record->{$sourceField};
+        }
+
+        $candidateKeys = array_values(array_filter(array_unique([
+            $sourceEntity,
+            Str::singular($sourceEntity),
+            Str::plural($sourceEntity),
+        ])));
+
+        foreach ($candidateKeys as $candidateKey) {
+            if (! isset($record->{$candidateKey})) {
+                continue;
+            }
+
+            $candidateValue = $record->{$candidateKey};
+
+            if (is_object($candidateValue) && isset($candidateValue->{$sourceField})) {
+                return $candidateValue->{$sourceField};
+            }
+
+            if ($candidateValue instanceof Collection) {
+                $firstItem = $candidateValue->first();
+
+                if (is_object($firstItem) && isset($firstItem->{$sourceField})) {
+                    return $firstItem->{$sourceField};
+                }
+            }
+
+            if (is_array($candidateValue) && array_key_exists($sourceField, $candidateValue)) {
+                return $candidateValue[$sourceField];
+            }
+        }
+
+        if (isset($record->{$sourceField})) {
+            return $record->{$sourceField};
+        }
+
+        return null;
+    }
+
+    protected function resolveBusinessEntityMetaValue(object $record, string $sourceEntity, string $sourceMetaKey): mixed
+    {
+        $candidateKeys = array_values(array_filter(array_unique([
+            $sourceEntity,
+            Str::singular($sourceEntity),
+            Str::plural($sourceEntity),
+        ])));
+
+        foreach ($candidateKeys as $candidateKey) {
+            if (! isset($record->{$candidateKey}) || ! is_object($record->{$candidateKey})) {
+                continue;
+            }
+
+            $candidateValue = $record->{$candidateKey};
+
+            if (isset($candidateValue->meta) && is_iterable($candidateValue->meta)) {
+                foreach ($candidateValue->meta as $metaItem) {
+                    if (($metaItem->meta_key ?? null) === $sourceMetaKey) {
+                        return $metaItem->meta_value ?? null;
+                    }
+                }
+            }
+        }
+
+        if (isset($record->meta) && is_iterable($record->meta)) {
+            foreach ($record->meta as $metaItem) {
+                if (($metaItem->meta_key ?? null) === $sourceMetaKey) {
+                    return $metaItem->meta_value ?? null;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function renderBusinessEntityAction(
+        Request $request,
+        string $businessEntityName,
+        string $verb,
+        ?string $dataUid = null
+    ) {
+        $businessEntity = $this->resolveBusinessEntity($businessEntityName);
+        $mapping = $this->parseFieldMapping($businessEntity);
+
+        return ApiResponse::success([
+            'business_entity' => $businessEntity->slug,
+            'business_entity_name' => $businessEntity->business_entity_name,
+            'data_uid' => $dataUid,
+            'action' => $verb,
+            'field_mapping' => $mapping,
+            'request' => $request->except(['_token', '_method']),
+        ], 'Request successful');
     }
 
     // =========================================================================
@@ -215,10 +487,17 @@ class DynamicBusinessEntityController extends Controller
 
         $entityConfigMap = collect($mapping['entities'])
             ->sortBy('sort_order')
-            ->keyBy('entity')
+            ->mapWithKeys(function (array $entityConfig) {
+                $tableName = $this->resolveMappedEntityTableName($entityConfig['entity'] ?? null);
+
+                return [$tableName => $this->normalizeEntityConfig($entityConfig, $tableName)];
+            })
             ->toArray();
 
+        $primaryEntity = $this->resolveMappedEntityTableName($primaryEntity);
+
         $relationships = $mapping['relationships'] ?? [];
+        $relationships = $this->normalizeRelationships($relationships);
 
         $this->validateMappingTables(
             $entityConfigMap,
@@ -245,6 +524,117 @@ class DynamicBusinessEntityController extends Controller
                 throw new \RuntimeException("Pivot table '{$rel['through']}' referenced in relationship does not exist.");
             }
         }
+    }
+
+    protected function normalizeEntityConfig(array $entityConfig, string $tableName): array
+    {
+        $entityConfig['entity'] = $tableName;
+
+        if (! empty($entityConfig['meta_fields']) && is_array($entityConfig['meta_fields'])) {
+            $entityConfig['meta_fields'] = array_map(function ($field) use ($tableName) {
+                if (! is_array($field)) {
+                    return $field;
+                }
+
+                $field['source_entity'] = $tableName;
+
+                return $field;
+            }, $entityConfig['meta_fields']);
+        }
+
+        if (! empty($entityConfig['fields']) && is_array($entityConfig['fields'])) {
+            $entityConfig['fields'] = array_map(function ($field) use ($tableName) {
+                if (! is_array($field)) {
+                    return $field;
+                }
+
+                $field['source_entity'] = $tableName;
+
+                return $field;
+            }, $entityConfig['fields']);
+        }
+
+        return $entityConfig;
+    }
+
+    protected function normalizeRelationships(array $relationships): array
+    {
+        return array_map(function (array $relationship) {
+            if (isset($relationship['source_entity'])) {
+                $relationship['source_entity'] = $this->resolveMappedEntityTableName($relationship['source_entity']);
+            }
+
+            if (isset($relationship['target_entity'])) {
+                $relationship['target_entity'] = $this->resolveMappedEntityTableName($relationship['target_entity']);
+            }
+
+            if (isset($relationship['through'])) {
+                $relationship['through'] = $this->resolveMappedEntityTableName($relationship['through']);
+            }
+
+            return $relationship;
+        }, $relationships);
+    }
+
+    protected function resolveMappedEntityTableName(?string $mappedEntity): string
+    {
+        $mappedEntity = trim((string) $mappedEntity);
+
+        if ($mappedEntity === '') {
+            throw new \InvalidArgumentException('Mapped entity name is empty.');
+        }
+
+        if (Schema::hasTable($mappedEntity)) {
+            return $mappedEntity;
+        }
+
+        $modelTable = $this->resolveModelTableName($mappedEntity);
+
+        if ($modelTable !== null && Schema::hasTable($modelTable)) {
+            return $modelTable;
+        }
+
+        $entity = FoundationEntity::query()
+            ->where('slug', $mappedEntity)
+            ->orWhere('entity_name', $mappedEntity)
+            ->first();
+
+        if ($entity) {
+            $tableName = (string) ($entity->getMeta('published_table_name') ?: $entity->getMeta('table_name'));
+
+            if ($tableName !== '' && Schema::hasTable($tableName)) {
+                return $tableName;
+            }
+        }
+
+        $slugified = Str::lower(Str::of($mappedEntity)->slug('_')->toString());
+
+        if ($slugified !== '' && Schema::hasTable($slugified)) {
+            return $slugified;
+        }
+
+        $pluralized = Str::pluralStudly(Str::studly($slugified));
+        $pluralized = Str::snake($pluralized);
+
+        if ($pluralized !== '' && Schema::hasTable($pluralized)) {
+            return $pluralized;
+        }
+
+        throw new \RuntimeException("Table '{$mappedEntity}' referenced in field mapping does not exist.");
+    }
+
+    protected function resolveModelTableName(string $mappedEntity): ?string
+    {
+        $modelClass = $this->findModelClass($mappedEntity);
+
+        if (! $modelClass) {
+            return null;
+        }
+
+        /** @var \Illuminate\Database\Eloquent\Model $model */
+        $model = new $modelClass();
+
+        return $model->getTable();
     }
 
     // =========================================================================
@@ -573,12 +963,26 @@ class DynamicBusinessEntityController extends Controller
             ->groupBy($throughSourceKey)
             ->map(fn($rows) => $rows->pluck($throughTargetKey)->unique()->values());
 
+        $pivotRecordMap = $pivotRows
+            ->groupBy($throughSourceKey)
+            ->map(function ($rows) {
+                return $rows->map(function ($row) {
+                    return (object) [
+                        'model_id' => $row->model_id ?? null,
+                        'model_type' => $row->model_type ?? null,
+                        'role_id' => $row->role_id ?? null,
+                        'id' => $row->id ?? null,
+                    ];
+                })->values();
+            });
+
         // Map target records: target_key_value → record
         $targetMap = $targetRecords->keyBy(fn($r) => $r->{$targetKey});
         $isPlural  = $this->isPlural($relType);
 
-        return $records->map(function ($record) use ($pivotMap, $targetMap, $sourceKey, $relationKey, $isPlural) {
+        return $records->map(function ($record) use ($pivotMap, $pivotRecordMap, $targetMap, $sourceKey, $relationKey, $throughTable, $isPlural) {
             $matchedTargetIds = $pivotMap[$record->{$sourceKey} ?? null] ?? collect();
+            $record->{$throughTable} = $pivotRecordMap[$record->{$sourceKey} ?? null] ?? collect();
 
             $matched = $matchedTargetIds
                 ->map(fn($id) => $targetMap[$id] ?? null)

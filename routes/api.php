@@ -54,6 +54,9 @@ Route::prefix('api')
             Route::get('business-entity/list/{business_entity_name}', [DynamicBusinessEntityController::class, 'list'])
                 ->name('api.business-entity.list');
 
+            Route::post('business-entity/store/{business_entity_name}', [DynamicBusinessEntityController::class, 'store'])
+                ->name('api.business-entity.store');
+
             Route::post('entity/store/{entity_name}', [DynamicEntityController::class, 'store'])
                 ->name('api.entity.store');
 
@@ -65,10 +68,16 @@ Route::prefix('api')
 
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
+
+            Route::put('business-entity/update/{business_entity_name}/{data_uid}', [DynamicBusinessEntityController::class, 'update'])
+                ->name('api.business-entity.update');
                 
             Route::get(
                 'business-entity/show/{business_entity_name}/{data_uid}', [DynamicBusinessEntityController::class, 'show'])
                 ->name('api.business-entity.show');
+
+            Route::delete('business-entity/delete/{business_entity_name}/{data_uid}', [DynamicBusinessEntityController::class, 'delete'])
+                ->name('api.business-entity.delete');
         });
     });
 
