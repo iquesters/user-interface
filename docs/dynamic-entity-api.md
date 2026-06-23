@@ -10,6 +10,80 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - `PUT /api/entity/update/{entity_name}/{data_uid}`
 - `DELETE /api/entity/delete/{entity_name}/{data_uid}`
 
+## List Flow
+1. Resolve the target table from `{entity_name}` and confirm it exists.
+2. Resolve the matching entity definition from the `entities` table by looking up the entity meta `table_name`.
+3. Build main-field definitions from `entities.fields` and meta-field definitions from `entities.meta_fields`.
+4. Accept reserved list query params for pagination and sorting:
+   - `offset`
+   - `length`
+   - `sort`
+5. Treat any non-reserved query parameter as a filter candidate.
+6. Apply filters against declared main fields directly on the entity table.
+7. Apply filters against declared meta fields through the entity meta table using `ref_parent`, `meta_key`, and `meta_value`.
+8. Apply multi-column sort in the order requested.
+9. Count the filtered result set.
+10. Return the paginated rows in the standardized API response format.
+
+## List Query Contract
+- Flat equality filters are supported for simple cases.
+- Operator-based filters are supported using bracket syntax on the field name.
+- Multi-column sort is supported using a comma-separated `sort` value.
+- Pagination is controlled with `offset` and `length`.
+
+### Reserved query parameters
+- `offset`
+- `length`
+- `sort`
+
+### Supported filter operators
+- `eq`
+- `neq`
+- `gt`
+- `gte`
+- `lt`
+- `lte`
+- `like`
+- `starts`
+- `ends`
+- `in`
+
+### Filter examples
+- `GET /api/entity/list/users?status=active`
+- `GET /api/entity/list/users?email=john@example.com`
+- `GET /api/entity/list/users?name[like]=john`
+- `GET /api/entity/list/users?name[starts]=jo`
+- `GET /api/entity/list/users?email[ends]=@gmail.com`
+- `GET /api/entity/list/users?created_at[gte]=2025-01-01`
+- `GET /api/entity/list/users?status[in]=active,inactive`
+- `GET /api/entity/list/users?status[neq]=deleted`
+
+### Sort examples
+- `GET /api/entity/list/users?sort=-created_at`
+- `GET /api/entity/list/users?sort=name,-created_at`
+
+### Pagination examples
+- `GET /api/entity/list/users?offset=0&length=20`
+- `GET /api/entity/list/users?status=active&sort=-created_at&offset=0&length=20`
+
+### Combined example
+```text
+GET /api/entity/list/users?status=active&name[like]=john&created_at[gte]=2025-01-01&sort=name,-created_at&offset=0&length=20
+```
+
+## List Query Behavior
+- `status=active` is treated as equality and maps to `status[eq]=active`.
+- `like` performs a contains match using `%value%`.
+- `starts` performs a prefix match using `value%`.
+- `ends` performs a suffix match using `%value`.
+- `in` accepts a comma-separated value list.
+- Unknown fields are ignored and skipped.
+- Unsupported operators are ignored and skipped.
+- Sort direction defaults to ascending unless the field is prefixed with `-`.
+- Sort can target declared main fields.
+- Sort can also target declared meta fields when the meta field type is string-like.
+- Meta sorting is currently limited to string-like field types such as `string`, `varchar`, `text`, and `char`.
+
 ## Store Flow
 1. Resolve the target table from `{entity_name}` and confirm it exists.
 2. Resolve the matching entity definition from the `entities` table by looking up the entity meta `table_name`.

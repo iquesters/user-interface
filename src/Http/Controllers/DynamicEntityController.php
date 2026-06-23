@@ -15,6 +15,7 @@ use Iquesters\Foundation\Helpers\DateTimeHelper;
 use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityListParams;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Iquesters\UserInterface\Http\Query\DynamicEntityListQuery;
 use Throwable;
@@ -59,11 +60,12 @@ class DynamicEntityController extends Controller
                 $metaTable
             );
 
-            $filters = collect(request()->query())->except(['offset', 'length', 'sort', 'direction', 'filter'])->all();
+            $filters = $this->parseListFilters(request()->query());
+            $sorts   = $this->parseListSorts(request()->get('sort', ''));
 
             $listQuery
                 ->applyFilters($filters)
-                ->applySort(request()->get('sort'), request()->get('direction', 'asc'));
+                ->applySort($sorts);
 
             $totalCount = $listQuery->count();
             $data = $listQuery->paginate($offset, $length);
@@ -80,6 +82,64 @@ class DynamicEntityController extends Controller
         } catch (Throwable $e) {
             return $this->handleException($e, $entity);
         }
+    }
+
+    protected function parseListFilters(array $queryParams): array
+    {
+        $reserved = [
+            EntityListParams::PARAM_OFFSET,
+            EntityListParams::PARAM_LENGTH,
+            EntityListParams::PARAM_SORT,
+            EntityListParams::PARAM_FILTER,
+        ];
+
+        $filters = [];
+
+        foreach ($queryParams as $key => $value) {
+            if (in_array($key, $reserved, true)) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                // ?name[like]=john  →  ['name' => ['like' => 'john']]
+                foreach ($value as $op => $opValue) {
+                    if ($opValue === null || $opValue === '') {
+                        continue;
+                    }
+                    $filters[] = ['field' => $key, 'op' => (string) $op, 'value' => $opValue];
+                }
+            } elseif ($value !== null && $value !== '') {
+                // ?status=active  →  equality
+                $filters[] = ['field' => $key, 'op' => EntityListParams::OP_EQ, 'value' => $value];
+            }
+        }
+
+        return $filters;
+    }
+
+    protected function parseListSorts(string $sortParam): array
+    {
+        if ($sortParam === '') {
+            return [];
+        }
+
+        $sorts = [];
+
+        foreach (explode(',', $sortParam) as $part) {
+            $part = trim($part);
+
+            if ($part === '') {
+                continue;
+            }
+
+            if (str_starts_with($part, '-')) {
+                $sorts[] = ['column' => substr($part, 1), 'direction' => EntityListParams::DIR_DESC];
+            } else {
+                $sorts[] = ['column' => $part, 'direction' => EntityListParams::DIR_ASC];
+            }
+        }
+
+        return $sorts;
     }
 
     protected function resolveEntityFieldDefinitions(string $entity): array

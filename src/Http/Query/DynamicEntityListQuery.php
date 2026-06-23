@@ -5,11 +5,28 @@ namespace Iquesters\UserInterface\Http\Query;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityListParams;
 use Throwable;
 
+/**
+ * @mixin \Iquesters\Foundation\System\Traits\Loggable
+ */
 class DynamicEntityListQuery
 {
     use Loggable;
+
+    private const SUPPORTED_OPERATORS = [
+        EntityListParams::OP_EQ,
+        EntityListParams::OP_NEQ,
+        EntityListParams::OP_GT,
+        EntityListParams::OP_GTE,
+        EntityListParams::OP_LT,
+        EntityListParams::OP_LTE,
+        EntityListParams::OP_LIKE,
+        EntityListParams::OP_STARTS,
+        EntityListParams::OP_ENDS,
+        EntityListParams::OP_IN,
+    ];
 
     public function __construct(
         private Builder $query,
@@ -19,27 +36,40 @@ class DynamicEntityListQuery
         private ?string $metaTable
     ) {}
 
-    public function applyFilters(mixed $filters): static
+    /**
+     * @param array<int, array{field: string, op: string, value: mixed}> $filters
+     */
+    public function applyFilters(array $filters): static
     {
         try {
-            if (! is_array($filters)) {
-                return $this;
-            }
+            foreach ($filters as $filter) {
+                $field = $filter['field'] ?? null;
+                $op    = $filter['op']    ?? EntityListParams::OP_EQ;
+                $value = $filter['value'] ?? null;
 
-            foreach ($filters as $key => $value) {
-                if (! is_string($key) || $value === null || $value === '') {
+                if (! is_string($field) || $value === null || $value === '') {
                     continue;
                 }
 
-                if (array_key_exists($key, $this->mainFieldDefinitions)) {
-                    $this->applyMainColumnFilter($key, $value);
-                } elseif ($this->metaTable && array_key_exists($key, $this->metaFieldDefinitions)) {
-                    $this->applyMetaFilter($key, $value);
+                if (! in_array($op, self::SUPPORTED_OPERATORS, true)) {
+                    $this->logDebug(sprintf(
+                        'DynamicEntityListQuery@applyFilters skipped unsupported operator | entity=%s | field=%s | op=%s',
+                        $this->entity,
+                        $field,
+                        $op
+                    ));
+                    continue;
+                }
+
+                if (array_key_exists($field, $this->mainFieldDefinitions)) {
+                    $this->applyMainColumnFilter($field, $op, $value);
+                } elseif ($this->metaTable && array_key_exists($field, $this->metaFieldDefinitions)) {
+                    $this->applyMetaFilter($field, $op, $value);
                 } else {
                     $this->logDebug(sprintf(
-                        'DynamicEntityListQuery@applyFilters skipped unknown key | entity=%s | key=%s',
+                        'DynamicEntityListQuery@applyFilters skipped unknown field | entity=%s | field=%s',
                         $this->entity,
-                        $key
+                        $field
                     ));
                 }
             }
@@ -56,49 +86,28 @@ class DynamicEntityListQuery
         }
     }
 
-    public function applySort(?string $column, string $direction = 'asc'): static
+    /**
+     * @param array<int, array{column: string, direction: string}> $sorts
+     */
+    public function applySort(array $sorts): static
     {
         try {
-            if (! $column) {
-                return $this;
-            }
+            foreach ($sorts as $sort) {
+                $column    = $sort['column']    ?? null;
+                $direction = $sort['direction'] ?? EntityListParams::DIR_ASC;
 
-            $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
-
-            if (array_key_exists($column, $this->mainFieldDefinitions)) {
-                $this->query->orderBy($column, $direction);
-                return $this;
-            }
-
-            if ($this->metaTable && array_key_exists($column, $this->metaFieldDefinitions)) {
-                $type = $this->metaFieldDefinitions[$column]['type'] ?? 'string';
-
-                if ($this->isStringSortableType($type)) {
-                    $this->applyMetaSort($column, $direction);
-                } else {
-                    $this->logWarning(sprintf(
-                        'DynamicEntityListQuery@applySort skipped non-string meta sort | entity=%s | column=%s | type=%s',
-                        $this->entity,
-                        $column,
-                        $type
-                    ));
+                if (! is_string($column) || $column === '') {
+                    continue;
                 }
 
-                return $this;
+                $this->applySingleSort($column, $direction);
             }
-
-            $this->logDebug(sprintf(
-                'DynamicEntityListQuery@applySort skipped unknown sort column | entity=%s | column=%s',
-                $this->entity,
-                $column
-            ));
 
             return $this;
         } catch (Throwable $e) {
             $this->logError(sprintf(
-                'DynamicEntityListQuery@applySort failed | entity=%s | column=%s | error=%s',
+                'DynamicEntityListQuery@applySort failed | entity=%s | error=%s',
                 $this->entity,
-                $column ?? 'null',
                 $e->getMessage()
             ));
 
@@ -138,32 +147,111 @@ class DynamicEntityListQuery
         }
     }
 
-    private function applyMainColumnFilter(string $key, mixed $value): void
+    private function applySingleSort(string $column, string $direction): void
     {
-        $type = $this->mainFieldDefinitions[$key]['type'] ?? 'string';
-        $this->query->where($key, $this->castFilterValue($value, $type));
+        $direction = strtolower($direction) === EntityListParams::DIR_DESC
+            ? EntityListParams::DIR_DESC
+            : EntityListParams::DIR_ASC;
+
+        if (array_key_exists($column, $this->mainFieldDefinitions)) {
+            $this->query->orderBy($column, $direction);
+            return;
+        }
+
+        if ($this->metaTable && array_key_exists($column, $this->metaFieldDefinitions)) {
+            $type = $this->metaFieldDefinitions[$column]['type'] ?? 'string';
+
+            if ($this->isStringSortableType($type)) {
+                $this->applyMetaSort($column, $direction);
+            } else {
+                $this->logWarning(sprintf(
+                    'DynamicEntityListQuery@applySort skipped non-string meta sort | entity=%s | column=%s | type=%s',
+                    $this->entity,
+                    $column,
+                    $type
+                ));
+            }
+
+            return;
+        }
+
+        $this->logDebug(sprintf(
+            'DynamicEntityListQuery@applySort skipped unknown column | entity=%s | column=%s',
+            $this->entity,
+            $column
+        ));
     }
 
-    private function applyMetaFilter(string $key, mixed $value): void
+    private function applyMainColumnFilter(string $field, string $op, mixed $value): void
+    {
+        $type = $this->mainFieldDefinitions[$field]['type'] ?? 'string';
+
+        if ($op === EntityListParams::OP_IN) {
+            $values = array_map(
+                fn ($v) => $this->castFilterValue(trim($v), $type),
+                explode(',', (string) $value)
+            );
+            $this->query->whereIn($field, $values);
+            return;
+        }
+
+        if (in_array($op, [EntityListParams::OP_LIKE, EntityListParams::OP_STARTS, EntityListParams::OP_ENDS], true)) {
+            $this->query->where($field, 'LIKE', $this->buildLikeValue($op, $value));
+            return;
+        }
+
+        $this->query->where($field, $this->mapOperator($op), $this->castFilterValue($value, $type));
+    }
+
+    private function applyMetaFilter(string $field, string $op, mixed $value): void
     {
         $metaTable = $this->metaTable;
 
-        $this->query->whereIn('id', function (Builder $sub) use ($metaTable, $key, $value) {
-            $sub->select('ref_parent')
-                ->from($metaTable)
-                ->where('meta_key', $key)
-                ->where('meta_value', (string) $value);
+        $this->query->whereIn('id', function (Builder $sub) use ($metaTable, $field, $op, $value) {
+            $sub->select('ref_parent')->from($metaTable)->where('meta_key', $field);
+
+            if ($op === EntityListParams::OP_IN) {
+                $values = array_map(fn ($v) => trim($v), explode(',', (string) $value));
+                $sub->whereIn('meta_value', $values);
+                return;
+            }
+
+            if (in_array($op, [EntityListParams::OP_LIKE, EntityListParams::OP_STARTS, EntityListParams::OP_ENDS], true)) {
+                $sub->where('meta_value', 'LIKE', $this->buildLikeValue($op, $value));
+                return;
+            }
+
+            $sub->where('meta_value', $this->mapOperator($op), (string) $value);
         });
     }
 
-    private function applyMetaSort(string $key, string $direction): void
+    private function applyMetaSort(string $column, string $direction): void
     {
-        $direction = strtoupper($direction);
-
         $this->query->orderByRaw(
             "(SELECT `meta_value` FROM `{$this->metaTable}` WHERE `ref_parent` = `{$this->entity}`.`id` AND `meta_key` = ? LIMIT 1) {$direction}",
-            [$key]
+            [$column]
         );
+    }
+
+    private function buildLikeValue(string $op, mixed $value): string
+    {
+        return match ($op) {
+            EntityListParams::OP_STARTS => $value . '%',
+            EntityListParams::OP_ENDS   => '%' . $value,
+            default                     => '%' . $value . '%',
+        };
+    }
+
+    private function mapOperator(string $op): string
+    {
+        return match ($op) {
+            EntityListParams::OP_NEQ => '!=',
+            EntityListParams::OP_GT  => '>',
+            EntityListParams::OP_GTE => '>=',
+            EntityListParams::OP_LT  => '<',
+            EntityListParams::OP_LTE => '<=',
+            default                  => '=',
+        };
     }
 
     private function isStringSortableType(string $type): bool
