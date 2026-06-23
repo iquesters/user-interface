@@ -16,6 +16,7 @@ use Iquesters\Foundation\Models\Entity as FoundationEntity;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Http\Query\DynamicEntityListQuery;
 use Throwable;
 
 class DynamicEntityController extends Controller
@@ -47,9 +48,25 @@ class DynamicEntityController extends Controller
             $length = max((int) request()->get('length', 50), 1);
             $page = (int) floor($offset / $length) + 1;
 
-            $query = DB::table($entity);
-            $totalCount = $query->count();
-            $data = $query->offset($offset)->limit($length)->get();
+            [$mainFieldDefinitions, $metaFieldDefinitions] = $this->resolveEntityFieldDefinitions($entity);
+            $metaTable = $this->resolveMetaTable($entity);
+
+            $listQuery = new DynamicEntityListQuery(
+                DB::table($entity),
+                $entity,
+                $mainFieldDefinitions,
+                $metaFieldDefinitions,
+                $metaTable
+            );
+
+            $filters = collect(request()->query())->except(['offset', 'length', 'sort', 'direction', 'filter'])->all();
+
+            $listQuery
+                ->applyFilters($filters)
+                ->applySort(request()->get('sort'), request()->get('direction', 'asc'));
+
+            $totalCount = $listQuery->count();
+            $data = $listQuery->paginate($offset, $length);
             $data = $this->attachMetaData($entity, $data);
             $data = $this->transformRecordsForResponse($data);
 
@@ -62,6 +79,20 @@ class DynamicEntityController extends Controller
             );
         } catch (Throwable $e) {
             return $this->handleException($e, $entity);
+        }
+    }
+
+    protected function resolveEntityFieldDefinitions(string $entity): array
+    {
+        try {
+            $entityDefinition = $this->resolveEntityDefinition($entity);
+
+            return [
+                $this->getMainFieldDefinitions($entityDefinition),
+                $this->getMetaFieldDefinitions($entityDefinition),
+            ];
+        } catch (Throwable) {
+            return [[], []];
         }
     }
 
