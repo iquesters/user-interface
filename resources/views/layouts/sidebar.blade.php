@@ -13,6 +13,28 @@
     </div>
 </aside>
 
+@push('styles')
+<style>
+.sidebar #sidebarMenu .active-module {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+    font-weight: 600;
+    border-radius: 0.35rem;
+}
+
+.sidebar #sidebarMenu .active-module:hover {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    color: var(--bs-primary-text-emphasis) !important;
+}
+
+.sidebar #sidebarMenu .dropdown-item:hover {
+    background-color: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+    border-radius: 0.35rem;
+}
+</style>
+@endpush
+
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,6 +56,55 @@ document.addEventListener('DOMContentLoaded', () => {
         return document.querySelectorAll(`.dropdown-item[data-menu][data-view-mode="${mode}"]`);
     }
 
+    function normalizeUrl(url) {
+        if (!url) return '';
+
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        } catch (e) {
+            return url;
+        }
+    }
+
+    function menuMatchesCurrentUrl(menu) {
+        const currentUrl = normalizeUrl(window.location.href);
+        const currentPath = normalizeUrl(window.location.pathname + window.location.search + window.location.hash);
+
+        return (menu || []).some(item => {
+            if (!item || !item.url || item.url === '#') {
+                return false;
+            }
+
+            const itemUrl = normalizeUrl(item.url);
+            return itemUrl === currentUrl || itemUrl === currentPath;
+        });
+    }
+
+    function findActiveElementByCurrentUrl(tabs, dropdownItems) {
+        const tabMatch = [...tabs].find(tab => {
+            try {
+                const menu = JSON.parse(tab.dataset.menu || '[]');
+                return menuMatchesCurrentUrl(menu);
+            } catch (e) {
+                return false;
+            }
+        });
+
+        if (tabMatch) {
+            return tabMatch;
+        }
+
+        return [...dropdownItems].find(item => {
+            try {
+                const menu = JSON.parse(item.dataset.menu || '[]');
+                return menuMatchesCurrentUrl(menu);
+            } catch (e) {
+                return false;
+            }
+        }) || null;
+    }
+
     /* ================================
        SIDEBAR RENDER
     ================================= */
@@ -45,11 +116,21 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const currentUrl = normalizeUrl(window.location.href);
+        const currentPath = normalizeUrl(window.location.pathname + window.location.search + window.location.hash);
+
         menu.forEach(item => {
             const link = document.createElement('a');
             link.className = 'list-group-item dropdown-item ps-3 pe-2 py-1 d-flex align-items-center';
             link.href = item.url || '#';
             link.innerHTML = `<i class="fa-fw ${item.icon} me-2"></i><span>${item.label}</span>`;
+
+            const itemUrl = normalizeUrl(item.url);
+            if (itemUrl && (itemUrl === currentUrl || itemUrl === currentPath)) {
+                link.classList.add('active-module');
+                link.setAttribute('aria-current', 'page');
+            }
+
             sidebar.appendChild(link);
         });
     }
@@ -88,13 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!tabs.length) return; // still none? exit
 
     let savedIndex = localStorage.getItem('activeModuleIndex');
-    let activeElement = tabs[0];
+    let activeElement = findActiveElementByCurrentUrl(tabs, dropdownItems);
 
-    if (savedIndex) {
+    if (!activeElement && savedIndex) {
         activeElement =
             [...tabs].find(t => t.dataset.index === savedIndex) ||
             [...dropdownItems].find(d => d.dataset.index === savedIndex) ||
-            activeElement;
+            tabs[0];
+    }
+
+    if (!activeElement) {
+        activeElement = tabs[0];
     }
 
     renderSidebar(JSON.parse(activeElement.dataset.menu || '[]'), activeElement.dataset.name);
