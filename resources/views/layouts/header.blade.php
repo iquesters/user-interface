@@ -75,7 +75,6 @@
             <div class="d-none d-lg-flex h-100 flex-grow-1 align-items-center overflow-hidden position-relative global-search-header-shell">
                 <div class="global-search-module-tabs d-flex h-100 overflow-x-auto overflow-y-hidden">
                     @include('userinterface::components.module-tabs', [
-                        'installedModules' => $installedModules,
                         'viewMode' => 'desktop'
                     ])
                 </div>

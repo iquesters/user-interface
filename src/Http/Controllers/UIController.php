@@ -5,6 +5,7 @@ namespace Iquesters\UserInterface\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
+use Iquesters\Foundation\Models\Module;
 use Iquesters\Foundation\Models\MasterData;
 use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Models\TableSchema;
@@ -18,13 +19,29 @@ class UIController extends Controller
      *
      * @return FormSchema[]
      */
-    public function list($table_schema_id)
+    public function list(Request $request, $table_schema_id)
     {
         try {
             $this->logMethodStart("table_schema_id={$table_schema_id}");
             Log::info('In UIController list method', [
                 'table_schema_id' => $table_schema_id,
+                'module_uid' => $request->query('module_uid'),
             ]);
+
+            $moduleUid = $request->query('module_uid');
+            if ($moduleUid) {
+                $module = Module::where('uid', $moduleUid)->first();
+                if ($module) {
+                    $targetSchemaUid = $this->resolveModuleDefaultTableSchemaUid($module);
+
+                    if ($targetSchemaUid && $targetSchemaUid !== $table_schema_id) {
+                        return redirect()->route('ui.list', [
+                            'default_table_schema_uid' => $targetSchemaUid,
+                            'module_uid' => $moduleUid,
+                        ]);
+                    }
+                }
+            }
 
             $table_schema = TableSchema::where('uid', $table_schema_id)->first();
 
@@ -38,6 +55,32 @@ class UIController extends Controller
 
             return back()->with('error', 'Something went wrong.');
         }
+    }
+
+    protected function resolveModuleDefaultTableSchemaUid(Module $module): ?string
+    {
+        $sidebarMenu = $module->getMeta('module_sidebar_menu');
+        if (!$sidebarMenu) {
+            return null;
+        }
+
+        $items = is_string($sidebarMenu) ? json_decode($sidebarMenu, true) : $sidebarMenu;
+        if (!is_array($items)) {
+            return null;
+        }
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $schemaUid = $item['default-table-schema-uid'] ?? null;
+            if (is_string($schemaUid) && $schemaUid !== '') {
+                return $schemaUid;
+            }
+        }
+
+        return null;
     }
 
     public function view(Request $request, $form_schema_id, $entity_uid = null)
