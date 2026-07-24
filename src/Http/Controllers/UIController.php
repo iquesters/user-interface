@@ -69,7 +69,14 @@ class UIController extends Controller
             return null;
         }
 
-        foreach ($items as $item) {
+        $sortedItems = collect($items)
+            ->filter(fn ($item) => is_array($item))
+            ->sortBy(function ($item) {
+                return is_numeric($item['sort_order'] ?? null) ? (int) $item['sort_order'] : PHP_INT_MAX;
+            })
+            ->values();
+
+        foreach ($sortedItems as $item) {
             if (!is_array($item)) {
                 continue;
             }

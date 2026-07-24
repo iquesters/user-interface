@@ -70,10 +70,21 @@
             return;
         }
 
+        const sortedMenu = [...menu].sort((left, right) => {
+            const leftOrder = Number.isFinite(Number(left?.sort_order)) ? Number(left.sort_order) : Number.MAX_SAFE_INTEGER;
+            const rightOrder = Number.isFinite(Number(right?.sort_order)) ? Number(right.sort_order) : Number.MAX_SAFE_INTEGER;
+
+            if (leftOrder === rightOrder) {
+                return 0;
+            }
+
+            return leftOrder - rightOrder;
+        });
+
         const currentUrl = normalizeUrl(window.location.href);
         const currentPath = normalizeUrl(window.location.pathname + window.location.search + window.location.hash);
 
-        menu.forEach(item => {
+        sortedMenu.forEach(item => {
             const link = document.createElement('a');
             link.className = 'list-group-item dropdown-item ps-3 pe-2 py-1 d-flex align-items-center';
             link.href = item.url || '#';
@@ -81,7 +92,7 @@
 
             const itemUrl = normalizeUrl(item.url);
             if (itemUrl && (itemUrl === currentUrl || itemUrl === currentPath)) {
-                link.classList.add('active-module');
+                link.classList.add('sidebar-active-module');
                 link.setAttribute('aria-current', 'page');
             }
 
@@ -89,28 +100,47 @@
         });
     }
 
+    function getPrimarySidebarUrl(menu) {
+        if (!Array.isArray(menu)) {
+            return '';
+        }
+
+        const firstVisibleItem = menu.find(item => item && item.url && item.url !== '#');
+        return firstVisibleItem ? firstVisibleItem.url : '';
+    }
+
     function setActive(element) {
         const mode = element.dataset.viewMode;
         const moduleUid = element.dataset.moduleUid || '';
 
-        getTabs(mode).forEach(t => t.classList.remove('active-module'));
+        getTabs(mode).forEach(t => t.classList.remove('minibar-active-module'));
         getDropdownItems(mode).forEach(d => d.classList.remove('active'));
 
-        element.classList.add(element.classList.contains('module-tab') ? 'active-module' : 'active');
+        element.classList.add(element.classList.contains('module-tab') ? 'minibar-active-module' : 'active');
         localStorage.setItem('activeModuleUid', moduleUid);
         localStorage.setItem('activeModuleIndex', element.dataset.index);
     }
 
     function navigateToModule(element) {
         const href = element.dataset.href || element.getAttribute('href');
+        let menu = [];
 
-        if (!href || href === '#' || href.startsWith('javascript:')) {
+        try {
+            menu = JSON.parse(element.dataset.menu || '[]');
+        } catch (e) {
+            menu = [];
+        }
+
+        const primarySidebarUrl = getPrimarySidebarUrl(menu);
+        const targetHref = primarySidebarUrl || href;
+
+        if (!targetHref || targetHref === '#' || targetHref.startsWith('javascript:')) {
             return false;
         }
 
         localStorage.setItem('activeModuleUid', element.dataset.moduleUid || '');
         localStorage.setItem('activeModuleIndex', element.dataset.index || '');
-        window.location.href = href;
+        window.location.href = targetHref;
         return true;
     }
 

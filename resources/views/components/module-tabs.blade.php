@@ -19,6 +19,9 @@
 
     $navigationItems = collect(is_array($navigationItems) ? $navigationItems : [])
         ->filter(fn ($item) => ($item['enabled'] ?? true) && ($item['visible'] ?? true))
+        ->sortBy(function ($item) {
+            return is_numeric($item['sort_order'] ?? null) ? (int) $item['sort_order'] : PHP_INT_MAX;
+        })
         ->values();
 
     if (!Auth::check()) {
@@ -150,7 +153,11 @@
 
         $route = $item['route'] ?? null;
         if ($route && Route::has($route)) {
-            return route($route, $params);
+            try {
+                return route($route, $params);
+            } catch (\Throwable $e) {
+                return '#';
+            }
         }
 
         if ($module) {
@@ -158,7 +165,14 @@
             $rawSidebarMenu = is_string($rawSidebarMenu) ? json_decode($rawSidebarMenu, true) : $rawSidebarMenu;
             $rawSidebarMenu = is_array($rawSidebarMenu) ? $rawSidebarMenu : [];
 
-            foreach ($rawSidebarMenu as $sidebarItem) {
+            $sortedSidebarMenu = collect($rawSidebarMenu)
+                ->filter(fn ($item) => is_array($item))
+                ->sortBy(function ($item) {
+                    return is_numeric($item['sort_order'] ?? null) ? (int) $item['sort_order'] : PHP_INT_MAX;
+                })
+                ->values();
+
+            foreach ($sortedSidebarMenu as $sidebarItem) {
                 if (!is_array($sidebarItem)) {
                     continue;
                 }
@@ -175,7 +189,11 @@
 
                 $sidebarRoute = $sidebarItem['route'] ?? null;
                 if ($sidebarRoute && Route::has($sidebarRoute)) {
-                    return route($sidebarRoute, $sidebarParams);
+                    try {
+                        return route($sidebarRoute, $sidebarParams);
+                    } catch (\Throwable $e) {
+                        return '#';
+                    }
                 }
             }
         }
@@ -191,31 +209,145 @@
         }
 
         $route = $item['route'] ?? null;
+        $url = $item['url'] ?? null;
+        if (is_string($url) && $url !== '' && $url !== '#') {
+            $resolvedUrl = $url;
+        } elseif ($route && Route::has($route)) {
+            try {
+                $resolvedUrl = route($route, $params);
+            } catch (\Throwable $e) {
+                $resolvedUrl = '#';
+            }
+        } else {
+            $resolvedUrl = '#';
+        }
 
         return [
             'icon' => $item['icon'] ?? null,
-            'label' => $item['label'] ?? null,
-            'url' => $route && Route::has($route)
-                ? route($route, $params)
-                : '#',
+            'label' => $item['label'] ?? ($item['original_label'] ?? null),
+            'url' => $resolvedUrl,
         ];
     };
 
-    $getModuleSidebarItems = function (array $module) use ($resolveModule): array {
+    $resolveSidebarNavigationItems = function (FoundationModule $module): array {
+        if ($module->name !== 'foundation') {
+            return [];
+        }
+
+        $foundationNavigationRows = Navigation::query()
+            ->where('ref_parent', $module->id)
+            ->where('name', 'not like', 'foundation\_navigation')
+            ->with(['metas' => function ($query) {
+                $query->where('meta_key', 'navigation_items');
+            }])
+            ->orderBy('id')
+            ->get();
+
+        if ($foundationNavigationRows->isEmpty()) {
+            $foundationNavigationRows = Navigation::query()
+                ->where('name', 'foundation_navigation')
+                ->with(['metas' => function ($query) {
+                    $query->where('meta_key', 'navigation_items');
+                }])
+                ->get();
+        }
+
+        if ($foundationNavigationRows->isEmpty()) {
+            return [];
+        }
+
+        $navigationItemsByNavigationName = $foundationNavigationRows->mapWithKeys(function (Navigation $navigation) {
+            $items = json_decode($navigation->getMeta('navigation_items') ?? '[]', true);
+            $items = is_array($items) ? $items : [];
+
+            return [
+                $navigation->name => collect($items)
+                    ->filter(fn ($item) => is_array($item))
+                    ->values()
+                    ->all(),
+            ];
+        });
+
+        $resolveFirstTabUrl = function (array $sidebarItem) use ($navigationItemsByNavigationName): ?string {
+            $sidebarId = $sidebarItem['id'] ?? null;
+
+            if (!$sidebarId) {
+                return null;
+            }
+
+            foreach ($navigationItemsByNavigationName as $items) {
+                foreach ($items as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+
+                    $placement = $item['placement'] ?? $item['section'] ?? null;
+                    if ($placement !== 'tabs') {
+                        continue;
+                    }
+
+                    if (($item['parent_id'] ?? null) !== $sidebarId) {
+                        continue;
+                    }
+
+                    $params = $item['params'] ?? [];
+                    if (!empty($item['default-table-schema-uid'])) {
+                        $params['default_table_schema_uid'] = $item['default-table-schema-uid'];
+                    }
+
+                    $route = $item['route'] ?? null;
+                    if ($route && Route::has($route)) {
+                        try {
+                            return route($route, $params);
+                        } catch (\Throwable $e) {
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        };
+
+        $foundationItems = $foundationNavigationRows
+            ->flatMap(function (Navigation $navigation) {
+                $items = json_decode($navigation->getMeta('navigation_items') ?? '[]', true);
+                $items = is_array($items) ? $items : [];
+
+                return collect($items)
+                    ->filter(function ($item) {
+                        return is_array($item)
+                            && (($item['placement'] ?? $item['section'] ?? 'sidebar') === 'sidebar')
+                            && ($item['enabled'] ?? true)
+                            && ($item['visible'] ?? true);
+                    })
+                    ->map(function (array $item) use ($navigation) {
+                        $item['navigation_name'] = $navigation->name;
+                        return $item;
+                    });
+            })
+            ->sortBy(function ($item) {
+                return is_numeric($item['sort_order'] ?? null) ? (int) $item['sort_order'] : PHP_INT_MAX;
+            })
+            ->values()
+            ->map(function (array $item) use ($resolveFirstTabUrl) {
+                $item['label'] = $item['label'] ?? $item['original_label'] ?? '';
+                $item['url'] = $item['url'] ?? $resolveFirstTabUrl($item) ?? null;
+                return $item;
+            })
+            ->all();
+
+        return $foundationItems;
+    };
+
+    $getModuleSidebarItems = function (array $module) use ($resolveModule, $resolveSidebarNavigationItems): array {
         $targetModule = $resolveModule($module['target_module_uid'] ?? $module['module_uid'] ?? null);
 
         if (!$targetModule) {
             return [];
         }
 
-        $rawSidebarMenu = $targetModule->getMeta('module_sidebar_menu') ?? '[]';
-        $rawSidebarMenu = is_string($rawSidebarMenu) ? json_decode($rawSidebarMenu, true) : $rawSidebarMenu;
-        $rawSidebarMenu = is_array($rawSidebarMenu) ? $rawSidebarMenu : [];
-
-        return collect($rawSidebarMenu)
-            ->filter(fn ($item) => is_array($item) && (($item['enabled'] ?? true) && ($item['visible'] ?? true)))
-            ->values()
-            ->all();
+        return $resolveSidebarNavigationItems($targetModule);
     };
     
     // View mode configurations
@@ -269,7 +401,7 @@
                 $primaryUrl = $withModuleQuery($resolveNavigationUrl($module, $moduleModel), $moduleUid);
                 $menu = collect($submenuItems)
                     ->map(fn ($item) => is_array($item) ? $buildSidebarMenuItem($item) : [])
-                    ->filter(fn ($item) => !empty($item['url']) && $item['url'] !== '#')
+                    ->filter(fn ($item) => !empty($item['label']))
                     ->values();
             @endphp
 
@@ -321,7 +453,7 @@
                             $primaryUrl = $withModuleQuery($resolveNavigationUrl($module, $moduleModel), $moduleUid);
                             $menu = collect($submenuItems)
                                 ->map(fn ($item) => is_array($item) ? $buildSidebarMenuItem($item) : [])
-                                ->filter(fn ($item) => !empty($item['url']) && $item['url'] !== '#')
+                                ->filter(fn ($item) => !empty($item['label']))
                                 ->values();
                         @endphp
                         <li>
