@@ -67,6 +67,8 @@
 
         if (!menu || menu.length === 0) {
             sidebar.innerHTML = '<div class="text-muted ps-3 pe-2 py-1">No menu available.</div>';
+            sidebar.classList.remove('nav-sidebar-pending');
+            sidebar.classList.add('nav-sidebar-ready');
             return;
         }
 
@@ -98,6 +100,42 @@
 
             sidebar.appendChild(link);
         });
+
+        sidebar.classList.remove('nav-sidebar-pending');
+        sidebar.classList.add('nav-sidebar-ready');
+    }
+
+    function refreshSidebarFromModuleUid(moduleUid, fallbackMenu) {
+        if (!moduleUid) {
+            return false;
+        }
+
+        const activeElement =
+            document.querySelector(`.module-tab[data-module-uid="${moduleUid}"]`) ||
+            document.querySelector(`.dropdown-item[data-module-uid="${moduleUid}"]`);
+
+        if (!activeElement) {
+            if (Array.isArray(fallbackMenu)) {
+                renderSidebar(fallbackMenu);
+                return true;
+            }
+
+            return false;
+        }
+
+        let menu = fallbackMenu;
+
+        if (!Array.isArray(menu)) {
+            try {
+                menu = JSON.parse(activeElement.dataset.menu || '[]');
+            } catch (e) {
+                menu = [];
+            }
+        }
+
+        renderSidebar(menu);
+        setActive(activeElement);
+        return true;
     }
 
     function getPrimarySidebarUrl(menu) {
@@ -228,4 +266,13 @@
     }, true);
 
     document.addEventListener('DOMContentLoaded', activateCurrentModule);
+
+    document.addEventListener('navigation:sidebar-refresh', function (event) {
+        const detail = event.detail || {};
+        refreshSidebarFromModuleUid(detail.moduleUid, detail.menu);
+    });
+
+    window.__refreshNavigationSidebar = function (moduleUid, menu) {
+        return refreshSidebarFromModuleUid(moduleUid, menu);
+    };
 })();

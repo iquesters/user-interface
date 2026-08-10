@@ -223,6 +223,7 @@
         }
 
         return [
+            'navigation_uid' => $item['navigation_uid'] ?? null,
             'icon' => $item['icon'] ?? null,
             'label' => $item['label'] ?? ($item['original_label'] ?? null),
             'url' => $resolvedUrl,
@@ -230,21 +231,16 @@
     };
 
     $resolveSidebarNavigationItems = function (FoundationModule $module): array {
-        if ($module->name !== 'foundation') {
-            return [];
-        }
-
-        $foundationNavigationRows = Navigation::query()
+        $navigationRows = Navigation::query()
             ->where('ref_parent', $module->id)
-            ->where('name', 'not like', 'foundation\_navigation')
             ->with(['metas' => function ($query) {
                 $query->where('meta_key', 'navigation_items');
             }])
             ->orderBy('id')
             ->get();
 
-        if ($foundationNavigationRows->isEmpty()) {
-            $foundationNavigationRows = Navigation::query()
+        if ($navigationRows->isEmpty() && $module->name === 'foundation') {
+            $navigationRows = Navigation::query()
                 ->where('name', 'foundation_navigation')
                 ->with(['metas' => function ($query) {
                     $query->where('meta_key', 'navigation_items');
@@ -252,11 +248,11 @@
                 ->get();
         }
 
-        if ($foundationNavigationRows->isEmpty()) {
+        if ($navigationRows->isEmpty()) {
             return [];
         }
 
-        $navigationItemsByNavigationName = $foundationNavigationRows->mapWithKeys(function (Navigation $navigation) {
+        $navigationItemsByNavigationName = $navigationRows->mapWithKeys(function (Navigation $navigation) {
             $items = json_decode($navigation->getMeta('navigation_items') ?? '[]', true);
             $items = is_array($items) ? $items : [];
 
@@ -309,7 +305,7 @@
             return null;
         };
 
-        $foundationItems = $foundationNavigationRows
+        $sidebarItems = $navigationRows
             ->flatMap(function (Navigation $navigation) {
                 $items = json_decode($navigation->getMeta('navigation_items') ?? '[]', true);
                 $items = is_array($items) ? $items : [];
@@ -337,7 +333,7 @@
             })
             ->all();
 
-        return $foundationItems;
+        return $sidebarItems;
     };
 
     $getModuleSidebarItems = function (array $module) use ($resolveModule, $resolveSidebarNavigationItems): array {

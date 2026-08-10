@@ -10,6 +10,17 @@
   background-color: var(--bs-body-bg);
   min-height: 100%;
 }
+
+.nav-sidebar-pending {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.nav-sidebar-ready {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.18s ease;
+}
 .ui-workarea {
   padding-top: 0.1px;
 }

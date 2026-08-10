@@ -4,6 +4,7 @@ namespace Iquesters\UserInterface\Database\Seeders;
 
 use Iquesters\Foundation\Database\Seeders\BaseSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class UserInterfaceSeeder extends BaseSeeder
 {
@@ -171,6 +172,273 @@ class UserInterfaceSeeder extends BaseSeeder
      */
     protected function seedCustom(): void
     {
+        $module = DB::table('modules')
+            ->where('name', $this->moduleName)
+            ->first();
+
+        if (!$module) {
+            return;
+        }
+
+        $moduleId = $module->id;
+        $moduleUid = $module->uid;
+        $userId = 0;
+        $now = now();
+
+        $sidebarItems = [
+            [
+                'name' => 'user-interface-form-schemas',
+                'id' => 'user-interface-form-schemas',
+                'label' => 'Form Schemas',
+                'icon' => 'fas fa-list-check',
+                'route' => 'ui.list',
+                'schema_uid' => DB::table('table_schemas')->where('slug', 'form-schema-table')->value('uid'),
+                'sort_order' => 10,
+            ],
+            [
+                'name' => 'user-interface-table-schemas',
+                'id' => 'user-interface-table-schemas',
+                'label' => 'Table Schemas',
+                'icon' => 'fas fa-table',
+                'route' => 'ui.list',
+                'schema_uid' => DB::table('table_schemas')->where('slug', 'table-schema-table')->value('uid'),
+                'sort_order' => 20,
+            ],
+            [
+                'name' => 'user-interface-navigations',
+                'id' => 'user-interface-navigations',
+                'label' => 'Navigations',
+                'icon' => 'fas fa-bars-staggered',
+                'route' => 'ui.list',
+                'schema_uid' => DB::table('table_schemas')->where('slug', 'navigation-table')->value('uid'),
+                'sort_order' => 30,
+            ],
+            [
+                'name' => 'user-interface-organisations',
+                'id' => 'user-interface-organisations',
+                'label' => 'All Organisations',
+                'icon' => 'fas fa-building-columns',
+                'route' => 'organisations.index',
+                'schema_uid' => null,
+                'sort_order' => 40,
+            ],
+        ];
+
+        $sidebarNavigationUids = [];
+
+        foreach ($sidebarItems as $item) {
+            DB::table('navigations')->updateOrInsert(
+                ['name' => $item['name']],
+                [
+                    'uid' => (string) Str::ulid(),
+                    'ref_parent' => $moduleId,
+                    'status' => 'active',
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+
+            $navigation = DB::table('navigations')
+                ->where('name', $item['name'])
+                ->first();
+
+            if (!$navigation) {
+                continue;
+            }
+
+            $sidebarNavigationUids[$item['name']] = $navigation->uid;
+
+            DB::table('navigation_metas')->updateOrInsert(
+                [
+                    'ref_parent' => $navigation->id,
+                    'meta_key' => 'navigation_items',
+                ],
+                [
+                    'meta_value' => json_encode([
+                        [
+                            'id' => $item['id'],
+                            'label' => $item['label'],
+                            'original_label' => $item['label'],
+                            'slug' => Str::slug($item['label']),
+                            'route' => $item['route'],
+                            'icon' => $item['icon'],
+                            'placement' => 'sidebar',
+                            'module_uid' => $moduleUid,
+                            'target_module_uid' => $moduleUid,
+                            'module_name' => $module->name,
+                            'default-table-schema-uid' => $item['schema_uid'],
+                            'sort_order' => $item['sort_order'],
+                            'visible' => true,
+                            'enabled' => true,
+                            'locked' => false,
+                            'source' => [
+                                'table' => 'module_metas',
+                                'meta_key' => 'module_sidebar_menu',
+                            ],
+                        ],
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'status' => 'active',
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+
+            DB::table('module_has_navigations')->updateOrInsert(
+                [
+                    'module_id' => $moduleId,
+                    'navigation_id' => $navigation->id,
+                ],
+                [
+                    'label' => $item['label'],
+                    'icon' => $item['icon'],
+                    'sort_order' => $item['sort_order'],
+                    'visible' => 1,
+                    'enabled' => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
+            );
+        }
+
+        $tabDefinitions = [
+            'user-interface-form-schemas' => [
+                [
+                    'name' => 'user-interface-form-schemas-list',
+                    'id' => 'form-schemas-list-tab',
+                    'label' => 'List',
+                    'icon' => 'fas fa-fw fa-list',
+                    'route' => 'ui.list',
+                    'parent_id' => 'user-interface-form-schemas',
+                    'schema_uid' => DB::table('table_schemas')->where('slug', 'form-schema-table')->value('uid'),
+                ],
+                [
+                    'name' => 'user-interface-form-schemas-create',
+                    'id' => 'form-schemas-create-tab',
+                    'label' => 'Create',
+                    'icon' => 'fas fa-fw fa-plus',
+                    'route' => 'form.create',
+                    'parent_id' => 'user-interface-form-schemas',
+                    'schema_uid' => null,
+                ],
+            ],
+            'user-interface-table-schemas' => [
+                [
+                    'name' => 'user-interface-table-schemas-list',
+                    'id' => 'table-schemas-list-tab',
+                    'label' => 'List',
+                    'icon' => 'fas fa-fw fa-list',
+                    'route' => 'ui.list',
+                    'parent_id' => 'user-interface-table-schemas',
+                    'schema_uid' => DB::table('table_schemas')->where('slug', 'table-schema-table')->value('uid'),
+                ],
+                [
+                    'name' => 'user-interface-table-schemas-create',
+                    'id' => 'table-schemas-create-tab',
+                    'label' => 'Create',
+                    'icon' => 'fas fa-fw fa-plus',
+                    'route' => 'table.create',
+                    'parent_id' => 'user-interface-table-schemas',
+                    'schema_uid' => null,
+                ],
+            ],
+            'user-interface-navigations' => [
+                [
+                    'name' => 'user-interface-navigations-list',
+                    'id' => 'navigations-list-tab',
+                    'label' => 'List',
+                    'icon' => 'fas fa-fw fa-list',
+                    'route' => 'ui.list',
+                    'parent_id' => 'user-interface-navigations',
+                    'schema_uid' => DB::table('table_schemas')->where('slug', 'navigation-table')->value('uid'),
+                ],
+            ],
+        ];
+
+        foreach ($tabDefinitions as $parentName => $tabs) {
+            $parentNavigation = DB::table('navigations')->where('name', $parentName)->first();
+            if (!$parentNavigation) {
+                continue;
+            }
+
+            foreach ($tabs as $index => $tab) {
+                DB::table('navigations')->updateOrInsert(
+                    ['name' => $tab['name']],
+                    [
+                        'uid' => (string) Str::ulid(),
+                        'ref_parent' => $moduleId,
+                        'status' => 'active',
+                        'created_by' => $userId,
+                        'updated_by' => $userId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                );
+
+                $tabNavigation = DB::table('navigations')->where('name', $tab['name'])->first();
+                if (!$tabNavigation) {
+                    continue;
+                }
+
+                DB::table('navigation_metas')->updateOrInsert(
+                    [
+                        'ref_parent' => $tabNavigation->id,
+                        'meta_key' => 'navigation_items',
+                    ],
+                    [
+                        'meta_value' => json_encode([
+                            [
+                                'id' => $tab['id'],
+                                'label' => $tab['label'],
+                                'original_label' => $tab['label'],
+                                'slug' => Str::slug($tab['label']),
+                                'route' => $tab['route'],
+                                'icon' => $tab['icon'],
+                                'placement' => 'tabs',
+                                'parent_id' => $tab['parent_id'],
+                                'module_uid' => $moduleUid,
+                                'target_module_uid' => $moduleUid,
+                                'module_name' => $module->name,
+                                'default-table-schema-uid' => $tab['schema_uid'],
+                                'sort_order' => ($index + 1) * 10,
+                                'visible' => true,
+                                'enabled' => true,
+                                'locked' => false,
+                                'source' => [
+                                    'table' => 'module_metas',
+                                    'meta_key' => 'module_sidebar_menu',
+                                ],
+                            ],
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'status' => 'active',
+                        'created_by' => $userId,
+                        'updated_by' => $userId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                );
+
+                DB::table('module_has_navigations')->updateOrInsert(
+                    [
+                        'module_id' => $moduleId,
+                        'navigation_id' => $tabNavigation->id,
+                    ],
+                    [
+                        'label' => $tab['label'],
+                        'icon' => $tab['icon'],
+                        'sort_order' => ($index + 1) * 10,
+                        'visible' => 1,
+                        'enabled' => 1,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]
+                );
+            }
+        }
+
         // Create or fetch parent "theme"
         $themeParent = DB::table('master_data')->updateOrInsert(
             ['key' => 'theme'],

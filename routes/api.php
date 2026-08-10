@@ -6,6 +6,7 @@ use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
 use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
 use Iquesters\UserInterface\Http\Controllers\DynamicBusinessEntityController;
+use Iquesters\UserInterface\Http\Controllers\NavigationEditorController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
 
 /*
@@ -62,6 +63,9 @@ Route::prefix('api')
 
             Route::put('entity/update/{entity_name}/{data_uid}', [DynamicEntityController::class, 'update'])
                 ->name('api.entity.update');
+
+            Route::put('navigation/update/{navigation_uid}', [NavigationEditorController::class, 'update'])
+                ->name('api.navigation.update');
 
             Route::delete('entity/delete/{entity_name}/{data_uid}', [DynamicEntityController::class, 'delete'])
                 ->name('api.entity.delete');
