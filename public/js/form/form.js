@@ -728,17 +728,19 @@ async function renderFormForModal(formElement, formMeta) {
 
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
+    let formDataFromSchema = null;
 
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
     }
 
-    if (!entityData && formMeta.entity && entityUId) {
-        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
+    if (!entityData && entityUId) {
+        const getentityResponse = await getfetchEntityData(formMeta, entityUId);
         entityData = getentityResponse?.data || null;
     }
 
     if (entityData) {
+        formDataFromSchema = entityData.form_data || null;
         formElement.__entityDataCache = entityData;
     }
 
@@ -746,7 +748,7 @@ async function renderFormForModal(formElement, formMeta) {
         formMeta.fields.forEach((field, index) => {
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
-            field.value = resolveFieldValue(field.id, formData, entityData);
+            field.value = resolveFieldValue(field.id, formDataFromSchema || formData, entityData);
             addField(field, formElement, formMeta);
         });
     }
@@ -1199,25 +1201,34 @@ function resolveDynamicFormMethod(formMeta, form) {
 }
 
 function resolveDynamicFormEndpoint(formMeta, form, method) {
+    const apiPrefix = formMeta.business_entity ? 'business-entity' : 'entity';
+    const apiTarget = formMeta.business_entity || formMeta.entity || null;
+
     if (formMeta.endpoint) {
+        if (formMeta.business_entity) {
+            return String(formMeta.endpoint)
+                .replace('/api/entity/', '/api/business-entity/')
+                .replace('/api/entity', '/api/business-entity');
+        }
+
         return formMeta.endpoint;
     }
 
-    if (!formMeta.entity) {
+    if (!apiTarget) {
         return null;
     }
 
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return `/api/entity/update/${formMeta.entity}/${entityUid}`;
+        return `/api/${apiPrefix}/update/${apiTarget}/${entityUid}`;
     }
 
     if (method === 'DELETE' && entityUid) {
-        return `/api/entity/delete/${formMeta.entity}/${entityUid}`;
+        return `/api/${apiPrefix}/delete/${apiTarget}/${entityUid}`;
     }
 
-    return `/api/entity/store/${formMeta.entity}`;
+    return `/api/${apiPrefix}/store/${apiTarget}`;
 }
 
 function serializeDynamicFormPayload(form, formMeta) {

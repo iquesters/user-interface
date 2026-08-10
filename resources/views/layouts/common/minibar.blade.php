@@ -19,7 +19,6 @@
             <ul class="minibar-body">
                 <div class="d-flex flex-column align-items-center border-start border-white position-relative">
                     @include('userinterface::components.module-tabs', [
-                        'installedModules' => $installedModules, 
                         'viewMode' => 'vertical'
                     ])
             </ul>

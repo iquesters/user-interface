@@ -225,7 +225,7 @@ async function initLabTable(tableElement) {
     }
 
     const schema = schemaResponse.data;
-    const entity = schema.entity;
+    const entity = schema.entity || schema.business_entity || null;
     const dtSchemaConfig = schema["dt-options"] || {};
     const entriesPerPage = schema.entries_per_page || 10;
 

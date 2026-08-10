@@ -53,8 +53,8 @@ async function setupFormBlock(formCol, formMeta) {
             entityData = formData;
         }
 
-        if (!entityData && formMeta.entity && entityUId) {
-            const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
+        if (!entityData && entityUId) {
+            const getentityResponse = await getfetchEntityData(formMeta, entityUId);
             entityData = getentityResponse?.data || null;
         }
 
@@ -669,17 +669,28 @@ function sanitizeDomIdSegment(value) {
 /**
  * Fetch entity data from Laravel API with Sanctum token
  */
-async function getfetchEntityData(entity,entityUId) {
+function resolveFormApiPrefix(formMeta = {}) {
+    return formMeta.business_entity ? 'business-entity' : 'entity';
+}
+
+function resolveFormApiTarget(formMeta = {}) {
+    return formMeta.business_entity || formMeta.entity || null;
+}
+
+async function getfetchEntityData(formMeta, entityUId) {
     try {
-        if (!entity || !entityUId) {
+        const target = resolveFormApiTarget(formMeta);
+        const prefix = resolveFormApiPrefix(formMeta);
+
+        if (!target || !entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
         if (typeof apiClient !== 'undefined' && apiClient) {
-            return await apiClient.get(`/api/entity/show/${entity}/${entityUId}`);
+            return await apiClient.get(`/api/${prefix}/show/${target}/${entityUId}`);
         }
 
-        const res = await fetch(`/api/entity/show/${entity}/${entityUId}`, {
+        const res = await fetch(`/api/${prefix}/show/${target}/${entityUId}`, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -704,22 +715,178 @@ async function getfetchEntityData(entity,entityUId) {
 }
 
 function resolveFieldValue(fieldId, formData, entityData) {
-    if (formData && Object.prototype.hasOwnProperty.call(formData, fieldId)) {
-        return formData[fieldId];
+    const resolvedFormData = entityData?.form_data || formData;
+    const normalizedFieldId = String(fieldId || '').trim();
+
+    if (!normalizedFieldId) {
+        return "";
+    }
+
+    if (resolvedFormData && Object.prototype.hasOwnProperty.call(resolvedFormData, normalizedFieldId)) {
+        return resolvedFormData[normalizedFieldId];
     }
 
     if (!entityData) {
         return "";
     }
 
-    if (Object.prototype.hasOwnProperty.call(entityData, fieldId)) {
-        return entityData[fieldId] ?? "";
+    if (Object.prototype.hasOwnProperty.call(entityData, normalizedFieldId)) {
+        return entityData[normalizedFieldId] ?? "";
+    }
+
+    const relationValue = resolveBusinessEntityFieldValue(entityData, normalizedFieldId);
+
+    if (relationValue !== undefined) {
+        return relationValue ?? "";
+    }
+
+    const primaryValue = resolvePrimaryBusinessEntityFieldValue(entityData, normalizedFieldId);
+    if (primaryValue !== undefined) {
+        return primaryValue ?? "";
     }
 
     const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
-    const metaItem = metaEntries.find((item) => item?.meta_key === fieldId);
+    const metaItem = metaEntries.find((item) => item?.meta_key === normalizedFieldId);
 
     return metaItem ? (metaItem.meta_value ?? "") : "";
+}
+
+function resolveBusinessEntityDisplayValue(entityData, fieldId) {
+    const normalizedFieldId = String(fieldId || '').trim();
+
+    if (!normalizedFieldId || !entityData) {
+        return undefined;
+    }
+
+    const directValue = entityData?.[normalizedFieldId];
+    if (directValue !== undefined) {
+        return directValue;
+    }
+
+    const relationValue = resolveBusinessEntityFieldValue(entityData, normalizedFieldId);
+    if (relationValue !== undefined) {
+        return relationValue;
+    }
+
+    const primaryValue = resolvePrimaryBusinessEntityFieldValue(entityData, normalizedFieldId);
+    if (primaryValue !== undefined) {
+        return primaryValue;
+    }
+
+    return undefined;
+}
+
+function isBusinessEntityResponse(entityData) {
+    return Boolean(
+        entityData?.business_entity ||
+        entityData?.business_entity_name ||
+        entityData?.field_mapping?.primary_entity ||
+        entityData?.field_mapping?.entities
+    );
+}
+
+function resolveBusinessEntityPrimaryKey(entityData) {
+    return entityData?.field_mapping?.primary_entity
+        || entityData?.business_entity_primary_entity
+        || entityData?.field_mapping?.primary
+        || entityData?.field_mapping?.primary_table
+        || null;
+}
+
+function resolvePrimaryBusinessEntityFieldValue(entityData, fieldId) {
+    if (!fieldId) {
+        return undefined;
+    }
+
+    const normalizedFieldId = String(fieldId);
+    const primaryFieldKey = normalizedFieldId.split('_').slice(1).join('_') || normalizedFieldId;
+
+    if (!primaryFieldKey) {
+        return undefined;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(entityData, primaryFieldKey)) {
+        return entityData[primaryFieldKey] ?? "";
+    }
+
+    const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
+    const metaItem = metaEntries.find((item) => item?.meta_key === primaryFieldKey);
+    if (metaItem) {
+        return metaItem.meta_value ?? "";
+    }
+
+    return undefined;
+}
+
+function resolveBusinessEntityFieldValue(entityData, fieldId) {
+    if (!entityData || !fieldId) {
+        return undefined;
+    }
+
+    const segments = String(fieldId).split('_');
+
+    for (let i = segments.length - 1; i >= 1; i--) {
+        const relationKey = segments.slice(0, i).join('_');
+        const leafKey = segments.slice(i).join('_');
+        const relationValue = entityData?.[relationKey];
+
+        if (!relationValue) {
+            continue;
+        }
+
+        if (Array.isArray(relationValue)) {
+            const match = relationValue.find((item) => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, leafKey));
+            if (match) {
+                return match[leafKey] ?? "";
+            }
+
+            const firstItem = relationValue.find((item) => item && typeof item === 'object');
+            if (firstItem && Object.prototype.hasOwnProperty.call(firstItem, leafKey)) {
+                return firstItem[leafKey] ?? "";
+            }
+        }
+
+        if (relationValue && typeof relationValue === 'object') {
+            if (Object.prototype.hasOwnProperty.call(relationValue, leafKey)) {
+                return relationValue[leafKey] ?? "";
+            }
+
+            if (Array.isArray(relationValue.meta)) {
+                const metaItem = relationValue.meta.find((item) => item?.meta_key === leafKey);
+                if (metaItem) {
+                    return metaItem.meta_value ?? "";
+                }
+            }
+        }
+    }
+
+    return undefined;
+}
+
+function resolveBusinessEntityFormValue(entityData, fieldId) {
+    const normalizedFieldId = String(fieldId || '').trim();
+
+    if (!normalizedFieldId || !entityData) {
+        return undefined;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(entityData, normalizedFieldId)) {
+        return entityData[normalizedFieldId] ?? "";
+    }
+
+    const relationValue = resolveBusinessEntityFieldValue(entityData, normalizedFieldId);
+    if (relationValue !== undefined) {
+        return relationValue ?? "";
+    }
+
+    const primaryValue = resolvePrimaryBusinessEntityFieldValue(entityData, normalizedFieldId);
+    if (primaryValue !== undefined) {
+        return primaryValue ?? "";
+    }
+
+    const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
+    const metaItem = metaEntries.find((item) => item?.meta_key === normalizedFieldId);
+    return metaItem ? (metaItem.meta_value ?? "") : undefined;
 }
 
 /**
@@ -731,28 +898,60 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         ? document.querySelector(formSelector)
         : formSelector;
     const entityData = entityResponse || null;
+    const formData = entityData?.form_data || null;
+    const formMeta = form?.__formMeta || {};
+    const isBusinessEntityForm = Boolean(formMeta.business_entity);
 
     if (!form || !entityData) return;
 
-    for (const [key, value] of Object.entries(entityData)) {
-        const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-            ? CSS.escape(key)
-            : key.replace(/"/g, '\\"');
-        const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
-        const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
-
-        if (field) {
-            if (field.type === 'checkbox') {
-                field.checked = Boolean(Number(value)) || value === true || value === '1';
-            } else {
-                field.value = value ?? "";
-            }
+    const fieldNodes = Array.from(form.querySelectorAll('input[name], textarea[name], select[name]'));
+    fieldNodes.forEach((fieldNode) => {
+        const fieldName = fieldNode.name || fieldNode.id;
+        if (!fieldName) {
+            return;
         }
 
-        if (readOnlyField) {
-            readOnlyField.textContent = value ?? "—";
+        if (fieldNode.value && fieldNode.value !== '' && fieldNode.value !== 'Enter ' + fieldName.toLowerCase()) {
+            return;
         }
-    }
+
+        const directValue = formData?.[fieldName] ?? entityData?.[fieldName];
+        const relationValue = isBusinessEntityForm
+            ? resolveBusinessEntityFormValue(entityData, fieldName)
+            : resolveBusinessEntityFieldValue(entityData, fieldName);
+        const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
+        const metaValue = metaEntries.find((item) => item?.meta_key === fieldName)?.meta_value;
+        const resolvedValue = directValue ?? relationValue ?? metaValue;
+
+        if (resolvedValue === undefined || resolvedValue === null || resolvedValue === '') {
+            return;
+        }
+
+        if (fieldNode.type === 'checkbox') {
+            fieldNode.checked = Boolean(Number(resolvedValue)) || resolvedValue === true || resolvedValue === '1';
+        } else {
+            fieldNode.value = resolvedValue;
+        }
+    });
+
+    const readOnlyNodes = Array.from(form.querySelectorAll('[data-field-id]'));
+    readOnlyNodes.forEach((readOnlyNode) => {
+        const fieldId = readOnlyNode.dataset.fieldId;
+        if (!fieldId) {
+            return;
+        }
+
+        const resolvedValue =
+            formData?.[fieldId] ??
+            entityData?.[fieldId] ??
+            (isBusinessEntityForm ? resolveBusinessEntityFormValue(entityData, fieldId) : resolveBusinessEntityFieldValue(entityData, fieldId));
+
+        if (resolvedValue === undefined || resolvedValue === null || resolvedValue === '') {
+            return;
+        }
+
+        readOnlyNode.textContent = resolvedValue;
+    });
 
     const metaEntries = Array.isArray(entityData.meta) ? entityData.meta : [];
     metaEntries.forEach((item) => {

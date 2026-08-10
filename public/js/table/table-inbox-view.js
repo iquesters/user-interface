@@ -11,6 +11,27 @@ function clearInboxRowSelection(tableElement) {
     });
 }
 
+function syncInboxRowSelection(tableElement) {
+    if (!tableElement) {
+        return;
+    }
+
+    clearInboxRowSelection(tableElement);
+
+    tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`).forEach((checkbox) => {
+        const rowElement = checkbox.closest('tr');
+
+        if (!rowElement) {
+            return;
+        }
+
+        rowElement.classList.add(TABLE_CLASS_BG_PRIMARY_SUBTLE);
+        rowElement.querySelectorAll(TABLE_SELECTOR_TABLE_CELLS).forEach((cell) => {
+            cell.classList.add(TABLE_CLASS_BG_PRIMARY_SUBTLE);
+        });
+    });
+}
+
 function setInboxRowSelection(rowElement) {
     if (!rowElement) {
         return;
@@ -126,7 +147,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         <thead>
             <tr>
                 <th class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)}">
-                    <input type="checkbox" id="${TABLE_ID_SELECT_ALL_INBOX}" style="cursor: pointer;">
+                    <input type="checkbox" id="${TABLE_ID_SELECT_ALL_INBOX}" style="cursor: pointer; margin: 0 auto; display: block;">
                 </th>
                 <th class="${TABLE_CLASS_TEXT_UPPERCASE}">
                     ${formattedEntityName}
@@ -184,6 +205,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
             styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
             initializeInboxSummaryComponents(listTable);
+            syncInboxRowSelection(listTable);
         },
         drawCallback: function (...args) {
             if (typeof dtConfig.drawCallback === 'function') {
@@ -193,12 +215,14 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
             styleInboxRows(listTable);
             applyInboxStickyStyles(leftPanel);
             initializeInboxSummaryComponents(listTable);
+            syncInboxRowSelection(listTable);
         },
     });
 
     styleInboxRows(listTable);
     applyInboxStickyStyles(leftPanel);
     initializeInboxSummaryComponents(listTable);
+    syncInboxRowSelection(listTable);
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);
@@ -210,8 +234,12 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
 
     // Handle row selection
     $(listTable).on('click', TABLE_SELECTOR_INBOX_ROW, function(e) {
-        // Don't trigger if clicking checkbox
-        if ($(e.target).hasClass(TABLE_SELECTOR_ROW_CHECKBOX.slice(1)) || $(e.target).closest(TABLE_SELECTOR_CHECKBOX_COLUMN).length) {
+        // Don't trigger if clicking checkbox or the responsive/detail toggle control
+        if (
+            $(e.target).hasClass(TABLE_SELECTOR_ROW_CHECKBOX.slice(1)) ||
+            $(e.target).closest(TABLE_SELECTOR_CHECKBOX_COLUMN).length ||
+            $(e.target).closest('button, a, .dtr-control, .dt-control, .details-control').length
+        ) {
             return;
         }
 

@@ -1,7 +1,8 @@
 @extends(app('app.layout'))
 
 @php
-    $entity = ucwords(str_replace('_', ' ', $table_schema->schema['entity']));
+    $schemaEntity = $table_schema->schema['entity'] ?? $table_schema->schema['business_entity'] ?? '';
+    $entity = ucwords(str_replace('_', ' ', $schemaEntity));
     $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
 
     $tabs = [
@@ -39,6 +40,19 @@
                     id="refreshTableBtn"
                     title="Refresh">
                 <i class="fas fa-sync-alt"></i>
+            </button>
+
+            {{-- Selection Count Badge (Visible when items selected) --}}
+            <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
+                <span class="selected-count">0</span> Selected
+            </span>
+
+            {{-- Clear Selection Button (Visible when items selected) --}}
+            <button type="button"
+                    id="bulkClearSelectionBtn"
+                    class="btn btn-sm btn-link text-decoration-none p-0 d-none"
+                    style="min-width: 40px;">
+                Clear
             </button>
 
             {{-- Select Hint (Visible when nothing selected) --}}
@@ -207,21 +221,8 @@
             </div>
         </div>
 
-        {{-- Right side: Selection Count, Clear Button, and View Toggle --}}
+        {{-- Right side: View Toggle --}}
         <div class="d-flex align-items-center gap-2">
-            {{-- Selection Count Badge (Visible when items selected) --}}
-            <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
-                <span class="selected-count">0</span> Selected
-            </span>
-
-            {{-- Clear Selection Button (Visible when items selected) --}}
-            <button type="button"
-                    id="bulkClearSelectionBtn"
-                    class="btn btn-sm btn-link text-decoration-none p-0 d-none"
-                    style="min-width: 40px;">
-                Clear
-            </button>
-
             {{-- View Toggle Button (Always visible) --}}
             <button type="button"
                     class="btn btn-sm btn-outline-secondary text-muted border-0"
