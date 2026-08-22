@@ -33,8 +33,15 @@ async function setupFormBlock(formCol, formMeta) {
             form.setAttribute('action', formMeta.endpoint)
         }
         form.setAttribute(ATTR_CONS.ENTYPE, formMeta.enctype)
-        // form.classList.add(...['row', 'row-cols-1', 'row-cols-md-4', 'g-2', 'needs-validation'])
-        form.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, STYLE_CLASS.G_2, STYLE_CLASS.NEEDS_VALIDATION])
+        // Suppress the browser's own validation popups so every error
+        // — native constraint failures included — always renders through
+        // our own error UI (applyDynamicFormFieldError / the submit
+        // summary banner) instead of the browser's default bubble.
+        form.noValidate = true
+        // Single spacing source between stacked fields: g-1 on the row,
+        // no per-field margin (see createFieldFragment) — avoids the two
+        // stacking and producing an inconsistent-looking gap.
+        form.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, 'g-2', STYLE_CLASS.NEEDS_VALIDATION])
 
         // get form data
         let formData = form.dataset.formData
@@ -281,6 +288,30 @@ async function addField(field, addTo,formMeta) {
         input.value = field.value || "";
         fragment.appendChild(formContainer);
 
+        // ✅ Password fields get a show/hide toggle, matching the classic
+        // auth forms. The click handling itself is a shared, delegated
+        // listener (see layouts/common/script.blade.php) that looks for
+        // .toggle-password buttons anywhere in the document.
+        if (field.type === INPUT_TYPE.PASSWORD) {
+            const inputGroup = document.createElement(HTML_TAG.DIV);
+            inputGroup.classList.add('input-group');
+            input.replaceWith(inputGroup);
+            inputGroup.appendChild(input);
+
+            const toggleBtn = document.createElement('button');
+            toggleBtn.type = 'button';
+            toggleBtn.classList.add('btn', 'btn-outline-secondary', 'toggle-password');
+            const toggleIcon = document.createElement('i');
+            toggleIcon.classList.add('fas', 'fa-eye-slash');
+            toggleBtn.appendChild(toggleIcon);
+            inputGroup.appendChild(toggleBtn);
+        }
+
+        // Reserve this field's message space up front (before any error or
+        // live hint ever appears) so showing/clearing one later never
+        // shifts the form's height.
+        getOrCreateFieldMessageSlot(getFieldDomId(field), fragment);
+
         // // Frontend validation
         applyFieldValidation(field, input);
         // // formContainer.appendChild(input);
@@ -449,8 +480,10 @@ function createFieldFragment(field, addTo, addClass = null) {
     const fragment = document.createElement(HTML_TAG.DIV);
     fragment.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
     addFieldSize(field, fragment);
-    fragment.classList.add(STYLE_CLASS.MB_2);
-    
+    // No per-field margin — the row's own g-1 gap (setupFormBlock) is now
+    // the single source of spacing between fields, so it stays consistent
+    // regardless of a field's own content height.
+
     // optional extra class (for things like 'form-check-group')
     if (addClass) {
         if (Array.isArray(addClass)) {
@@ -656,6 +689,75 @@ function buildFieldDomId(formMeta, field, index) {
 
 function getFieldDomId(field) {
     return field?._domId || field?.id;
+}
+
+/**
+ * One persistent message slot per field, shared by both the live-typing
+ * hints (input-field-validation.js) and submit-time/backend errors
+ * (appendDynamicFormFieldError in form.js). Created once — normally here,
+ * during initial field rendering, so its space is reserved before any
+ * message ever appears — and reused after that. Showing or clearing a
+ * message only ever toggles visibility/text on this same element, never
+ * adds/removes nodes, so the field's height never shifts.
+ *
+ * Truncates to one line (text-truncate) with the full text available via
+ * the native title-attribute tooltip on hover.
+ */
+function getOrCreateFieldMessageSlot(fieldDomId, fallbackContainer) {
+    if (!fieldDomId) {
+        return null;
+    }
+
+    const slotId = `${fieldDomId}-message-slot`;
+    let slot = document.getElementById(slotId);
+    if (slot) {
+        return slot;
+    }
+
+    const fieldWrapper = document.getElementById(fieldDomId + SUFFIX.FIELD) || fallbackContainer;
+    if (!fieldWrapper) {
+        return null;
+    }
+
+    slot = document.createElement(HTML_TAG.DIV);
+    slot.id = slotId;
+    slot.classList.add(STYLE_CLASS.INVALID_FEEDBACK, STYLE_CLASS.SMALL, 'd-block', 'text-truncate');
+    slot.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
+    // line-height is pinned explicitly, not left to inherit Bootstrap's
+    // body default (1.5) — an empty block-level element still gets a line
+    // box sized by its line-height even with no text, so an inherited 1.5
+    // line-height was reserving noticeably more space than the min-height
+    // alone suggested.
+    slot.style.lineHeight = '0.9rem';
+    slot.style.minHeight = '0.9rem';
+    slot.style.visibility = 'hidden';
+    fieldWrapper.appendChild(slot);
+
+    return slot;
+}
+
+/**
+ * Show or clear a field's message through its shared slot. Passing an empty
+ * message hides the slot (visibility, not display — the reserved space
+ * stays) without removing it.
+ */
+function setFieldMessage(fieldDomId, message, fallbackContainer) {
+    const slot = getOrCreateFieldMessageSlot(fieldDomId, fallbackContainer);
+    if (!slot) {
+        return false;
+    }
+
+    if (!message) {
+        slot.textContent = '';
+        slot.removeAttribute('title');
+        slot.style.visibility = 'hidden';
+        return true;
+    }
+
+    slot.textContent = message;
+    slot.title = message;
+    slot.style.visibility = 'visible';
+    return true;
 }
 
 function sanitizeDomIdSegment(value) {

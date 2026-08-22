@@ -260,15 +260,17 @@ class ApiClient {
             ...request.headers,
         });
 
-        // Add authentication token
+        // Add authentication token if one is already present. Most requests
+        // in this app are same-origin and cookie-authenticated (Sanctum
+        // stateful mode via credentials:'same-origin'), so a bearer token
+        // often never exists at all — polling for one that will never
+        // appear (the old behavior, up to 5s via _waitForToken()) only added
+        // latency to every request, including on pages with no session yet
+        // (e.g. login/register).
         if (!request.skipAuth) {
-            try {
-                const token = await this._waitForToken();
-                if (token) {
-                    headers.set('Authorization', `Bearer ${token}`);
-                }
-            } catch (error) {
-                console.warn('⚠️ Token not available:', error.message);
+            const token = this._getToken();
+            if (token) {
+                headers.set('Authorization', `Bearer ${token}`);
             }
         }
 
@@ -393,6 +395,7 @@ class ApiClient {
             meta: json.response_schema?.meta || null,
             links: json.response_schema?.links || null,
             ui_context: json.ui_context || {},
+            redirect_url: json.redirect_url || json.ui_context?.redirect || null,
         };
 
         // Process UI context
@@ -418,6 +421,7 @@ class ApiClient {
             meta: json.meta || null,
             links: json.links || null,
             ui_context: {},
+            redirect_url: json.redirect_url || null,
         };
     }
 

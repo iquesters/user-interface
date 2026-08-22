@@ -4,27 +4,27 @@
         $uiSnackbarConf = $uiConf->snackbar_conf;
     @endphp
 
-    document.addEventListener('DOMContentLoaded', function() {
-        // Get all toggle buttons
-        const toggleButtons = document.querySelectorAll('.toggle-password');
-        
-        toggleButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Find the associated password input (previous sibling)
-                const passwordInput = this.parentNode.querySelector('input');
-                
-                if (passwordInput) {
-                    // Toggle password visibility
-                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                    passwordInput.setAttribute('type', type);
-                    
-                    // Toggle icon
-                    const icon = this.querySelector('i');
-                    icon.classList.toggle('fa-eye-slash');
-                    icon.classList.toggle('fa-eye');
-                }
-            });
-        });
+    // Event delegation so toggle-password buttons added after page load
+    // (e.g. schema-rendered forms, which insert their fields asynchronously)
+    // still work, not just ones present at DOMContentLoaded.
+    document.addEventListener('click', function(event) {
+        const button = event.target.closest('.toggle-password');
+        if (!button) {
+            return;
+        }
+
+        const passwordInput = button.parentNode.querySelector('input');
+
+        if (passwordInput) {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+
+            const icon = button.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye-slash');
+                icon.classList.toggle('fa-eye');
+            }
+        }
     });
 
     // -----------------------------

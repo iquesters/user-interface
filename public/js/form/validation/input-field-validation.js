@@ -28,12 +28,94 @@ window.applyFieldValidation = function (field, input) {
     const type = input.type;
     const messages = field.messages;
     applyValidationMessage(type, field, input, messages);
+
+    // The form has novalidate set (see setupFormBlock in form-block-builder.js)
+    // specifically so the browser's own popup never shows — setCustomValidity()
+    // alone is invisible without it, so render the message through the same
+    // visible error UI used for backend validation errors instead.
+    const form = input.form;
+    if (form && typeof appendDynamicFormFieldError === 'function') {
+      appendDynamicFormFieldError(form, field, input.validationMessage);
+    }
   });
 
   // ✅ Live validation: reset message when typing
-  input.addEventListener("input", () => input.setCustomValidity(""));
+  input.addEventListener("input", () => {
+    input.setCustomValidity("");
+    input.classList.remove("is-invalid");
+    setFieldMessage(input.id, "");
+  });
+
+  // ✅ Live, character-by-character requirement feedback — separate from the
+  // submit-time "invalid" messaging above. Only attaches when the schema
+  // actually declares complexity requirements for this field (login's
+  // password has none of these, so it never attaches there).
+  if (field.type === VALIDATION_KEYS.PASSWORD) {
+    if (field.password_mixed_case || field.password_numbers || field.password_symbols || field.minLength) {
+      input.addEventListener("input", () => updatePasswordRequirementHint(field, input));
+    }
+
+    if (field.confirms) {
+      // Scoped to this field's own form — the classic and schema-driven
+      // columns both have a field named "password", so an unscoped
+      // document-wide query can grab the wrong one.
+      const sourceInput = input.form?.querySelector(`[name="${field.confirms}"]`);
+      input.addEventListener("input", () => updateConfirmationHint(field, input));
+      if (sourceInput) {
+        // Editing the original password after already typing the
+        // confirmation should re-check the match too, not just typing
+        // in the confirmation field itself.
+        sourceInput.addEventListener("input", () => updateConfirmationHint(field, input));
+      }
+    }
+  }
 
 };
+
+/**
+ * Which of a password field's declared requirements the current value
+ * doesn't satisfy yet, in plain-English fragments (e.g. "a number").
+ */
+function getPasswordRequirementGaps(field, value) {
+  const gaps = [];
+  const minLength = field.minLength || 8;
+
+  if (value.length < minLength) {
+    gaps.push(`at least ${minLength} characters`);
+  }
+  if (field.password_mixed_case && !(/[a-z]/.test(value) && /[A-Z]/.test(value))) {
+    gaps.push("uppercase and lowercase letters");
+  }
+  if (field.password_numbers && !/[0-9]/.test(value)) {
+    gaps.push("a number");
+  }
+  if (field.password_symbols && !/[^a-zA-Z0-9\s]/.test(value)) {
+    gaps.push("a special character");
+  }
+
+  return gaps;
+}
+
+// Both live-hints below render through the same shared, pre-reserved
+// message slot as backend errors (getOrCreateFieldMessageSlot/
+// setFieldMessage in form-block-builder.js) — one slot per field, created
+// during initial rendering, so height never shifts either way.
+
+function updatePasswordRequirementHint(field, input) {
+  const gaps = getPasswordRequirementGaps(field, input.value);
+  setFieldMessage(input.id, gaps.length > 0 ? `Needs: ${gaps.join(", ")}.` : "");
+}
+
+function updateConfirmationHint(field, input) {
+  const sourceInput = input.form?.querySelector(`[name="${field.confirms}"]`);
+
+  if (!sourceInput || input.value === "") {
+    setFieldMessage(input.id, "");
+    return;
+  }
+
+  setFieldMessage(input.id, input.value !== sourceInput.value ? "Passwords do not match." : "");
+}
 
 
 

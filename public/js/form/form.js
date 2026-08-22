@@ -822,7 +822,14 @@ function normalizeFieldErrorMessages(messages, fieldLabel) {
     return list
         .filter(Boolean)
         .map((message) => {
-            const rawMessage = String(message).trim();
+            // apiClient's parse-failure fallback returns errors as
+            // [{ message: '...' }] rather than plain strings — String() on
+            // an object produces the literal text "[object Object]", so
+            // pull .message out first when present.
+            const messageText = (message && typeof message === 'object' && typeof message.message === 'string')
+                ? message.message
+                : message;
+            const rawMessage = String(messageText).trim();
 
             if (!rawMessage) {
                 return `${fieldLabel} is invalid.`;
@@ -901,7 +908,17 @@ function clearDynamicFormSubmitErrors(form) {
         return;
     }
 
+    // The top-of-form summary banner is a one-off node, removed and
+    // re-added as needed. Per-field messages are a different, persistent
+    // slot per field (see getOrCreateFieldMessageSlot) — cleared in place
+    // below rather than removed, so their reserved space never collapses.
     form.querySelectorAll('[data-server-error="true"]').forEach((node) => node.remove());
+
+    form.querySelectorAll('[id$="-message-slot"]').forEach((slot) => {
+        slot.textContent = '';
+        slot.removeAttribute('title');
+        slot.style.visibility = 'hidden';
+    });
 
     form.querySelectorAll('.is-invalid').forEach((input) => {
         input.classList.remove('is-invalid');
@@ -936,17 +953,6 @@ function getDynamicFormFieldElements(form, fieldId) {
     return byId ? [byId] : [];
 }
 
-function createDynamicFormErrorNode(message) {
-    const errorNode = document.createElement('div');
-    errorNode.classList.add(STYLE_CLASS.INVALID_FEEDBACK, STYLE_CLASS.SMALL);
-    errorNode.classList.add('d-block');
-    errorNode.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
-    errorNode.dataset.serverError = 'true';
-    errorNode.textContent = message;
-
-    return errorNode;
-}
-
 function appendDynamicFormFieldError(form, field, message) {
     const fieldElements = getDynamicFormFieldElements(form, field.id);
 
@@ -958,6 +964,8 @@ function appendDynamicFormFieldError(form, field, message) {
         });
         return false;
     }
+
+    const fieldDomId = typeof getFieldDomId === 'function' ? getFieldDomId(field) : field.id;
 
     fieldElements.forEach((element) => {
         element.classList.add('is-invalid');
@@ -971,10 +979,7 @@ function appendDynamicFormFieldError(form, field, message) {
                 element.setCustomValidity('');
             }
 
-            const feedback = form.querySelector(`[data-server-error="true"][data-field-error="${field.id}"]`);
-            if (feedback) {
-                feedback.remove();
-            }
+            setFieldMessage(fieldDomId, '');
         };
 
         element.addEventListener('input', clearServerErrorState, { once: true });
@@ -986,14 +991,7 @@ function appendDynamicFormFieldError(form, field, message) {
         || fieldElements[0].parentElement
         || fieldElements[0].closest('.col');
 
-    if (!fieldContainer) {
-        return false;
-    }
-
-    const errorNode = createDynamicFormErrorNode(message);
-    errorNode.dataset.fieldError = field.id;
-    fieldContainer.appendChild(errorNode);
-    return true;
+    return setFieldMessage(fieldDomId, message, fieldContainer);
 }
 
 function appendDynamicFormSubmitSummary(form, message, generalErrors = []) {
@@ -1037,6 +1035,23 @@ function applyDynamicFormSubmitErrors(form, formMeta, errors, message, payload) 
     }
 }
 
+/**
+ * Show a snackbar for a dynamic form outcome, if snackbar.js is loaded and
+ * the schema hasn't opted out via 'disableSnackbar' => true. Applies to
+ * every schema-driven form by default — no per-endpoint wiring needed.
+ *
+ * Only called for the success case — every failure path already renders its
+ * message visibly inline (per-field errors and/or a summary banner), so a
+ * failure snackbar would just duplicate text already on screen.
+ */
+function notifyDynamicFormOutcome(formMeta, type, message) {
+    if (formMeta?.disableSnackbar || typeof window.showSnackbar !== 'function' || !message) {
+        return;
+    }
+
+    window.showSnackbar(message, type);
+}
+
 async function handleDynamicFormSubmit(event, formMeta) {
     const form = event.currentTarget;
     clearDynamicFormValidationState(form);
@@ -1062,6 +1077,8 @@ async function handleDynamicFormSubmit(event, formMeta) {
     }
 
     const payload = serializeDynamicFormPayload(form, formMeta);
+    setDynamicFormSubmitting(form, true);
+    let isRedirecting = false;
     try {
         const result = await submitDynamicFormRequest(endpoint, method, payload, form);
         const errors = result?.errors || result?.response_schema?.errors || null;
@@ -1075,20 +1092,16 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 result,
             });
 
+            // No snackbar here — applyDynamicFormSubmitErrors()/
+            // appendDynamicFormSubmitSummary() already render this same
+            // message visibly inline (per-field and/or a summary banner), so
+            // a snackbar would just duplicate it.
             if (errors) {
-                applyDynamicFormSubmitErrors(
-                    form,
-                    formMeta,
-                    errors,
-                    resolveDynamicFormMessage(result, 'Unable to submit the form. Please review the highlighted fields and try again.'),
-                    payload
-                );
+                const errorMessage = resolveDynamicFormMessage(result, 'Unable to submit the form. Please review the highlighted fields and try again.');
+                applyDynamicFormSubmitErrors(form, formMeta, errors, errorMessage, payload);
             } else {
-                appendDynamicFormSubmitSummary(
-                    form,
-                    resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.'),
-                    []
-                );
+                const errorMessage = resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.');
+                appendDynamicFormSubmitSummary(form, errorMessage, []);
             }
 
             dispatchDynamicFormEvent('lab-form:submit-failed', {
@@ -1104,14 +1117,27 @@ async function handleDynamicFormSubmit(event, formMeta) {
             return;
         }
 
+        const successMessage = resolveDynamicFormMessage(result, 'Form submitted successfully.');
         dispatchDynamicFormEvent('lab-form:submitted', {
             formId: form.id,
             endpoint,
             method,
             payload,
             response: result,
-            message: resolveDynamicFormMessage(result, 'Form submitted successfully.'),
+            message: successMessage,
         });
+        notifyDynamicFormOutcome(formMeta, 'success', successMessage);
+
+        // A server that returns a redirect_url (auth forms, or any other
+        // fixed-endpoint form) is explicitly telling the client where to go
+        // next — honor it before falling back to inbox/detail-view handling,
+        // which only applies to entity-backed forms rendered inside a modal.
+        const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url;
+        if (redirectUrl) {
+            isRedirecting = true;
+            window.location.href = redirectUrl;
+            return;
+        }
 
         if (detailContext?.componentBackedEdit && method !== 'DELETE') {
             const nextDetailData = mergeSubmittedDetailData(
@@ -1137,12 +1163,9 @@ async function handleDynamicFormSubmit(event, formMeta) {
         }
     } catch (error) {
         console.error('Dynamic form submit error.', error);
+        const errorMessage = error?.message || 'Something went wrong while submitting the form.';
         clearDynamicFormSubmitErrors(form);
-        appendDynamicFormSubmitSummary(
-            form,
-            error?.message || 'Something went wrong while submitting the form.',
-            []
-        );
+        appendDynamicFormSubmitSummary(form, errorMessage, []);
 
         dispatchDynamicFormEvent('lab-form:submit-failed', {
             formId: form.id,
@@ -1150,8 +1173,78 @@ async function handleDynamicFormSubmit(event, formMeta) {
             method,
             payload,
             error,
-            message: error?.message || 'Something went wrong while submitting the form.',
+            message: errorMessage,
         });
+    } finally {
+        // Leave the button in its loading state when navigating away — the
+        // browser hasn't actually left the page yet at this point (finally
+        // runs synchronously right after the `return` above), so resetting
+        // here would flash the button back to normal for a moment before
+        // the redirect actually takes effect.
+        if (!isRedirecting) {
+            setDynamicFormSubmitting(form, false);
+        }
+    }
+}
+
+/**
+ * Injects the loading-dots keyframes once (idempotent) rather than
+ * depending on a separate stylesheet being loaded/coordinated — self
+ * contained so setDynamicFormSubmitting() works regardless of CSS load order.
+ */
+function ensureLoadingDotsStyle() {
+    if (document.getElementById('lab-form-loading-dots-style')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'lab-form-loading-dots-style';
+    style.textContent = `
+        .lab-form-loading-dots span {
+            animation: labFormLoadingDotBlink 1.4s infinite both;
+        }
+        .lab-form-loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .lab-form-loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes labFormLoadingDotBlink {
+            0%, 80%, 100% { opacity: 0; }
+            40% { opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/**
+ * Disable the submit button and show "Verifying..." (animated) while a
+ * dynamic form submission is in flight, restoring its original state
+ * afterward. No-op if the form has no submit button (e.g. read-only view
+ * mode).
+ */
+function setDynamicFormSubmitting(form, isSubmitting) {
+    // Buttons rendered via the footer's actions array (setupFormFooter)
+    // live in the card, a DOM sibling of <form>, not a descendant — they
+    // associate back to it via the HTML5 form="..." attribute instead. A
+    // plain form.querySelector() only ever finds the older auto-generated
+    // inline submit button (a true descendant), so it silently found
+    // nothing once a schema started defining explicit actions.
+    const submitBtn = form.querySelector('button[type="submit"]')
+        || document.querySelector(`button[type="submit"][form="${form.id}"]`);
+    if (!submitBtn) {
+        return;
+    }
+
+    if (isSubmitting) {
+        ensureLoadingDotsStyle();
+        submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Verifying<span class="lab-form-loading-dots">'
+            + '<span>.</span><span>.</span><span>.</span></span>';
+        return;
+    }
+
+    submitBtn.disabled = false;
+    if (submitBtn.dataset.originalHtml !== undefined) {
+        submitBtn.innerHTML = submitBtn.dataset.originalHtml;
+        delete submitBtn.dataset.originalHtml;
     }
 }
 
@@ -1386,6 +1479,58 @@ function setupFormBody(cardBody, formMeta) {
  * @param {*} formMeta 
  */
 function setupFormFooter(cardFooter, formMeta, formElement) {
+    const actions = Array.isArray(formMeta.actions) ? formMeta.actions : [];
+    const hasCancelAction = actions.some((action) => {
+        const actionText = String(action?.text || '').trim().toLowerCase();
+        return action?.type === 'cancel' || actionText === 'cancel';
+    });
+
+    // Opt-in multi-row layout: give any action a numeric 'row', and each
+    // distinct row renders as its own space-between flex line (a lone
+    // action sits at the left, a pair splits to opposite ends) — lets a
+    // schema replicate a classic multi-line footer (e.g. a link above the
+    // submit row). Forms that never set 'row' fall through to the single
+    // end-aligned row below, unchanged from before.
+    const usesRows = actions.some((action) => action?.row !== undefined && action?.row !== null);
+
+    if (usesRows) {
+        const rows = new Map();
+        actions.forEach((action) => {
+            const rowKey = action.row ?? 0;
+            if (!rows.has(rowKey)) {
+                rows.set(rowKey, []);
+            }
+            rows.get(rowKey).push(action);
+        });
+
+        const sortedRowKeys = Array.from(rows.keys()).sort((a, b) => a - b);
+        let lastRowFragment = null;
+
+        sortedRowKeys.forEach((rowKey) => {
+            const rowActions = rows.get(rowKey);
+            // A lone action in a row has nothing to space between, so it
+            // reads better centered than pinned to the left.
+            const rowJustify = rowActions.length === 1 ? 'justify-content-center' : 'justify-content-between';
+
+            const rowFragment = document.createElement('div');
+            rowFragment.id = `${cardFooter.id}-item-row-${rowKey}`;
+            rowFragment.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, rowJustify, STYLE_CLASS.GAP_2, 'mb-3']);
+            cardFooter.appendChild(rowFragment);
+
+            rowActions.forEach((action) => {
+                action.form = formMeta.id;
+                addAction(action, rowFragment);
+            });
+
+            lastRowFragment = rowFragment;
+        });
+
+        if (formMeta.allowCancel && !isFormReadOnly(formMeta) && !hasCancelAction && lastRowFragment) {
+            appendDefaultCancelButton(lastRowFragment, formElement, formMeta);
+        }
+
+        return;
+    }
 
     const fragment = document.createElement('div');
     fragment.id = cardFooter.id + "-item"
@@ -1395,20 +1540,12 @@ function setupFormFooter(cardFooter, formMeta, formElement) {
     }
     cardFooter.appendChild(fragment)
 
-    if (formMeta.actions) {
-        formMeta.actions.forEach(action => {
-            action.form = formMeta.id
-            addAction(action, fragment);
-        })
-    }
+    actions.forEach(action => {
+        action.form = formMeta.id
+        addAction(action, fragment);
+    })
 
-    const hasCancelAction = Array.isArray(formMeta.actions)
-        && formMeta.actions.some((action) => {
-            const actionText = String(action?.text || '').trim().toLowerCase();
-            return action?.type === 'cancel' || actionText === 'cancel';
-        });
-
-    if (!isFormReadOnly(formMeta) && !hasCancelAction) {
+    if (formMeta.allowCancel && !isFormReadOnly(formMeta) && !hasCancelAction) {
         appendDefaultCancelButton(fragment, formElement, formMeta);
     }
 
@@ -1489,7 +1626,7 @@ function addAction(action, addTo) {
         actionElement.classList.add(STYLE_CLASS.BTN)
         actionElement.classList.add('btn-' + action.element.size);
         if ('link' === action.element.variant) {
-            actionElement.classList.add('btn-' + action.element.variant);
+            actionElement.classList.add('btn-' + action.element.variant, 'text-decoration-none');
         } else if ('outline' === action.element.variant) {
             let eleColorVariant = (action.element.variant ? '-' + action.element.variant : '') + (action.element.color ? '-' + action.element.color : '')
             eleColorVariant ? actionElement.classList.add('btn' + eleColorVariant) : '';
@@ -1580,7 +1717,11 @@ function setupInfoBlock(infoCol, formMeta) {
 
         const infoBlockHTML = document.createElement('span')
         infoBlockHTML.id = `form-info-block-${formMeta.id}`;
-        infoBlockHTML.classList.add("form-info-block", STYLE_CLASS.SMALL)
+        // Reads as a form description by default (matches the classic
+        // forms' plain text-muted intro paragraph) rather than small
+        // caption text; a schema can opt back into the compact style with
+        // info.small === true.
+        infoBlockHTML.classList.add("form-info-block", resolvedInfo.small ? STYLE_CLASS.SMALL : 'text-muted')
         infoBlockHTML.innerHTML = resolvedInfo.innerHTML
 
         para.appendChild(infoBlockHTML)

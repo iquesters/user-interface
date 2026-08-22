@@ -41,6 +41,16 @@ class DynamicEntityController extends Controller
         'meta',
     ];
 
+    /**
+     * Columns treated as access-scope dimensions when present on a dynamic
+     * entity table (e.g. multi-tenant ownership). Any table with one of these
+     * columns is automatically restricted to the IDs an EntityScopeResolver
+     * (tagged 'entity-scope-resolvers') resolves for the current actor. If no
+     * resolver claims the column, access fails closed rather than exposing
+     * every row.
+     */
+    protected array $scopedColumns = ['organisation_id'];
+
     public function list(string $entity)
     {
         try {
@@ -53,8 +63,11 @@ class DynamicEntityController extends Controller
             [$mainFieldDefinitions, $metaFieldDefinitions] = $this->resolveEntityFieldDefinitions($entity);
             $metaTable = $this->resolveMetaTable($entity);
 
+            $query = DB::table($entity);
+            $this->applyScopeToQuery($query, Schema::getColumnListing($entity));
+
             $listQuery = new DynamicEntityListQuery(
-                DB::table($entity),
+                $query,
                 $entity,
                 $mainFieldDefinitions,
                 $metaFieldDefinitions,
@@ -174,6 +187,8 @@ class DynamicEntityController extends Controller
                 );
             }
 
+            $this->assertRecordInScope($entity, $record);
+
             $record = $this->attachMetaData($entity, collect([$record]));
             $record = $this->transformRecordsForResponse($record)->first();
 
@@ -202,6 +217,7 @@ class DynamicEntityController extends Controller
             );
 
             $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
+            $this->assertWritePayloadInScope($mainData);
 
             $record = $this->createEntityRecord($entity, $mainData, $metaData);
 
@@ -241,6 +257,7 @@ class DynamicEntityController extends Controller
             );
 
             $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
+            $this->assertWritePayloadInScope($mainData);
 
             $record = $this->updateEntityRecord($entity, $data_uid, $mainData, $metaData);
 
@@ -412,6 +429,8 @@ class DynamicEntityController extends Controller
                 throw new \RuntimeException('Record not found');
             }
 
+            $this->assertRecordInScope($entity, $existingRecord);
+
             $mainData = $this->applyMissingCreateAuditDefaults($mainData, $existingRecord);
 
             if (! empty($mainData)) {
@@ -451,6 +470,8 @@ class DynamicEntityController extends Controller
             if (! $existingRecord) {
                 throw new \RuntimeException('Record not found');
             }
+
+            $this->assertRecordInScope($entity, $existingRecord);
 
             DB::table($entity)
                 ->where('id', $existingRecord->id)
@@ -495,6 +516,78 @@ class DynamicEntityController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * Restrict a list query to the scope-column values the current actor may
+     * access, for every scoped column present on the table.
+     */
+    protected function applyScopeToQuery($query, array $tableColumns): void
+    {
+        foreach (array_intersect($this->scopedColumns, $tableColumns) as $column) {
+            $query->whereIn($column, $this->resolveAllowedIdsForColumn($column));
+        }
+    }
+
+    /**
+     * Deny access to a fetched record if any of its scoped-column values fall
+     * outside what the current actor may access. Throws the same 'Record not
+     * found' RuntimeException used for missing rows, so an out-of-scope
+     * record is indistinguishable from a nonexistent one.
+     */
+    protected function assertRecordInScope(string $entity, object $record): void
+    {
+        $tableColumns = Schema::getColumnListing($entity);
+
+        foreach (array_intersect($this->scopedColumns, $tableColumns) as $column) {
+            $allowedIds = $this->resolveAllowedIdsForColumn($column);
+            $value = $record->{$column} ?? null;
+
+            if ($value === null || ! in_array((int) $value, $allowedIds, true)) {
+                throw new \RuntimeException('Record not found');
+            }
+        }
+    }
+
+    /**
+     * Reject a store/update payload that targets a scoped-column value the
+     * current actor is not allowed to write (e.g. someone else's organisation_id).
+     * Only checks columns actually present in the payload.
+     */
+    protected function assertWritePayloadInScope(array $mainData): void
+    {
+        foreach ($this->scopedColumns as $column) {
+            if (! array_key_exists($column, $mainData)) {
+                continue;
+            }
+
+            $allowedIds = $this->resolveAllowedIdsForColumn($column);
+
+            if (! in_array((int) $mainData[$column], $allowedIds, true)) {
+                throw new \InvalidArgumentException("You do not have access to the specified {$column}.");
+            }
+        }
+    }
+
+    /**
+     * Ask every tagged EntityScopeResolver for the IDs the current actor may
+     * access for a scope column, in registration order, until one claims it.
+     * Fails closed (throws) if the column is recognized as scoped but no
+     * resolver is registered for it — never silently exposes every row.
+     *
+     * @return array<int>
+     */
+    protected function resolveAllowedIdsForColumn(string $column): array
+    {
+        foreach (app()->tagged('entity-scope-resolvers') as $resolver) {
+            $allowed = $resolver->resolveAllowedIds($column);
+
+            if ($allowed !== null) {
+                return $allowed;
+            }
+        }
+
+        throw new \RuntimeException("No access-scope resolver is registered for the '{$column}' column.");
     }
 
     protected function ensureEntityTableExists(string $entity): void

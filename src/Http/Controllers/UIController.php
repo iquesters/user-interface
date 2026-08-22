@@ -89,9 +89,25 @@ class UIController extends Controller
         }
     }
 
-    public function delete()
+    public function delete($form_schema_id, $entity_uid)
     {
-        return view('userinterface::form-schemas.list', compact('forms'));
+        try {
+            $this->logMethodStart("form_schema_id={$form_schema_id}, entity_uid={$entity_uid}");
+            Log::info('In UIController delete method', [
+                'form_schema_id' => $form_schema_id,
+                'entity_uid' => $entity_uid,
+            ]);
+
+            $this->logMethodEnd("form_schema_id={$form_schema_id}, entity_uid={$entity_uid}");
+            return view('userinterface::ui.form.view', compact('form_schema_id', 'entity_uid'));
+        } catch (\Throwable $th) {
+            $this->logError('Delete failed: ' . $th->getMessage());
+            Log::error('UIController@delete failed', [
+                'exception' => $th,
+            ]);
+
+            throw $th;
+        }
     }
 
     public function setTheme()
