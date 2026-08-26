@@ -1052,6 +1052,34 @@ function notifyDynamicFormOutcome(formMeta, type, message) {
     window.showSnackbar(message, type);
 }
 
+/**
+ * AJAX equivalent of recaptcha.js's native-form flow. recaptcha.js only
+ * wires up [data-recaptcha-action] elements present at DOMContentLoaded, so
+ * it never sees these forms (rendered later, from an async schema fetch) —
+ * this fetches a v3 token the same way, for handleDynamicFormSubmit to
+ * attach to the payload instead of a real page submit.
+ *
+ * Resolves null (rather than throwing) when grecaptcha/site key aren't
+ * available or the token request fails, matching recaptcha.js's own
+ * fail-through behavior: the submit still proceeds without a token, and the
+ * backend's own recaptcha_token validation is what actually rejects it.
+ */
+function getDynamicFormRecaptchaToken(action) {
+    if (typeof grecaptcha === 'undefined' || !window.recaptchaSiteKey) {
+        return Promise.resolve(null);
+    }
+
+    return new Promise(resolve => {
+        grecaptcha.ready(function () {
+            grecaptcha.execute(window.recaptchaSiteKey, { action: action })
+                .then(resolve)
+                .catch(function () {
+                    resolve(null);
+                });
+        });
+    });
+}
+
 async function handleDynamicFormSubmit(event, formMeta) {
     const form = event.currentTarget;
     clearDynamicFormValidationState(form);
@@ -1077,6 +1105,15 @@ async function handleDynamicFormSubmit(event, formMeta) {
     }
 
     const payload = serializeDynamicFormPayload(form, formMeta);
+
+    const recaptchaAction = form.dataset.recaptchaAction;
+    if (recaptchaAction) {
+        const recaptchaToken = await getDynamicFormRecaptchaToken(recaptchaAction);
+        if (recaptchaToken) {
+            payload.recaptcha_token = recaptchaToken;
+        }
+    }
+
     setDynamicFormSubmitting(form, true);
     let isRedirecting = false;
     try {

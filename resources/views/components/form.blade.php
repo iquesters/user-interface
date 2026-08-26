@@ -6,6 +6,12 @@
     'formData' => '',
     'entity_uid' => null,
     'form_mode' => null,
+    // When set, form.js fetches a v3 token for this action before the AJAX
+    // submit and adds it to the payload as recaptcha_token — the AJAX
+    // equivalent of recaptcha.js's native-form flow (which never sees these
+    // async-rendered forms, since it only wires up [data-recaptcha-action]
+    // elements present at DOMContentLoaded).
+    'recaptchaAction' => null,
 ])
 
 @php
@@ -113,13 +119,14 @@
 
 {{-- The class should be named as the final named decide --}}
 <form id="{{ $id }}"
-      class="lab-form" 
+      class="lab-form"
       method="{{ strtoupper($method) }}"
       enctype="{{ $enctype }}"
       data-form-meta="{{ $meta }}"
       data-form-data='{{ $formData }}'
       data-entity-uid="{{ $entity_uid }}"
-      data-form-mode="{{ $form_mode }}">
+      data-form-mode="{{ $form_mode }}"
+      @if($recaptchaAction) data-recaptcha-action="{{ $recaptchaAction }}" @endif>
     @csrf
 
   <div class="form-skeleton">
