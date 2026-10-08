@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Console\Command;
 use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
+use Iquesters\UserInterface\Console\Commands\InstallCommand;
 use Iquesters\Foundation\Support\ConfProvider;
 use Iquesters\Foundation\Enums\Module as ModuleEnum;
 use Iquesters\UserManagement\Config\UserManagementConf;
@@ -82,6 +83,12 @@ class UserInterfaceServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../public' => public_path('vendor/userinterface'),
         ], 'user-userinterface-assets');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                InstallCommand::class,
+            ]);
+        }
     }
 
     /**
