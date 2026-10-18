@@ -76,7 +76,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
             \Iquesters\UserInterface\Support\SetupLinkInjector::inject();
         });
 
-        // Share installed modules globally
+        // Share role-filtered installed modules for navigation/tab rendering.
         $this->shareInstalledModules();
 
         $this->publishes([
@@ -283,23 +283,29 @@ class UserInterfaceServiceProvider extends ServiceProvider
                 $moduleIds = $modules->pluck('id')->toArray();
 
                 /**
-                 * STEP 2: Fetch primary navigation order
+                 * STEP 2: Fetch module navigation JSON
                  */
                 $navigation = $navigationModel::where(
                     'name',
-                    'primary_navigation'
+                    'module_navigation'
                 )->first();
 
                 $savedOrder = [];
 
                 if ($navigation) {
                     $savedOrder = json_decode(
-                        $navigation->getMeta('navigation_order') ?? '[]',
+                        $navigation->getMeta('navigation_items') ?? '[]',
                         true
                     );
                 }
 
                 $savedOrder = is_array($savedOrder) ? $savedOrder : [];
+
+                $savedOrder = collect($savedOrder)
+                    ->pluck('module_uid')
+                    ->filter()
+                    ->values()
+                    ->toArray();
 
                 /**
                  * STEP 3: Clean invalid / old module IDs

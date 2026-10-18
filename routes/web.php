@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
+use Iquesters\UserInterface\Http\Controllers\NavigationEditorController;
 use Iquesters\Foundation\Http\Controllers\MasterDataController;
 use Iquesters\UserManagement\Http\Controllers\ProfileController;
 
@@ -31,6 +32,14 @@ Route::middleware(['web'])->group(function () {
         Route::get('/theme', [UIController::class, 'setTheme'])->name('ui.theme');
 
         Route::put('/master-data/{master_datum}', [MasterDataController::class, 'update'])->name('master-data.update');
+
+        Route::prefix('navigation-editor')->name('navigation-editor')->group(function () {
+            Route::get('/', [NavigationEditorController::class, 'index'])->name('.index');
+            Route::put('/update/{navigation_uid}', [NavigationEditorController::class, 'update'])->name('.update');
+            Route::get('/children/{parent_uid}', [NavigationEditorController::class, 'children'])->name('.children');
+            Route::get('/live/{module_uid}', [NavigationEditorController::class, 'liveData'])->name('.live');
+            Route::get('/sidebar/{module_uid}', [NavigationEditorController::class, 'sidebarHtml'])->name('.sidebar');
+        });
 
         Route::prefix('form')->name('form')->group(function () {
             Route::get('/list', [FormController::class, 'list'])->name('.list');

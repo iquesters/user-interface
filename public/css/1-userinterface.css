@@ -5,6 +5,22 @@
   z-index: 1000;
   transition: all 0.3s ease;
 }
+
+.sidebar-body {
+  background-color: var(--bs-body-bg);
+  min-height: 100%;
+}
+
+.nav-sidebar-pending {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.nav-sidebar-ready {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.18s ease;
+}
 .ui-workarea {
   padding-top: 0.1px;
 }
@@ -38,8 +54,38 @@
   box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
 }
 
-.active-module {
-  background-color: var(--bs-light);
+.sidebar #sidebarMenu .sidebar-active-module {
+  background-color: var(--bs-primary-bg-subtle) !important;
+  color: var(--bs-primary-text-emphasis) !important;
+  font-weight: 400;
+  border-radius: 0 0.35rem 0.35rem 0;
+}
+
+.sidebar #sidebarMenu .sidebar-active-module:hover {
+  background-color: var(--bs-primary-bg-subtle) !important;
+  color: var(--bs-primary-text-emphasis) !important;
+  border-radius: 0 0.35rem 0.35rem 0;
+}
+
+.sidebar #sidebarMenu .dropdown-item:hover {
+  background-color: var(--bs-light-bg-subtle);
+  color: var(--bs-body-color);
+  border-radius: 0 0.35rem 0.35rem 0;
+}
+
+.minibar .module-tab.minibar-active-module {
+  background-color: var(--bs-body-bg) !important;
+  color: var(--bs-primary) !important;
+  border-radius: 0.5rem;
+}
+
+.minibar .module-tab.minibar-active-module .module-tab-icon-wrapper,
+.minibar .module-tab.minibar-active-module .module-tab-label {
+  color: inherit !important;
+}
+
+.minibar .module-tab:hover {
+  background-color: rgba(var(--bs-body-color-rgb), 0.08);
 }
 /* 
 .main-content {
@@ -168,7 +214,7 @@
 }
 
 .module-tab-mobile .module-tab-label-featured {
-  font-weight: 600;
+  font-weight: 400;
   color: #667eea;
 }
 
@@ -177,7 +223,7 @@
 .module-dropdown-btn-vertical,
 .module-dropdown-btn-mobile {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 400;
   padding: 0.85rem 0.25rem;
 }
 
@@ -275,7 +321,6 @@
 .global-search-action:active {
   background-color: transparent;
   border-color: transparent;
-  box-shadow: none;
   color: var(--bs-primary);
 }
 
@@ -488,3 +533,8 @@ ol.breadcrumb {
     min-width: 40px;
     max-width: 40px;
 }
+
+
+
+
+

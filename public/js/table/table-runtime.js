@@ -91,7 +91,8 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // Add checkbox column header
     const checkboxTh = document.createElement("th");
     checkboxTh.className = TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1);
-    checkboxTh.innerHTML = `<input type="checkbox" id="${TABLE_ID_SELECT_ALL}" style="cursor: pointer;">`;
+    checkboxTh.style.width = TABLE_VALUE_CHECKBOX_COLUMN_WIDTH;
+    checkboxTh.innerHTML = `<input type="checkbox" id="${TABLE_ID_SELECT_ALL}" style="cursor: pointer; display: block; margin: 0 auto;">`;
     theadRow.appendChild(checkboxTh);
 
     // Add other columns
@@ -166,10 +167,8 @@ function renderCell(col, row, rootFormSchemaUid) {
         const key = col.data.split(".")[1];
         const metaItem = (row.meta || []).find(m => m.meta_key === key);
         val = metaItem ? metaItem.meta_value : "";
-    } else if (col.data?.includes?.(".")) {
-        val = col.data.split(".").reduce((acc, key) => acc?.[key], row) ?? "";
     } else {
-        val = row[col.data] ?? "";
+        val = resolveRowValueByPath(row, col.data);
     }
 
     if (col.link && row.uid) {
@@ -177,6 +176,30 @@ function renderCell(col, row, rootFormSchemaUid) {
         return `<a href="${TABLE_ROUTE_EDIT_PREFIX}${formSchemaUid}/${row.uid}" class="datatable-link text-primary" style="text-decoration:none;">${val}</a>`;
     }
     return val;
+}
+
+function resolveRowValueByPath(row = {}, path = '') {
+    if (!path) {
+        return '';
+    }
+
+    if (!path.includes('.')) {
+        return row?.[path] ?? '';
+    }
+
+    const segments = path.split('.');
+    const [first, second, third] = segments;
+
+    if (second === 'meta') {
+        return row?.meta?.[third] ?? row?.[first]?.meta?.[third] ?? '';
+    }
+
+    const directValue = segments.reduce((acc, key) => acc?.[key], row);
+    if (directValue !== undefined && directValue !== null && directValue !== '') {
+        return directValue;
+    }
+
+    return resolveRowValueByPath(row, segments.slice(1).join('.'));
 }
 
 // ---------------------------
@@ -217,7 +240,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     console.log(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
-    const result = await fetchEntityData(entityName, start, length);
+    const result = await fetchEntityData(entityName, start, length, schema);
     
     if (result.success && result.data) {
         cache.set(start, result.data, result.total);
@@ -256,7 +279,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
 
     console.log(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
     
-    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength)
+    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, schema)
         .then(result => {
             if (result.success && result.data?.length) {
                 cache.set(nextOffset, result.data, result.total);
@@ -330,6 +353,25 @@ function setupCheckboxHandlers(tableElement, isInboxView = false) {
     const selectAllCheckbox = document.getElementById(selectAllId);
     
     if (!selectAllCheckbox) return;
+
+    const headerCell = selectAllCheckbox.closest('th');
+    if (headerCell) {
+        if (!isInboxView) {
+            headerCell.style.textAlign = 'center';
+            headerCell.style.verticalAlign = 'middle';
+            headerCell.style.paddingLeft = '0';
+            headerCell.style.paddingRight = '0';
+            headerCell.style.display = 'flex';
+            headerCell.style.alignItems = 'center';
+            headerCell.style.justifyContent = 'center';
+        }
+    }
+
+    if (!isInboxView) {
+        selectAllCheckbox.style.margin = '0 auto';
+        selectAllCheckbox.style.display = 'block';
+        selectAllCheckbox.style.flex = '0 0 auto';
+    }
     
     // Select/Deselect all
     selectAllCheckbox.addEventListener('change', function() {
@@ -357,6 +399,47 @@ function setupCheckboxHandlers(tableElement, isInboxView = false) {
         setTimeout(() => {
             updateSelectionCount(tableElement);
         }, 10);
+    });
+
+    const syncSelectionState = () => {
+        const checkedBoxes = tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`);
+        const allCheckboxes = tableElement.querySelectorAll(TABLE_SELECTOR_ROW_CHECKBOX);
+
+        selectAllCheckbox.checked = allCheckboxes.length > 0 && checkedBoxes.length === allCheckboxes.length;
+        selectAllCheckbox.indeterminate = checkedBoxes.length > 0 && checkedBoxes.length < allCheckboxes.length;
+    };
+
+    const restoreSelections = () => {
+        const manager = window.bulkActionsManager;
+        const selectedUids = manager?.selectedUids instanceof Set ? manager.selectedUids : null;
+
+        if (!selectedUids || selectedUids.size === 0) {
+            return false;
+        }
+
+        let restoredCount = 0;
+        tableElement.querySelectorAll(TABLE_SELECTOR_ROW_CHECKBOX).forEach((checkbox) => {
+            const uid = checkbox.dataset.uid;
+            const shouldBeChecked = uid && selectedUids.has(uid);
+            checkbox.checked = shouldBeChecked;
+            if (shouldBeChecked) {
+                restoredCount++;
+            }
+        });
+
+        return restoredCount > 0;
+    };
+
+    if (restoreSelections()) {
+        updateSelectionCount(tableElement);
+    }
+
+    syncSelectionState();
+    $(tableElement).on('draw.dt', () => {
+        if (restoreSelections()) {
+            updateSelectionCount(tableElement);
+        }
+        syncSelectionState();
     });
 }
 

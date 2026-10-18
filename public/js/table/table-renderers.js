@@ -27,12 +27,13 @@ function applyCompactDataTableControls(container) {
 /**
  * Render inbox row with "Label: Value" in one line (Bootstrap only)
  */
-function renderFallbackInboxRow(row, columns) {
+function renderFallbackInboxRow(row, columns, schema = {}) {
+    const allowMetaColumns = !!(schema?.business_entity || schema?.is_business_entity);
     const visibleColumns = columns.filter(
         col =>
             col.visible !== false &&
             col.data &&
-            !col.data.startsWith('meta.')
+            (allowMetaColumns || !col.data.startsWith('meta.'))
     );
 
     return `
@@ -40,14 +41,7 @@ function renderFallbackInboxRow(row, columns) {
             ${visibleColumns
                 .map(col => {
                     let value = '';
-
-                    if (col.data.includes('.')) {
-                        value = col.data
-                            .split('.')
-                            .reduce((acc, key) => acc?.[key], row) ?? '';
-                    } else {
-                        value = row[col.data] ?? '';
-                    }
+                    value = resolveRowValueByPath(row, col.data);
 
                     if (value === '' || value === null || value === undefined) {
                         return '';
@@ -116,10 +110,8 @@ function getFirstRowValue(row = {}, metaMap = {}, paths = [], fallback = '') {
 
         if (path.startsWith('meta:')) {
             value = metaMap[path.slice(5)];
-        } else if (path.includes('.')) {
-            value = path.split('.').reduce((acc, key) => acc?.[key], row);
         } else {
-            value = row?.[path];
+            value = resolveRowValueByPath(row, path);
         }
 
         if (value !== null && value !== undefined && value !== '') {
@@ -265,7 +257,7 @@ function hydrateComponentTemplate(templateHtml, bindings = {}, row = {}) {
 function renderInboxRow(row, columns, schema = {}) {
     const summaryComponent = getSchemaConfigValue(schema, TABLE_SCHEMA_KEY_SUMMARY_COMPONENT);
     if (!summaryComponent) {
-        return renderFallbackInboxRow(row, columns);
+        return renderFallbackInboxRow(row, columns, schema);
     }
 
     if (schema.__summaryComponentTemplate?.html) {
@@ -280,16 +272,17 @@ function renderInboxRow(row, columns, schema = {}) {
         `;
     }
 
-    return renderFallbackInboxRow(row, columns);
+    return renderFallbackInboxRow(row, columns, schema);
 }
 
 
-function getPriorityColumns(columns) {
+function getPriorityColumns(columns, schema = {}) {
+    const allowMetaColumns = !!(schema?.business_entity || schema?.is_business_entity);
     const priorityOrder = ['id', 'status', 'name', 'email', 'title', 'subject'];
     
     return columns
         .filter(c => c.visible !== false)
-        .filter(c => !c.data?.startsWith?.('meta.'))
+        .filter(c => allowMetaColumns || !c.data?.startsWith?.('meta.'))
         .sort((a, b) => {
             const aIdx = priorityOrder.indexOf(a.data);
             const bIdx = priorityOrder.indexOf(b.data);
@@ -325,6 +318,48 @@ function getLoaderComponentHTML() {
             </div>
         </div>
     `;
+}
+
+function resolveRowValueByPath(row = {}, path = '') {
+    if (!path) {
+        return '';
+    }
+
+    if (!path.includes('.')) {
+        return row?.[path] ?? '';
+    }
+
+    const segments = path.split('.');
+    const [first, second, third] = segments;
+
+    if (first && first !== 'meta' && row?.[first] && segments.length > 1) {
+        const nestedValue = segments.reduce((acc, key) => acc?.[key], row);
+        if (nestedValue !== undefined && nestedValue !== null && nestedValue !== '') {
+            return nestedValue;
+        }
+    }
+
+    if (second === 'meta') {
+        const metaKey = third || '';
+        const metaValue = row?.meta?.[metaKey] ?? row?.[first]?.meta?.[metaKey];
+        if (metaValue !== undefined && metaValue !== null && metaValue !== '') {
+            return metaValue;
+        }
+
+        return '';
+    }
+
+    const directValue = segments.reduce((acc, key) => acc?.[key], row);
+    if (directValue !== undefined && directValue !== null && directValue !== '') {
+        return directValue;
+    }
+
+    const strippedPath = segments.length > 1 ? segments.slice(1).join('.') : path;
+    if (strippedPath && strippedPath !== path) {
+        return resolveRowValueByPath(row, strippedPath);
+    }
+
+    return '';
 }
 
 function escapeDetailHtml(value) {
@@ -371,18 +406,29 @@ function renderFallbackDetailComponent(data = {}) {
         `);
     });
 
-    const metaEntries = Array.isArray(data.meta) ? data.meta : [];
-    metaEntries.forEach((item) => {
-        const metaKey = item?.meta_key || item?.key || 'Meta';
-        const metaValue = item?.meta_value ?? item?.value ?? item;
+    const metaValue = data.meta;
+    if (Array.isArray(metaValue)) {
+        metaValue.forEach((item) => {
+            const metaKey = item?.meta_key || item?.key || 'Meta';
+            const value = item?.meta_value ?? item?.value ?? item;
 
-        rows.push(`
-            <tr>
-                <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
-                <td class="text-break">${formatFallbackDetailValue(metaValue)}</td>
-            </tr>
-        `);
-    });
+            rows.push(`
+                <tr>
+                    <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                    <td class="text-break">${formatFallbackDetailValue(value)}</td>
+                </tr>
+            `);
+        });
+    } else if (metaValue && typeof metaValue === 'object') {
+        Object.entries(metaValue).forEach(([metaKey, value]) => {
+            rows.push(`
+                <tr>
+                    <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                    <td class="text-break">${formatFallbackDetailValue(value)}</td>
+                </tr>
+            `);
+        });
+    }
 
     if (rows.length === 0) {
         rows.push(`
@@ -1007,6 +1053,8 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             if (typeof setupCoreFormElement === 'function') {
                 setupCoreFormElement();
             }
+
+            injectMetaDetailsIfMissing(contentContainer, data);
             
             initializeDetailViewScripts(contentContainer);
             
@@ -1047,6 +1095,71 @@ function showDetailError(container, message) {
             </button>
         </div>
     `;
+}
+
+function renderMetaDetailRows(data = {}) {
+    const metaValue = data?.meta;
+    if (!metaValue) {
+        return '';
+    }
+
+    const rows = [];
+
+    if (Array.isArray(metaValue)) {
+        metaValue.forEach((item) => {
+            const metaKey = item?.meta_key || item?.key || 'Meta';
+            const value = item?.meta_value ?? item?.value ?? item;
+
+            rows.push(`
+                <tr>
+                    <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                    <td class="text-break">${formatFallbackDetailValue(value)}</td>
+                </tr>
+            `);
+        });
+    } else if (typeof metaValue === 'object') {
+        Object.entries(metaValue).forEach(([metaKey, value]) => {
+            rows.push(`
+                <tr>
+                    <th scope="row" class="${TABLE_CLASS_TEXT_MUTED} fw-semibold" style="width: 32%;">${escapeDetailHtml(`M / ${formatDetailLabel(metaKey)}`)}</th>
+                    <td class="text-break">${formatFallbackDetailValue(value)}</td>
+                </tr>
+            `);
+        });
+    }
+
+    if (!rows.length) {
+        return '';
+    }
+
+    return `
+        <div class="table-responsive ${TABLE_CLASS_ROUNDED} ${TABLE_CLASS_P_1} mt-2">
+            <table class="table table-sm table-hover ${TABLE_CLASS_MB_0} align-middle" style="--bs-table-bg: transparent;">
+                <colgroup><col style="width: 32%;"><col></colgroup>
+                <tbody>
+                    ${rows.join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function injectMetaDetailsIfMissing(contentContainer, data = {}) {
+    if (!contentContainer || !data?.meta) {
+        return;
+    }
+
+    const hasRenderedMeta = contentContainer.textContent?.includes('M /');
+    if (hasRenderedMeta) {
+        return;
+    }
+
+    const metaHtml = renderMetaDetailRows(data);
+    if (!metaHtml) {
+        return;
+    }
+
+    contentContainer.insertAdjacentHTML('beforeend', metaHtml);
 }
 
 function initializeInboxSummaryComponents(container) {

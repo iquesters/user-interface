@@ -1,128 +1,73 @@
 @php
     use Iquesters\Foundation\Support\ConfProvider;
     use Iquesters\Foundation\Enums\Module;
+    use Iquesters\Foundation\Models\Module as FoundationModule;
+    use Illuminate\Support\Facades\Route;
+
+    $currentModuleUid = request()->query('module_uid');
+    $currentModule = $currentModuleUid
+        ? FoundationModule::where('uid', $currentModuleUid)->first()
+        : null;
+
+    $sidebarMenu = [];
+
+    if ($currentModule) {
+        $rawSidebarMenu = $currentModule->getMeta('module_sidebar_menu') ?? '[]';
+        $sidebarMenu = is_string($rawSidebarMenu) ? json_decode($rawSidebarMenu, true) : $rawSidebarMenu;
+        $sidebarMenu = is_array($sidebarMenu) ? $sidebarMenu : [];
+    }
+
+    $sidebarMenu = collect($sidebarMenu)
+        ->filter(fn ($item) => is_array($item))
+        ->filter(fn ($item) => ($item['enabled'] ?? true) && ($item['visible'] ?? true))
+        ->sortBy(function ($item) {
+            return is_numeric($item['sort_order'] ?? null) ? (int) $item['sort_order'] : PHP_INT_MAX;
+        })
+        ->values();
+
+    $resolveUrl = function (array $item): string {
+        $params = $item['params'] ?? [];
+
+        if (!empty($item['default-table-schema-uid'])) {
+            $params['default_table_schema_uid'] = $item['default-table-schema-uid'];
+        }
+
+        $route = $item['route'] ?? null;
+        if ($route && Route::has($route)) {
+            try {
+                return route($route, $params);
+            } catch (\Throwable $e) {
+                return '#';
+            }
+        }
+
+        $url = $item['url'] ?? null;
+        if (is_string($url) && $url !== '' && $url !== '#') {
+            return $url;
+        }
+
+        return '#';
+    };
 @endphp
 
-<aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
-    <div class="sidebar-body">
-        <div class="list-group list-group-flush" id="sidebarMenu">
-            <div class="list-group-item dropdown-item ps-3 pe-2 py-1 d-flex justify-content-between align-items-center">
-                Loading menu...
-            </div>
+<aside class="sidebar ui-sidebar bg-body {{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
+    <div class="sidebar-body bg-body">
+        <div class="list-group list-group-flush nav-sidebar-pending" id="sidebarMenu">
+            @forelse($sidebarMenu as $item)
+                <a
+                    href="{{ $resolveUrl($item) }}"
+                    class="list-group-item list-group-item-action dropdown-item ps-3 pe-2 py-2 d-flex justify-content-between align-items-center"
+                >
+                    <span class="d-flex align-items-center gap-2 text-truncate">
+                        <i class="{{ $item['icon'] ?? 'fas fa-circle' }}"></i>
+                        <span>{{ $item['label'] ?? $item['original_label'] ?? 'Navigation' }}</span>
+                    </span>
+                </a>
+            @empty
+                <div class="list-group-item dropdown-item ps-3 pe-2 py-1 d-flex justify-content-between align-items-center">
+                    No menu available.
+                </div>
+            @endforelse
         </div>
     </div>
 </aside>
-
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-
-    const sidebar = document.getElementById('sidebarMenu');
-
-    /* ================================
-       VIEW MODE HELPERS
-    ================================= */
-    function getCurrentViewMode() {
-        return window.innerWidth < 992 ? 'mobile' : 'vertical';
-    }
-
-    function getTabs(mode) {
-        return document.querySelectorAll(`.module-tab[data-view-mode="${mode}"]`);
-    }
-
-    function getDropdownItems(mode) {
-        return document.querySelectorAll(`.dropdown-item[data-menu][data-view-mode="${mode}"]`);
-    }
-
-    /* ================================
-       SIDEBAR RENDER
-    ================================= */
-    function renderSidebar(menu, name) {
-        sidebar.innerHTML = '';
-
-        if (!menu || menu.length === 0) {
-            sidebar.innerHTML = `<div class="text-muted ps-3 pe-2 py-1">No menu available for ${name}</div>`;
-            return;
-        }
-
-        menu.forEach(item => {
-            const link = document.createElement('a');
-            link.className = 'list-group-item dropdown-item ps-3 pe-2 py-1 d-flex align-items-center';
-            link.href = item.url || '#';
-            link.innerHTML = `<i class="fa-fw ${item.icon} me-2"></i><span>${item.label}</span>`;
-            sidebar.appendChild(link);
-        });
-    }
-
-    /* ================================
-       ACTIVE STATE HANDLER
-    ================================= */
-    function setActive(element) {
-        const mode = element.dataset.viewMode;
-
-        getTabs(mode).forEach(t => t.classList.remove('active-module'));
-        getDropdownItems(mode).forEach(d => d.classList.remove('active'));
-
-        element.classList.add(
-            element.classList.contains('module-tab') ? 'active-module' : 'active'
-        );
-
-        localStorage.setItem('activeModuleIndex', element.dataset.index);
-    }
-
-    /* ================================
-       INITIAL LOAD
-    ================================= */
-    const mode = getCurrentViewMode();
-    let tabs = getTabs(mode);
-    let dropdownItems = getDropdownItems(mode);
-
-    // fallback for header/minibar if no tabs in current mode
-    if (!tabs.length) {
-        tabs = getTabs('desktop'); // try desktop tabs
-    }
-    if (!dropdownItems.length) {
-        dropdownItems = getDropdownItems('desktop');
-    }
-
-    if (!tabs.length) return; // still none? exit
-
-    let savedIndex = localStorage.getItem('activeModuleIndex');
-    let activeElement = tabs[0];
-
-    if (savedIndex) {
-        activeElement =
-            [...tabs].find(t => t.dataset.index === savedIndex) ||
-            [...dropdownItems].find(d => d.dataset.index === savedIndex) ||
-            activeElement;
-    }
-
-    renderSidebar(JSON.parse(activeElement.dataset.menu || '[]'), activeElement.dataset.name);
-    setActive(activeElement);
-
-    /* ================================
-       CLICK HANDLERS
-    ================================= */
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            renderSidebar(JSON.parse(tab.dataset.menu || '[]'), tab.dataset.name);
-            setActive(tab);
-        });
-    });
-
-    dropdownItems.forEach(item => {
-        item.addEventListener('click', e => {
-            e.preventDefault();
-
-            renderSidebar(JSON.parse(item.dataset.menu || '[]'), item.dataset.name);
-            setActive(item);
-
-            // Close dropdown
-            const btn = item.closest('.dropdown')?.querySelector('[data-bs-toggle="dropdown"]');
-            if (btn) bootstrap.Dropdown.getInstance(btn)?.hide();
-        });
-    });
-
-});
-</script>
-@endpush
