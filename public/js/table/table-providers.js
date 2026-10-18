@@ -9,8 +9,17 @@ function removeTableSkeleton(tableElement) {
     tableElement.classList.remove(TABLE_CLASS_HIDDEN);
 }
 
-async function fetchEntityData(entity, offset = 0, length = 50) {
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, {
+function resolveTableListApiPrefix(schema = {}) {
+    if (schema?.business_entity || schema?.is_business_entity) {
+        return TABLE_API_BUSINESS_ENTITY_LIST_PREFIX;
+    }
+
+    return TABLE_API_ENTITY_LIST_PREFIX;
+}
+
+async function fetchEntityData(entity, offset = 0, length = 50, schema = {}) {
+    const listApiPrefix = resolveTableListApiPrefix(schema);
+    const response = await apiClient.get(`${listApiPrefix}${entity}`, {
         offset,
         length
     });
