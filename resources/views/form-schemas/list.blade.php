@@ -58,8 +58,8 @@ Form Schemas
                     <td class="">{{ $form->name }}</td>
                     <td class="">{{ $form->description }}</td>
                     <td class="">{{ $form->slug }}</td>
-                    <!-- <td class="">{{ $form->schema }}</td> -->
-                    <!-- <td class="">{{ $form->extra_info }}</td> -->
+                    {{-- <td class="">{{ $form->schema }}</td> --}}
+                    {{-- <td class="">{{ $form->extra_info }}</td> --}}
                     <td class="">
                         <div class="d-flex justify-content-center gap-2">
                             <a type="button" class="nav-link d-flex align-items-center text-primary" title="Form Creation of {{ $form->name }} form" href="{{route('form.formCreation_new',$form->uid)}}">
