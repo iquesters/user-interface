@@ -46,6 +46,10 @@ Route::prefix('api')
 
             Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
                 ->name('auth.table');
+        });
+
+        // Generic entity CRUD: admin only until per-entity permissions exist.
+        Route::middleware(['auth:sanctum', 'ensure.admin'])->group(function () {
 
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
                 ->name('api.entity.list');
@@ -76,7 +80,8 @@ Route::prefix('api')
         Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
             ->name('auth.form');
 
-        Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
+        Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata'])
+            ->middleware('ensure.admin');
 
         Route::get('components/templates/{component}', [ComponentTemplateController::class, 'show'])
             ->name('api.components.template');

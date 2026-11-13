@@ -11,7 +11,7 @@
 <link href="https://cdn.datatables.net/v/bs5/jq-3.7.0/moment-2.29.4/jszip-3.10.1/dt-2.2.2/af-2.7.0/b-3.2.2/b-colvis-3.2.2/b-html5-3.2.2/b-print-3.2.2/cr-2.0.4/date-1.5.5/fc-5.0.4/fh-4.0.1/kt-2.12.1/r-3.0.4/rg-1.5.1/rr-1.5.0/sc-2.4.3/sb-1.8.2/sp-2.3.3/sl-3.0.0/sr-1.4.1/datatables.min.css" rel="stylesheet" integrity="sha384-wYf859STWTPggciSnTIDCGMabsgGXnODSCOXsmSXYvBU+qa7uYQjrZCTi9/jyzAD" crossorigin="anonymous">
 
 <!-- JSON Editor -->
-<link href="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.css" integrity="sha384-cj1rYBc4/dVYAknZMTkVCDRL6Knzugf32igVqsuFW0iRWFHKH8Ci8+ekC8gNsFZ+" crossorigin="anonymous" rel="stylesheet">
 
 <!-- All package CSS assets (including theme and bootstrap-override) -->
 @foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getCssAssets() as $asset)

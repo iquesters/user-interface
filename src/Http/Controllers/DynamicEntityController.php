@@ -57,7 +57,7 @@ class DynamicEntityController extends Controller
             $this->ensureEntityTableExists($entity);
 
             $offset = max((int) request()->get('offset', 0), 0);
-            $length = max((int) request()->get('length', 50), 1);
+            $length = min(max((int) request()->get('length', 50), 1), EntityListParams::MAX_LENGTH);
             $page = (int) floor($offset / $length) + 1;
 
             [$mainFieldDefinitions, $metaFieldDefinitions] = $this->resolveEntityFieldDefinitions($entity);
@@ -158,16 +158,12 @@ class DynamicEntityController extends Controller
 
     protected function resolveEntityFieldDefinitions(string $entity): array
     {
-        try {
-            $entityDefinition = $this->resolveEntityDefinition($entity);
+        $entityDefinition = $this->resolveEntityDefinition($entity);
 
-            return [
-                $this->getMainFieldDefinitions($entityDefinition),
-                $this->getMetaFieldDefinitions($entityDefinition),
-            ];
-        } catch (Throwable) {
-            return [[], []];
-        }
+        return [
+            $this->getMainFieldDefinitions($entityDefinition),
+            $this->getMetaFieldDefinitions($entityDefinition),
+        ];
     }
 
     public function show(string $entity, string $data_uid)
@@ -596,9 +592,19 @@ class DynamicEntityController extends Controller
             throw new \InvalidArgumentException('Entity name is required');
         }
 
+        // Allowlist: only tables backed by a registered entity definition are
+        // reachable. Both failures return the same message so callers cannot
+        // probe which tables exist.
+        try {
+            $this->resolveEntityDefinition($entity);
+        } catch (\RuntimeException) {
+            $this->logWarning("Entity access denied: no entity definition for '{$entity}'");
+            throw new \RuntimeException("Entity {$entity} not found");
+        }
+
         if (! Schema::hasTable($entity)) {
             $this->logWarning("Entity fetch failed: Table '{$entity}' not found");
-            throw new \RuntimeException("Table {$entity} does not exist");
+            throw new \RuntimeException("Entity {$entity} not found");
         }
     }
 

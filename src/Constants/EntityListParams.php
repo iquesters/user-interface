@@ -10,6 +10,9 @@ class EntityListParams
     const PARAM_SORT   = 'sort';
     const PARAM_FILTER = 'filter';
 
+    // Upper bound for the `length` page-size parameter
+    const MAX_LENGTH = 100;
+
     // Filter operators
     const OP_EQ     = 'eq';
     const OP_NEQ    = 'neq';
