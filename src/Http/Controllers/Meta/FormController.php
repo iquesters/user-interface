@@ -3,7 +3,7 @@
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
 use Iquesters\UserInterface\Constants\EntityStatus;
-use App\Http\Controllers\Controller;
+use Illuminate\Routing\Controller;
 use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
 use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Models\FormValue;

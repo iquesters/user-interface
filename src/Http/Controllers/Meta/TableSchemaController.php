@@ -3,7 +3,7 @@
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
 use Iquesters\UserInterface\Constants\EntityStatus;
-use App\Http\Controllers\Controller;
+use Illuminate\Routing\Controller;
 use Iquesters\UserInterface\Models\TableSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
