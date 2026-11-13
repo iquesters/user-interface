@@ -12,12 +12,32 @@
     "iquesters/user-management": "Login, per-user theme and the sanctum token used by the in-app API client",
     "spatie/laravel-permission": "Role checks (setup link, admin-only routes)"
   },
+  "require-dev": {
+    "orchestra/testbench": "^10.0|^11.0",
+    "laravel/sanctum": "^4.0",
+    "spatie/laravel-permission": "^6.16"
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../foundation",
+      "options": { "symlink": true, "versions": { "iquesters/foundation": "1.x-dev" } }
+    }
+  ],
   "license": "MIT",
   "autoload": {
     "psr-4": {
       "Iquesters\\UserInterface\\": "src/",
       "Iquesters\\UserInterface\\Database\\Seeders\\": "database/seeders/"
     }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Iquesters\\UserInterface\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
   },
   "authors": [
     {
@@ -26,6 +46,7 @@
     }
   ],
   "minimum-stability": "dev",
+  "prefer-stable": true,
   "extra": {
     "laravel": {
       "providers": [

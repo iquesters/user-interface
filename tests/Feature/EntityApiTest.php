@@ -1,0 +1,118 @@
+<?php
+
+namespace Iquesters\UserInterface\Tests\Feature;
+
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Iquesters\UserInterface\Tests\TestCase;
+use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+class EntityApiTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Schema::create('demo_items', function (Blueprint $table) {
+            $table->id();
+            $table->ulid('uid')->unique();
+            $table->string('name');
+            $table->string('status')->default('active');
+            $table->timestamps();
+        });
+
+        $entityId = DB::table('entities')->insertGetId([
+            'uid' => (string) Str::ulid(),
+            'entity_name' => 'Demo Item',
+            'slug' => 'demo-items',
+            'fields' => json_encode(['name' => ['name' => 'name', 'type' => 'string', 'nullable' => false]]),
+            'meta_fields' => json_encode([]),
+            'status' => 'active',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('entity_metas')->insert([
+            'ref_parent' => $entityId, 'meta_key' => 'table_name', 'meta_value' => 'demo_items',
+            'status' => 'active', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $rows = [];
+        for ($i = 1; $i <= 120; $i++) {
+            $rows[] = ['uid' => (string) Str::ulid(), 'name' => "Item {$i}", 'status' => 'active', 'created_at' => now(), 'updated_at' => now()];
+        }
+        DB::table('demo_items')->insert($rows);
+    }
+
+    protected function tearDown(): void
+    {
+        Schema::dropIfExists('demo_items');
+
+        parent::tearDown();
+    }
+
+    private function actingAsAdmin(): void
+    {
+        Sanctum::actingAs($this->makeUser('super-admin'));
+    }
+
+    public function test_guest_is_unauthorized(): void
+    {
+        $this->getJson('/api/entity/list/demo_items')->assertUnauthorized();
+    }
+
+    public function test_non_admin_is_forbidden(): void
+    {
+        Sanctum::actingAs($this->makeUser('user'));
+
+        $this->getJson('/api/entity/list/demo_items')->assertForbidden();
+        $this->deleteJson('/api/entity/delete/demo_items/x')->assertForbidden();
+    }
+
+    public function test_admin_can_list_a_registered_entity(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->getJson('/api/entity/list/demo_items?length=10')
+            ->assertOk()
+            ->assertJsonPath('response_schema.meta.pagination.total', 120)
+            ->assertJsonPath('response_schema.meta.pagination.per_page', 10);
+    }
+
+    public function test_page_size_is_capped(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->getJson('/api/entity/list/demo_items?length=10000000')->assertOk();
+
+        $response->assertJsonPath('response_schema.meta.pagination.per_page', 100);
+        $this->assertCount(100, $response->json('response_schema.data'));
+    }
+
+    public static function unregisteredTables(): array
+    {
+        return [['users'], ['sessions'], ['personal_access_tokens'], ['migrations'], ['roles'], ['no_such_table']];
+    }
+
+    #[DataProvider('unregisteredTables')]
+    public function test_tables_without_an_entity_definition_are_not_reachable(string $table): void
+    {
+        $this->actingAsAdmin();
+
+        $this->getJson("/api/entity/list/{$table}")->assertNotFound()->assertJsonPath('message', "Entity {$table} not found");
+        $this->getJson("/api/entity/show/{$table}/1")->assertNotFound();
+        $this->deleteJson("/api/entity/delete/{$table}/1")->assertNotFound();
+        $this->postJson("/api/entity/store/{$table}", ['name' => 'x'])->assertNotFound();
+    }
+
+    public function test_unregistered_table_is_not_modified(): void
+    {
+        $this->actingAsAdmin();
+        $before = DB::table('users')->count();
+
+        $this->deleteJson('/api/entity/delete/users/1')->assertNotFound();
+
+        $this->assertSame($before, DB::table('users')->count());
+    }
+}
