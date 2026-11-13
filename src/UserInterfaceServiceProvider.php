@@ -8,16 +8,13 @@ use Illuminate\Console\Command;
 use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
 use Iquesters\Foundation\Support\ConfProvider;
 use Iquesters\Foundation\Enums\Module as ModuleEnum;
-use Iquesters\UserManagement\Config\UserManagementConf;
 use Iquesters\UserInterface\Config\UserInterfaceConf;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\Schema;
 use Iquesters\Foundation\Models\Module;
 use Iquesters\Foundation\Models\Navigation;
-use Iquesters\UserManagement\UserManagementServiceProvider;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
-use Iquesters\UserManagement\Models\UserMeta;
 use Illuminate\Support\Facades\Log;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Support\Facades\File;
@@ -32,10 +29,11 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // Register seeder command
         $this->registerSeedCommand();
 
-        //  Conditionally register UserManagement package if available
-        if (class_exists(UserManagementServiceProvider::class)) {
-            ConfProvider::register(ModuleEnum::USER_MGMT, UserManagementConf::class);
-        }
+        // Foundation's entity builder stores generated schemas in our models.
+        $this->app->singleton(\Iquesters\Foundation\Contracts\SchemaModels::class, fn () => new class implements \Iquesters\Foundation\Contracts\SchemaModels {
+            public function formSchemaModel(): string { return \Iquesters\UserInterface\Models\FormSchema::class; }
+            public function tableSchemaModel(): string { return \Iquesters\UserInterface\Models\TableSchema::class; }
+        });
     }
 
     public function boot()
@@ -436,9 +434,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
             $user = Auth::user();
 
             $userTheme = null;
-            // Check user-specific theme
-            if ($user) {
-                $userTheme = UserMeta::where('ref_parent', $user->id)
+            // Check user-specific theme (stored by iquesters/user-management when installed)
+            $userMetaModel = 'Iquesters\\UserManagement\\Models\\UserMeta';
+            if ($user && class_exists($userMetaModel)) {
+                $userTheme = $userMetaModel::where('ref_parent', $user->id)
                     ->where('meta_key', 'theme')
                     ->where('status', 'active')
                     ->first(); 

@@ -4,7 +4,7 @@
     $superadminExists = false;
 
     try {
-        if (Schema::hasTable('roles') && Schema::hasTable('model_has_roles')) {
+        if (class_exists(Role::class) && Schema::hasTable('roles') && Schema::hasTable('model_has_roles')) {
             $superadminExists = Role::where('name', 'super-admin')
                 ->whereHas('users')
                 ->exists();

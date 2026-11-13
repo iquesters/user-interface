@@ -1,7 +1,6 @@
 @php
     use Iquesters\Foundation\Support\ConfProvider;
     use Iquesters\Foundation\Enums\Module;
-    use Iquesters\UserManagement\UserManagementServiceProvider;
 @endphp
 
 <head>
@@ -12,7 +11,9 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @auth
-        <meta name="sanctum-token" content="{{ Iquesters\UserManagement\Helpers\LoginHelper::get_sanctum_token(auth()->user()) }}">
+        @if (class_exists(\Iquesters\UserManagement\Helpers\LoginHelper::class))
+        <meta name="sanctum-token" content="{{ \Iquesters\UserManagement\Helpers\LoginHelper::get_sanctum_token(auth()->user()) }}">
+        @endif
     @endauth
 
     {{-- <title>
@@ -29,7 +30,7 @@
     <link rel="icon" type="image/x-icon" href="{{ route('userinterface.asset', ['path' => 'img/favicon.png']) }}">
 
     {{-- ✅ Only load reCAPTCHA when on auth layout --}}
-    @if (!empty($isAuth) && class_exists(UserManagementServiceProvider::class))
+    @if (!empty($isAuth) && class_exists(\Iquesters\UserManagement\UserManagementServiceProvider::class))
         @php
             $recaptcha = ConfProvider::from(Module::USER_MGMT)->recaptcha ?? null;
         @endphp

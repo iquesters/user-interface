@@ -8,6 +8,10 @@
     "iquesters/foundation": "^1.0",
     "diglactic/laravel-breadcrumbs": "^10.0"
   },
+  "suggest": {
+    "iquesters/user-management": "Login, per-user theme and the sanctum token used by the in-app API client",
+    "spatie/laravel-permission": "Role checks (setup link, admin-only routes)"
+  },
   "license": "MIT",
   "autoload": {
     "psr-4": {
