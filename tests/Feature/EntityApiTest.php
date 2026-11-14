@@ -106,6 +106,23 @@ class EntityApiTest extends TestCase
         $this->postJson("/api/entity/store/{$table}", ['name' => 'x'])->assertNotFound();
     }
 
+    public function test_soft_deleted_records_are_hidden(): void
+    {
+        $this->actingAsAdmin();
+        $uid = DB::table('demo_items')->value('uid');
+
+        $this->deleteJson("/api/entity/delete/demo_items/{$uid}")->assertOk();
+
+        // Still in the table (soft delete via status), but hidden from the API.
+        $this->assertDatabaseHas('demo_items', ['uid' => $uid, 'status' => 'deleted']);
+        $this->getJson('/api/entity/list/demo_items?length=100')
+            ->assertOk()
+            ->assertJsonPath('response_schema.meta.pagination.total', 119);
+        $this->getJson("/api/entity/show/demo_items/{$uid}")->assertNotFound();
+        $this->putJson("/api/entity/update/demo_items/{$uid}", ['name' => 'Back'])->assertNotFound();
+        $this->deleteJson("/api/entity/delete/demo_items/{$uid}")->assertNotFound();
+    }
+
     public function test_unregistered_table_is_not_modified(): void
     {
         $this->actingAsAdmin();

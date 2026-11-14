@@ -30,7 +30,7 @@ class EntityRepository
     {
         [$main, $meta] = $this->schema->fieldDefinitions($table);
 
-        $query = DB::table($table);
+        $query = $this->visible($table);
         $this->scope->applyToQuery($query, $table);
 
         $listQuery = (new DynamicEntityListQuery($query, $table, $main, $meta, $this->schema->metaTable($table)))
@@ -44,7 +44,7 @@ class EntityRepository
 
     public function find(string $table, string $reference): ?object
     {
-        $record = DB::table($table)
+        $record = $this->visible($table)
             ->where($this->schema->referenceColumn($table, $reference), $reference)
             ->first();
 
@@ -59,7 +59,7 @@ class EntityRepository
 
     public function idFor(string $table, string $reference): ?int
     {
-        $id = DB::table($table)->where($this->schema->referenceColumn($table, $reference), $reference)->value('id');
+        $id = $this->visible($table)->where($this->schema->referenceColumn($table, $reference), $reference)->value('id');
 
         return $id ? (int) $id : null;
     }
@@ -142,9 +142,26 @@ class EntityRepository
         });
     }
 
+    /**
+     * Base query that hides soft-deleted rows (status = 'deleted'), so they are
+     * not listed and behave as "not found" for show/update/delete.
+     */
+    private function visible(string $table): \Illuminate\Database\Query\Builder
+    {
+        $query = DB::table($table);
+
+        if ($this->schema->hasColumn($table, 'status')) {
+            $query->where(function ($q) use ($table) {
+                $q->where("{$table}.status", '<>', EntityStatus::DELETED)->orWhereNull("{$table}.status");
+            });
+        }
+
+        return $query;
+    }
+
     private function lockedExisting(string $table, string $reference): object
     {
-        $existing = DB::table($table)
+        $existing = $this->visible($table)
             ->where($this->schema->referenceColumn($table, $reference), $reference)
             ->first();
 
