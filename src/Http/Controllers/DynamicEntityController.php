@@ -19,6 +19,8 @@ use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityListParams;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Iquesters\UserInterface\Http\Query\DynamicEntityListQuery;
+use Iquesters\UserInterface\Services\Entity\EntityValidator;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class DynamicEntityController extends Controller
@@ -200,6 +202,8 @@ class DynamicEntityController extends Controller
             $this->logStoreRequest($request, $entity);
 
             $schema = $this->resolveEntitySchema($request, $entity);
+            $this->validateEntityPayload($entity, $schema, $request->input('meta', []), false);
+
             $mainData = $this->prepareMainData(
                 $schema['payload'],
                 $schema['main_field_definitions'],
@@ -240,6 +244,11 @@ class DynamicEntityController extends Controller
             $this->logUpdateRequest($request, $entity, $data_uid);
 
             $schema = $this->resolveEntitySchema($request, $entity);
+            $existingId = DB::table($entity)
+                ->where($this->resolveReferenceColumn($entity, $data_uid), $data_uid)
+                ->value('id');
+            $this->validateEntityPayload($entity, $schema, $request->input('meta', []), true, $existingId ? (int) $existingId : null);
+
             $mainData = $this->prepareUpdateData(
                 $schema['payload'],
                 $schema['main_field_definitions'],
@@ -362,6 +371,43 @@ class DynamicEntityController extends Controller
             'meta_field_definitions' => $metaFieldDefinitions,
             'writable_main_columns' => $writableMainColumns,
         ];
+    }
+
+    /**
+     * Validate the raw payload against the entity's field definitions.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function validateEntityPayload(
+        string $entity,
+        array $schema,
+        mixed $explicitMeta,
+        bool $isUpdate,
+        ?int $ignoreId = null
+    ): void {
+        $mainInput = array_intersect_key($schema['payload'], array_flip($schema['writable_main_columns']));
+
+        $metaInput = [];
+        if (is_array($explicitMeta)) {
+            foreach ($explicitMeta as $key => $value) {
+                if (is_int($key) && is_array($value) && isset($value['meta_key'])) {
+                    $key = $value['meta_key'];
+                    $value = $value['meta_value'] ?? null;
+                }
+                $metaInput[$key] = $value;
+            }
+        }
+
+        app(EntityValidator::class)->validate(
+            $entity,
+            $schema['main_field_definitions'],
+            $schema['meta_field_definitions'],
+            $mainInput,
+            $metaInput,
+            $schema['writable_main_columns'],
+            $isUpdate,
+            $ignoreId
+        );
     }
 
     protected function prepareMainData(
@@ -1209,6 +1255,7 @@ class DynamicEntityController extends Controller
     protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)
     {
         [$status, $message, $errors] = match (true) {
+            $e instanceof ValidationException => [HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY, 'The given data was invalid.', $e->errors()],
             $e instanceof \InvalidArgumentException => [HttpStatusCode::HTTP_BAD_REQUEST, $e->getMessage(), null],
             $e instanceof UniqueConstraintViolationException,
             $e instanceof QueryException => $this->mapQueryException($e),
@@ -1217,6 +1264,7 @@ class DynamicEntityController extends Controller
         };
 
         if (! $e instanceof \InvalidArgumentException
+            && ! $e instanceof ValidationException
             && ! $e instanceof UniqueConstraintViolationException
             && ! $e instanceof QueryException
             && ! $e instanceof \RuntimeException) {
