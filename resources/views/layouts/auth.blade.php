@@ -17,25 +17,6 @@
                          alt="Logo" 
                          style="max-width: 200px; width: 100%;">
 
-                    <!-- Session Status -->
-                    @if (session('status'))
-                        <div class="alert alert-info m-0 m-2 p-2 w-100" role="alert">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
-                    @if(session('success'))
-                        <div class="alert alert-success m-2 p-2 w-100" role="alert">
-                            {{ session('success') }}
-                        </div>
-                    @endif
-
-                    @if (session('error'))
-                        <div class="alert alert-danger m-2 p-2 w-100" role="alert">
-                            {{ session('error') }}
-                        </div>
-                    @endif
-
                     @yield('content')
                 </div>
             </div>
@@ -44,5 +25,27 @@
 
     @include('userinterface::layouts.common.snackbar')
     @include('userinterface::layouts.common.js', ['isAuth' => true])
+
+    {{-- Flashed messages from a plain redirect (e.g. Google login error, setup done)
+         show as a toast, same as form submissions. --}}
+    @php
+        $flashToasts = array_filter([
+            'info' => session('status'),
+            'success' => session('success'),
+            'error' => session('error'),
+        ]);
+    @endphp
+    @if ($flashToasts)
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.showSnackbar !== 'function') {
+                return;
+            }
+            @foreach ($flashToasts as $type => $message)
+            window.showSnackbar(@json(__($message)), @json($type));
+            @endforeach
+        });
+    </script>
+    @endif
 </body>
 </html>
