@@ -178,8 +178,8 @@ class UserInterfaceSeeder extends BaseSeeder
                 'value' => 'Theme Configuration',
                 'parent_id' => 0,
                 'status' => 'active',
-                'created_by' => 0,
-                'updated_by' => 0,
+                'created_by' => null,
+                'updated_by' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
@@ -229,8 +229,8 @@ class UserInterfaceSeeder extends BaseSeeder
                 [
                     'value' => ucfirst($theme),
                     'status' => 'active',
-                    'created_by' => 0,
-                    'updated_by' => 0,
+                    'created_by' => null,
+                    'updated_by' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]
@@ -243,8 +243,8 @@ class UserInterfaceSeeder extends BaseSeeder
             [
                 'value' => 'default',
                 'status' => 'active',
-                'created_by' => 0,
-                'updated_by' => 0,
+                'created_by' => null,
+                'updated_by' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
