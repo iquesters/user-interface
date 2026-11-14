@@ -30,15 +30,6 @@ class RouteProtectionTest extends TestCase
         $this->assertGreaterThan(14, $checked, 'Expected the builder/entity routes to be registered.');
     }
 
-    public function test_save_form_requires_admin(): void
-    {
-        $route = collect(app('router')->getRoutes()->getRoutes())
-            ->first(fn (Route $r) => $r->uri() === 'api/form/save-form/{uid}');
-
-        $this->assertNotNull($route);
-        $this->assertContains('ensure.admin', $route->gatherMiddleware());
-    }
-
     public function test_settings_route_is_not_registered_by_user_interface(): void
     {
         // user-management owns /settings; the broken duplicate was removed.

@@ -81,9 +81,6 @@ Route::prefix('api')
         Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
             ->name('auth.form');
 
-        Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata'])
-            ->middleware('ensure.admin');
-
         Route::get('components/templates/{component}', [ComponentTemplateController::class, 'show'])
             ->name('api.components.template');
 
