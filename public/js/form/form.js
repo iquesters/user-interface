@@ -1291,6 +1291,11 @@ async function submitDynamicFormRequest(endpoint, method, payload, form) {
         ? { headers: { 'X-CSRF-TOKEN': csrfToken } }
         : {};
 
+    // JSON can't carry files; use multipart when the form has file fields.
+    if (method !== 'DELETE' && payloadHasFiles(payload)) {
+        return submitMultipartFormRequest(endpoint, method, payload, csrfToken);
+    }
+
     if (typeof apiClient !== 'undefined' && apiClient) {
         switch (method) {
             case 'PUT':
@@ -1392,7 +1397,88 @@ function getSerializedFieldValue(form, field) {
     }
 
     const input = form.querySelector(`[name="${escapedName}"]`);
+
+    // File inputs: send the File objects (multipart), not the fake "C:\fakepath\..." value.
+    if (input && input.type === 'file') {
+        const files = Array.from(input.files || []);
+        return input.multiple ? files : (files[0] || null);
+    }
+
     return input ? input.value : null;
+}
+
+function payloadHasFiles(value) {
+    if (typeof File !== 'undefined' && value instanceof File) {
+        return true;
+    }
+
+    if (Array.isArray(value)) {
+        return value.some(payloadHasFiles);
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.values(value).some(payloadHasFiles);
+    }
+
+    return false;
+}
+
+// Flattens a payload into FormData using PHP's bracket notation (meta[key], tags[]).
+function appendToFormData(formData, key, value) {
+    if (value === null || value === undefined) {
+        formData.append(key, '');
+    } else if (typeof File !== 'undefined' && value instanceof File) {
+        formData.append(key, value, value.name);
+    } else if (Array.isArray(value)) {
+        value.forEach(item => appendToFormData(formData, `${key}[]`, item));
+    } else if (typeof value === 'object') {
+        Object.entries(value).forEach(([subKey, subValue]) => appendToFormData(formData, `${key}[${subKey}]`, subValue));
+    } else if (typeof value === 'boolean') {
+        formData.append(key, value ? '1' : '0');
+    } else {
+        formData.append(key, value);
+    }
+}
+
+/**
+ * Submit a payload that contains files as multipart/form-data. PUT/PATCH are
+ * sent as POST with _method, because PHP only parses multipart bodies on POST.
+ */
+async function submitMultipartFormRequest(endpoint, method, payload, csrfToken) {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => appendToFormData(formData, key, value));
+
+    if (method !== 'POST') {
+        formData.append('_method', method);
+    }
+
+    const headers = {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+    if (csrfToken) {
+        headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+    const apiToken = document.querySelector('meta[name="sanctum-token"]')?.content;
+    if (apiToken) {
+        headers['Authorization'] = `Bearer ${apiToken}`;
+    }
+
+    // No Content-Type header: the browser sets the multipart boundary.
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+        body: formData,
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    return {
+        ...result,
+        success: result?.success ?? response.ok,
+        status: result?.status ?? response.status,
+    };
 }
 
 
