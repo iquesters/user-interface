@@ -29,6 +29,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // Register seeder command
         $this->registerSeedCommand();
 
+        // One schema resolver per request, so its introspection cache is shared
+        // by the entity API services.
+        $this->app->scoped(\Iquesters\UserInterface\Services\Entity\EntitySchemaResolver::class);
+
         // Foundation's entity builder stores generated schemas in our models.
         $this->app->singleton(\Iquesters\Foundation\Contracts\SchemaModels::class, fn () => new class implements \Iquesters\Foundation\Contracts\SchemaModels {
             public function formSchemaModel(): string { return \Iquesters\UserInterface\Models\FormSchema::class; }

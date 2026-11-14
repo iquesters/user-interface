@@ -2,108 +2,197 @@
 
 namespace Iquesters\UserInterface\Http\Controllers;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Carbon;
-use Illuminate\Database\QueryException;
-use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
-use Iquesters\Foundation\Helpers\DateTimeHelper;
 use Iquesters\Foundation\Constants\HttpStatusCode;
-use Iquesters\Foundation\Models\Entity as FoundationEntity;
+use Iquesters\Foundation\Support\EntityPermission;
 use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityListParams;
-use Iquesters\UserInterface\Constants\EntityStatus;
-use Iquesters\UserInterface\Http\Query\DynamicEntityListQuery;
+use Iquesters\UserInterface\Services\Entity\EntityErrorMapper;
+use Iquesters\UserInterface\Services\Entity\EntityPresenter;
+use Iquesters\UserInterface\Services\Entity\EntityRepository;
+use Iquesters\UserInterface\Services\Entity\EntitySchemaResolver;
+use Iquesters\UserInterface\Services\Entity\EntityScope;
 use Iquesters\UserInterface\Services\Entity\EntityValidator;
-use Illuminate\Validation\ValidationException;
-use Illuminate\Auth\Access\AuthorizationException;
-use Iquesters\Foundation\Support\EntityPermission;
+use Iquesters\UserInterface\Services\Entity\EntityValueNormalizer;
 use Throwable;
 
+/**
+ * Generic CRUD API over registered entity tables.
+ *
+ * Each action: permission check (entity.{table}.{action}) -> allowlist
+ * (registered entity) -> validate -> normalize -> repository -> presenter.
+ */
 class DynamicEntityController extends Controller
 {
     use Loggable;
 
-    protected array $sensitiveResponseFields = [
-        'password',
-        'remember_token',
-        'token',
-        'access_token',
-        'refresh_token',
-        'secret',
-        'api_key',
-    ];
+    /** Request keys that are never treated as column values. */
+    private const RESERVED_PAYLOAD_KEYS = ['_token', '_method', 'meta'];
 
-    protected array $reservedPayloadKeys = [
-        '_token',
-        '_method',
-        'meta',
-    ];
+    public function __construct(
+        private readonly EntitySchemaResolver $schema,
+        private readonly EntityRepository $repository,
+        private readonly EntityValidator $validator,
+        private readonly EntityValueNormalizer $normalizer,
+        private readonly EntityScope $scope,
+        private readonly EntityPresenter $presenter,
+        private readonly EntityErrorMapper $errors,
+    ) {
+    }
 
-    /**
-     * Columns treated as access-scope dimensions when present on a dynamic
-     * entity table (e.g. multi-tenant ownership). Any table with one of these
-     * columns is automatically restricted to the IDs an EntityScopeResolver
-     * (tagged 'entity-scope-resolvers') resolves for the current actor. If no
-     * resolver claims the column, access fails closed rather than exposing
-     * every row.
-     */
-    protected array $scopedColumns = ['organisation_id'];
-
-    public function list(string $entity)
+    public function list(Request $request, string $entity)
     {
         try {
             $this->authorizeEntity($entity, 'view');
-            $this->ensureEntityTableExists($entity);
+            $this->schema->ensureEntityTableExists($entity);
 
-            $offset = max((int) request()->get('offset', 0), 0);
-            $length = min(max((int) request()->get('length', 50), 1), EntityListParams::MAX_LENGTH);
-            $page = (int) floor($offset / $length) + 1;
+            $offset = max((int) $request->query('offset', 0), 0);
+            $length = min(max((int) $request->query('length', 50), 1), EntityListParams::MAX_LENGTH);
 
-            [$mainFieldDefinitions, $metaFieldDefinitions] = $this->resolveEntityFieldDefinitions($entity);
-            $metaTable = $this->resolveMetaTable($entity);
-
-            $query = DB::table($entity);
-            $this->applyScopeToQuery($query, Schema::getColumnListing($entity));
-
-            $listQuery = new DynamicEntityListQuery(
-                $query,
+            [$total, $records] = $this->repository->paginate(
                 $entity,
-                $mainFieldDefinitions,
-                $metaFieldDefinitions,
-                $metaTable
+                $this->parseListFilters($request->query()),
+                $this->parseListSorts((string) $request->query('sort', '')),
+                $offset,
+                $length
             );
 
-            $filters = $this->parseListFilters(request()->query());
-            $sorts   = $this->parseListSorts(request()->get('sort', ''));
-
-            $listQuery
-                ->applyFilters($filters)
-                ->applySort($sorts);
-
-            $totalCount = $listQuery->count();
-            $data = $listQuery->paginate($offset, $length);
-            $data = $this->attachMetaData($entity, $data);
-            $data = $this->transformRecordsForResponse($data);
-
             return ApiResponse::paginated(
-                $data,
-                $totalCount,
+                $this->presenter->many($records),
+                $total,
                 $length,
-                $page,
+                (int) floor($offset / $length) + 1,
                 'Request successful'
             );
         } catch (Throwable $e) {
-            return $this->handleException($e, $entity);
+            return $this->errorResponse($e, $entity);
         }
     }
 
-    protected function parseListFilters(array $queryParams): array
+    public function show(string $entity, string $data_uid)
+    {
+        try {
+            $this->authorizeEntity($entity, 'view');
+            $this->schema->ensureEntityTableExists($entity);
+
+            $record = $this->repository->find($entity, $data_uid);
+
+            if (! $record) {
+                return ApiResponse::error('Record not found', HttpStatusCode::HTTP_NOT_FOUND, [
+                    'entity' => $entity,
+                    'data_uid' => $data_uid,
+                ]);
+            }
+
+            return ApiResponse::success($this->presenter->one($record), 'Request successful');
+        } catch (Throwable $e) {
+            return $this->errorResponse($e, $entity, $data_uid);
+        }
+    }
+
+    public function store(Request $request, string $entity)
+    {
+        try {
+            $this->authorizeEntity($entity, 'create');
+            [$mainData, $metaData] = $this->validatedData($request, $entity, false);
+
+            $record = $this->repository->create($entity, $mainData, $metaData);
+            $this->logDebug("Dynamic entity record created | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+
+            return ApiResponse::created($this->presenter->one($record), 'Record created successfully');
+        } catch (Throwable $e) {
+            return $this->errorResponse($e, $entity);
+        }
+    }
+
+    public function update(Request $request, string $entity, string $data_uid)
+    {
+        try {
+            $this->authorizeEntity($entity, 'update');
+            [$mainData, $metaData] = $this->validatedData($request, $entity, true, $data_uid);
+
+            $record = $this->repository->update($entity, $data_uid, $mainData, $metaData);
+            $this->logDebug("Dynamic entity record updated | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+
+            return ApiResponse::success($this->presenter->one($record), 'Record updated successfully');
+        } catch (Throwable $e) {
+            return $this->errorResponse($e, $entity, $data_uid);
+        }
+    }
+
+    public function delete(string $entity, string $data_uid)
+    {
+        try {
+            $this->authorizeEntity($entity, 'delete');
+            $this->schema->ensureEntityTableExists($entity);
+
+            $record = $this->repository->softDelete($entity, $data_uid);
+            $this->logDebug("Dynamic entity record soft deleted | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+
+            return ApiResponse::success($this->presenter->one($record), 'Record deleted successfully');
+        } catch (Throwable $e) {
+            return $this->errorResponse($e, $entity, $data_uid);
+        }
+    }
+
+    /**
+     * Per-entity permission check; admins always pass. Runs before the
+     * allowlist so callers without permission get 403 whether or not the table
+     * exists, which avoids revealing registered entity names.
+     */
+    private function authorizeEntity(string $entity, string $action): void
+    {
+        if (! EntityPermission::allows(auth()->user(), $entity, $action)) {
+            throw new AuthorizationException("You do not have permission to {$action} {$entity}.");
+        }
+    }
+
+    /**
+     * Allowlist, validate against field definitions, normalize, and check scope.
+     *
+     * @return array{0: array, 1: array} [main data, meta data]
+     */
+    private function validatedData(Request $request, string $entity, bool $isUpdate, ?string $reference = null): array
+    {
+        $schema = $this->schema->writeSchema($entity);
+        $payload = $request->except(self::RESERVED_PAYLOAD_KEYS);
+        $explicitMeta = $request->input('meta', []);
+
+        $this->validator->validate(
+            $entity,
+            $schema['main_field_definitions'],
+            $schema['meta_field_definitions'],
+            array_intersect_key($payload, array_flip($schema['writable_main_columns'])),
+            $this->normalizer->flattenMeta($explicitMeta),
+            $schema['writable_main_columns'],
+            $isUpdate,
+            $isUpdate && $reference !== null ? $this->repository->idFor($entity, $reference) : null
+        );
+
+        $mainData = $this->normalizer->mainData($payload, $schema['main_field_definitions'], $schema['writable_main_columns']);
+        $metaData = $this->normalizer->metaData($schema['meta_field_definitions'], $explicitMeta);
+
+        if (empty($mainData) && empty($metaData)) {
+            throw new \InvalidArgumentException('Request payload is empty.');
+        }
+
+        $this->scope->assertWritePayloadInScope($mainData);
+
+        return [$mainData, $metaData];
+    }
+
+    private function errorResponse(Throwable $e, ?string $entity = null, ?string $reference = null)
+    {
+        [$status, $message, $errors] = $this->errors->map($e, $entity, $reference);
+
+        return ApiResponse::error($message, $status, $errors);
+    }
+
+    /** ?name[like]=john -> [['field' => 'name', 'op' => 'like', 'value' => 'john']]; ?status=active -> eq. */
+    private function parseListFilters(array $queryParams): array
     {
         $reserved = [
             EntityListParams::PARAM_OFFSET,
@@ -120,15 +209,12 @@ class DynamicEntityController extends Controller
             }
 
             if (is_array($value)) {
-                // ?name[like]=john  →  ['name' => ['like' => 'john']]
                 foreach ($value as $op => $opValue) {
-                    if ($opValue === null || $opValue === '') {
-                        continue;
+                    if ($opValue !== null && $opValue !== '') {
+                        $filters[] = ['field' => $key, 'op' => (string) $op, 'value' => $opValue];
                     }
-                    $filters[] = ['field' => $key, 'op' => (string) $op, 'value' => $opValue];
                 }
             } elseif ($value !== null && $value !== '') {
-                // ?status=active  →  equality
                 $filters[] = ['field' => $key, 'op' => EntityListParams::OP_EQ, 'value' => $value];
             }
         }
@@ -136,12 +222,9 @@ class DynamicEntityController extends Controller
         return $filters;
     }
 
-    protected function parseListSorts(string $sortParam): array
+    /** "name,-created_at" -> [['column' => 'name', 'direction' => 'asc'], ['column' => 'created_at', 'direction' => 'desc']]. */
+    private function parseListSorts(string $sortParam): array
     {
-        if ($sortParam === '') {
-            return [];
-        }
-
         $sorts = [];
 
         foreach (explode(',', $sortParam) as $part) {
@@ -151,1232 +234,11 @@ class DynamicEntityController extends Controller
                 continue;
             }
 
-            if (str_starts_with($part, '-')) {
-                $sorts[] = ['column' => substr($part, 1), 'direction' => EntityListParams::DIR_DESC];
-            } else {
-                $sorts[] = ['column' => $part, 'direction' => EntityListParams::DIR_ASC];
-            }
+            $sorts[] = str_starts_with($part, '-')
+                ? ['column' => substr($part, 1), 'direction' => EntityListParams::DIR_DESC]
+                : ['column' => $part, 'direction' => EntityListParams::DIR_ASC];
         }
 
         return $sorts;
-    }
-
-    protected function resolveEntityFieldDefinitions(string $entity): array
-    {
-        $entityDefinition = $this->resolveEntityDefinition($entity);
-
-        return [
-            $this->getMainFieldDefinitions($entityDefinition),
-            $this->getMetaFieldDefinitions($entityDefinition),
-        ];
-    }
-
-    public function show(string $entity, string $data_uid)
-    {
-        try {
-            $this->authorizeEntity($entity, 'view');
-            $this->ensureEntityTableExists($entity);
-
-            $query = DB::table($entity);
-            $referenceColumn = $this->resolveReferenceColumn($entity, $data_uid);
-            $record = $query->where($referenceColumn, $data_uid)->first();
-
-            if (! $record) {
-                return ApiResponse::error(
-                    'Record not found',
-                    HttpStatusCode::HTTP_NOT_FOUND,
-                    ['entity' => $entity, 'data_uid' => $data_uid]
-                );
-            }
-
-            $this->assertRecordInScope($entity, $record);
-
-            $record = $this->attachMetaData($entity, collect([$record]));
-            $record = $this->transformRecordsForResponse($record)->first();
-
-            return ApiResponse::success($record, 'Request successful');
-        } catch (Throwable $e) {
-            return $this->handleException($e, $entity, $data_uid);
-        }
-    }
-
-    public function store(Request $request, string $entity)
-    {
-        try {
-            $this->authorizeEntity($entity, 'create');
-            $this->logStoreRequest($request, $entity);
-
-            $schema = $this->resolveEntitySchema($request, $entity);
-            $this->validateEntityPayload($entity, $schema, $request->input('meta', []), false);
-
-            $mainData = $this->prepareMainData(
-                $schema['payload'],
-                $schema['main_field_definitions'],
-                $schema['table_columns'],
-                $schema['writable_main_columns']
-            );
-            $metaData = $this->prepareMetaData(
-                $schema['payload'],
-                $schema['meta_field_definitions'],
-                $request->input('meta', [])
-            );
-
-            $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
-            $this->assertWritePayloadInScope($mainData);
-
-            $record = $this->createEntityRecord($entity, $mainData, $metaData);
-
-            $this->logInfo(sprintf(
-                'Dynamic entity record created | file=%s | entity=%s | record_id=%s | timestamp=%s',
-                __FILE__,
-                $entity,
-                (string) ($record->id ?? 'null'),
-                now()->toDateTimeString()
-            ));
-
-            $record = $this->attachMetaData($entity, collect([$record]));
-            $record = $this->transformRecordsForResponse($record)->first();
-
-            return ApiResponse::created($record, 'Record created successfully');
-        } catch (Throwable $e) {
-            return $this->handleException($e, $entity);
-        }
-    }
-
-    public function update(Request $request, string $entity, string $data_uid)
-    {
-        try {
-            $this->authorizeEntity($entity, 'update');
-            $this->logUpdateRequest($request, $entity, $data_uid);
-
-            $schema = $this->resolveEntitySchema($request, $entity);
-            $existingId = DB::table($entity)
-                ->where($this->resolveReferenceColumn($entity, $data_uid), $data_uid)
-                ->value('id');
-            $this->validateEntityPayload($entity, $schema, $request->input('meta', []), true, $existingId ? (int) $existingId : null);
-
-            $mainData = $this->prepareUpdateData(
-                $schema['payload'],
-                $schema['main_field_definitions'],
-                $schema['table_columns'],
-                $schema['writable_main_columns']
-            );
-            $metaData = $this->prepareMetaData(
-                $schema['payload'],
-                $schema['meta_field_definitions'],
-                $request->input('meta', [])
-            );
-
-            $this->ensureStorePayloadIsNotEmpty($mainData, $metaData);
-            $this->assertWritePayloadInScope($mainData);
-
-            $record = $this->updateEntityRecord($entity, $data_uid, $mainData, $metaData);
-
-            $this->logInfo(sprintf(
-                'Dynamic entity record updated | file=%s | entity=%s | record_id=%s | reference=%s | timestamp=%s',
-                __FILE__,
-                $entity,
-                (string) ($record->id ?? 'null'),
-                $data_uid,
-                now()->toDateTimeString()
-            ));
-
-            $record = $this->attachMetaData($entity, collect([$record]));
-            $record = $this->transformRecordsForResponse($record)->first();
-
-            return ApiResponse::success($record, 'Record updated successfully');
-        } catch (Throwable $e) {
-            return $this->handleException($e, $entity, $data_uid);
-        }
-    }
-
-    public function delete(string $entity, string $data_uid)
-    {
-        try {
-            $this->authorizeEntity($entity, 'delete');
-            $this->logDeleteRequest($entity, $data_uid);
-
-            $record = $this->softDeleteEntityRecord($entity, $data_uid);
-
-            $this->logInfo(sprintf(
-                'Dynamic entity record soft deleted | file=%s | entity=%s | record_id=%s | reference=%s | timestamp=%s',
-                __FILE__,
-                $entity,
-                (string) ($record->id ?? 'null'),
-                $data_uid,
-                now()->toDateTimeString()
-            ));
-
-            $record = $this->attachMetaData($entity, collect([$record]));
-            $record = $this->transformRecordsForResponse($record)->first();
-
-            return ApiResponse::success($record, 'Record deleted successfully');
-        } catch (Throwable $e) {
-            return $this->handleException($e, $entity, $data_uid);
-        }
-    }
-
-    protected function logStoreRequest(Request $request, string $entity): void
-    {
-        $this->logInfo(sprintf(
-            'DynamicEntityController@store invoked | file=%s | entity=%s | request_keys=%s | timestamp=%s',
-            __FILE__,
-            $entity,
-            json_encode(array_keys($request->all())),
-            now()->toDateTimeString()
-        ));
-    }
-
-    protected function logUpdateRequest(Request $request, string $entity, string $dataUid): void
-    {
-        $this->logInfo(sprintf(
-            'DynamicEntityController@update invoked | file=%s | entity=%s | data_uid=%s | request_keys=%s | timestamp=%s',
-            __FILE__,
-            $entity,
-            $dataUid,
-            json_encode(array_keys($request->all())),
-            now()->toDateTimeString()
-        ));
-    }
-
-    protected function logDeleteRequest(string $entity, string $dataUid): void
-    {
-        $this->logInfo(sprintf(
-            'DynamicEntityController@delete invoked | file=%s | entity=%s | data_uid=%s | timestamp=%s',
-            __FILE__,
-            $entity,
-            $dataUid,
-            now()->toDateTimeString()
-        ));
-    }
-
-    protected function resolveEntitySchema(Request $request, string $entity): array
-    {
-        $this->ensureEntityTableExists($entity);
-
-        $payload = $request->except($this->reservedPayloadKeys);
-        $entityDefinition = $this->resolveEntityDefinition($entity);
-        $tableColumns = Schema::getColumnListing($entity);
-        $mainFieldDefinitions = $this->getMainFieldDefinitions($entityDefinition);
-        $metaFieldDefinitions = $this->getMetaFieldDefinitions($entityDefinition);
-        $writableMainColumns = $this->getWritableMainTableColumns($tableColumns, $mainFieldDefinitions);
-
-        // The store endpoint stays generic by deriving writable columns and types at runtime.
-        $this->logDebug(sprintf(
-            'Dynamic entity store schema resolved | entity=%s | table_columns=%s | main_field_keys=%s | meta_keys=%s',
-            $entity,
-            json_encode($tableColumns),
-            json_encode(array_keys($mainFieldDefinitions)),
-            json_encode(array_keys($metaFieldDefinitions))
-        ));
-
-        return [
-            'payload' => $payload,
-            'table_columns' => $tableColumns,
-            'entity_definition' => $entityDefinition,
-            'main_field_definitions' => $mainFieldDefinitions,
-            'meta_field_definitions' => $metaFieldDefinitions,
-            'writable_main_columns' => $writableMainColumns,
-        ];
-    }
-
-    /**
-     * Per-entity permission check (entity.{table}.{action}); admins always pass.
-     * Runs before the allowlist so callers without permission get 403 whether
-     * or not the table exists, which avoids revealing registered entity names.
-     *
-     * @throws AuthorizationException
-     */
-    protected function authorizeEntity(string $entity, string $action): void
-    {
-        if (! EntityPermission::allows(auth()->user(), $entity, $action)) {
-            throw new AuthorizationException("You do not have permission to {$action} {$entity}.");
-        }
-    }
-
-    /**
-     * Validate the raw payload against the entity's field definitions.
-     *
-     * @throws \Illuminate\Validation\ValidationException
-     */
-    protected function validateEntityPayload(
-        string $entity,
-        array $schema,
-        mixed $explicitMeta,
-        bool $isUpdate,
-        ?int $ignoreId = null
-    ): void {
-        $mainInput = array_intersect_key($schema['payload'], array_flip($schema['writable_main_columns']));
-
-        $metaInput = [];
-        if (is_array($explicitMeta)) {
-            foreach ($explicitMeta as $key => $value) {
-                if (is_int($key) && is_array($value) && isset($value['meta_key'])) {
-                    $key = $value['meta_key'];
-                    $value = $value['meta_value'] ?? null;
-                }
-                $metaInput[$key] = $value;
-            }
-        }
-
-        app(EntityValidator::class)->validate(
-            $entity,
-            $schema['main_field_definitions'],
-            $schema['meta_field_definitions'],
-            $mainInput,
-            $metaInput,
-            $schema['writable_main_columns'],
-            $isUpdate,
-            $ignoreId
-        );
-    }
-
-    protected function prepareMainData(
-        array $payload,
-        array $mainFieldDefinitions,
-        array $tableColumns,
-        array $writableMainColumns
-    ): array
-    {
-        $mainData = $this->extractMainTableData($payload, $mainFieldDefinitions, $writableMainColumns);
-
-        return $this->applySystemDefaults($mainData, $tableColumns, false);
-    }
-
-    protected function prepareUpdateData(
-        array $payload,
-        array $mainFieldDefinitions,
-        array $tableColumns,
-        array $writableMainColumns
-    ): array
-    {
-        $mainData = $this->extractMainTableData($payload, $mainFieldDefinitions, $writableMainColumns);
-        unset($mainData['id'], $mainData['uid']);
-
-        return $this->applySystemDefaults($mainData, $tableColumns, true);
-    }
-
-    protected function ensureStorePayloadIsNotEmpty(array $mainData, array $metaData): void
-    {
-        if (empty($mainData) && empty($metaData)) {
-            throw new \InvalidArgumentException('Request payload is empty.');
-        }
-    }
-
-    protected function createEntityRecord(string $entity, array $mainData, array $metaData): object
-    {
-        return DB::transaction(function () use ($entity, $mainData, $metaData) {
-            $recordId = DB::table($entity)->insertGetId($mainData);
-
-            $this->logInfo(sprintf(
-                'Dynamic entity main row inserted | entity=%s | record_id=%s | main_columns=%s',
-                $entity,
-                (string) $recordId,
-                json_encode(array_keys($mainData))
-            ));
-
-            // Meta rows are saved in the same transaction so partial writes do not survive failures.
-            $this->storeMetaData($entity, $recordId, $metaData);
-
-            return DB::table($entity)->where('id', $recordId)->first();
-        });
-    }
-
-    protected function updateEntityRecord(string $entity, string $dataUid, array $mainData, array $metaData): object
-    {
-        return DB::transaction(function () use ($entity, $dataUid, $mainData, $metaData) {
-            $referenceColumn = $this->resolveReferenceColumn($entity, $dataUid);
-            $existingRecord = DB::table($entity)->where($referenceColumn, $dataUid)->first();
-
-            if (! $existingRecord) {
-                throw new \RuntimeException('Record not found');
-            }
-
-            $this->assertRecordInScope($entity, $existingRecord);
-
-            $mainData = $this->applyMissingCreateAuditDefaults($mainData, $existingRecord);
-
-            if (! empty($mainData)) {
-                DB::table($entity)
-                    ->where('id', $existingRecord->id)
-                    ->update($mainData);
-
-                $this->logInfo(sprintf(
-                    'Dynamic entity main row updated | entity=%s | record_id=%s | reference=%s | main_columns=%s',
-                    $entity,
-                    (string) $existingRecord->id,
-                    $dataUid,
-                    json_encode(array_keys($mainData))
-                ));
-            }
-
-            $this->upsertMetaData($entity, $existingRecord->id, $metaData);
-
-            return DB::table($entity)->where('id', $existingRecord->id)->first();
-        });
-    }
-
-    protected function softDeleteEntityRecord(string $entity, string $dataUid): object
-    {
-        $this->ensureEntityTableExists($entity);
-
-        $tableColumns = Schema::getColumnListing($entity);
-
-        if (! in_array('status', $tableColumns, true)) {
-            throw new \InvalidArgumentException("Table {$entity} does not support soft delete because it has no status column.");
-        }
-
-        return DB::transaction(function () use ($entity, $dataUid, $tableColumns) {
-            $referenceColumn = $this->resolveReferenceColumn($entity, $dataUid);
-            $existingRecord = DB::table($entity)->where($referenceColumn, $dataUid)->first();
-
-            if (! $existingRecord) {
-                throw new \RuntimeException('Record not found');
-            }
-
-            $this->assertRecordInScope($entity, $existingRecord);
-
-            DB::table($entity)
-                ->where('id', $existingRecord->id)
-                ->update($this->buildSoftDeletePayload($tableColumns));
-
-            return DB::table($entity)->where('id', $existingRecord->id)->first();
-        });
-    }
-
-    protected function buildSoftDeletePayload(array $tableColumns): array
-    {
-        $userId = auth()->id() ?? 0;
-        $timestamp = now();
-        $payload = [
-            'status' => EntityStatus::DELETED,
-        ];
-
-        $columnValueMap = [
-            'updated_by' => $userId,
-            'updated_at' => $timestamp,
-            'deleted_by' => $userId,
-            'deleted_at' => $timestamp,
-        ];
-
-        foreach ($columnValueMap as $column => $value) {
-            if (in_array($column, $tableColumns, true)) {
-                $payload[$column] = $value;
-            }
-        }
-
-        return $payload;
-    }
-
-    protected function applyMissingCreateAuditDefaults(array $data, object $existingRecord): array
-    {
-        if (property_exists($existingRecord, 'created_at') && empty($existingRecord->created_at) && ! array_key_exists('created_at', $data)) {
-            $data['created_at'] = now();
-        }
-
-        if (property_exists($existingRecord, 'created_by') && empty($existingRecord->created_by) && ! array_key_exists('created_by', $data)) {
-            $data['created_by'] = auth()->id() ?? 0;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Restrict a list query to the scope-column values the current actor may
-     * access, for every scoped column present on the table.
-     */
-    protected function applyScopeToQuery($query, array $tableColumns): void
-    {
-        foreach (array_intersect($this->scopedColumns, $tableColumns) as $column) {
-            $query->whereIn($column, $this->resolveAllowedIdsForColumn($column));
-        }
-    }
-
-    /**
-     * Deny access to a fetched record if any of its scoped-column values fall
-     * outside what the current actor may access. Throws the same 'Record not
-     * found' RuntimeException used for missing rows, so an out-of-scope
-     * record is indistinguishable from a nonexistent one.
-     */
-    protected function assertRecordInScope(string $entity, object $record): void
-    {
-        $tableColumns = Schema::getColumnListing($entity);
-
-        foreach (array_intersect($this->scopedColumns, $tableColumns) as $column) {
-            $allowedIds = $this->resolveAllowedIdsForColumn($column);
-            $value = $record->{$column} ?? null;
-
-            if ($value === null || ! in_array((int) $value, $allowedIds, true)) {
-                throw new \RuntimeException('Record not found');
-            }
-        }
-    }
-
-    /**
-     * Reject a store/update payload that targets a scoped-column value the
-     * current actor is not allowed to write (e.g. someone else's organisation_id).
-     * Only checks columns actually present in the payload.
-     */
-    protected function assertWritePayloadInScope(array $mainData): void
-    {
-        foreach ($this->scopedColumns as $column) {
-            if (! array_key_exists($column, $mainData)) {
-                continue;
-            }
-
-            $allowedIds = $this->resolveAllowedIdsForColumn($column);
-
-            if (! in_array((int) $mainData[$column], $allowedIds, true)) {
-                throw new \InvalidArgumentException("You do not have access to the specified {$column}.");
-            }
-        }
-    }
-
-    /**
-     * Ask every tagged EntityScopeResolver for the IDs the current actor may
-     * access for a scope column, in registration order, until one claims it.
-     * Fails closed (throws) if the column is recognized as scoped but no
-     * resolver is registered for it — never silently exposes every row.
-     *
-     * @return array<int>
-     */
-    protected function resolveAllowedIdsForColumn(string $column): array
-    {
-        foreach (app()->tagged('entity-scope-resolvers') as $resolver) {
-            $allowed = $resolver->resolveAllowedIds($column);
-
-            if ($allowed !== null) {
-                return $allowed;
-            }
-        }
-
-        throw new \RuntimeException("No access-scope resolver is registered for the '{$column}' column.");
-    }
-
-    protected function ensureEntityTableExists(string $entity): void
-    {
-        if (! $entity) {
-            throw new \InvalidArgumentException('Entity name is required');
-        }
-
-        // Allowlist: only tables backed by a registered entity definition are
-        // reachable. Both failures return the same message so callers cannot
-        // probe which tables exist.
-        try {
-            $this->resolveEntityDefinition($entity);
-        } catch (\RuntimeException) {
-            $this->logWarning("Entity access denied: no entity definition for '{$entity}'");
-            throw new \RuntimeException("Entity {$entity} not found");
-        }
-
-        if (! Schema::hasTable($entity)) {
-            $this->logWarning("Entity fetch failed: Table '{$entity}' not found");
-            throw new \RuntimeException("Entity {$entity} not found");
-        }
-    }
-
-    protected function extractMainTableData(array $payload, array $mainFieldDefinitions, array $writableMainColumns): array
-    {
-        $data = [];
-
-        foreach ($payload as $key => $value) {
-            if (! $this->isWritableMainTableColumn($key, $writableMainColumns)) {
-                continue;
-            }
-
-            if (! array_key_exists($key, $mainFieldDefinitions)) {
-                continue;
-            }
-
-            $fieldDefinition = $mainFieldDefinitions[$key];
-            $this->validateNullability($key, $value, $fieldDefinition);
-            $data[$key] = $this->normalizeValueFromFieldDefinition($key, $value, $fieldDefinition);
-        }
-
-        return $data;
-    }
-
-    protected function prepareMetaData(
-        array $payload,
-        array $metaFieldDefinitions,
-        mixed $explicitMeta = []
-    ): array
-    {
-        $metaData = [];
-
-        if (is_array($explicitMeta)) {
-            foreach ($explicitMeta as $key => $value) {
-                if (is_int($key) && is_array($value) && isset($value['meta_key'])) {
-                    $key = $value['meta_key'];
-                    $value = $value['meta_value'] ?? null;
-                }
-
-                if (! array_key_exists($key, $metaFieldDefinitions)) {
-                    continue;
-                }
-
-                $fieldDefinition = $metaFieldDefinitions[$key];
-                $this->validateNullability($key, $value, $fieldDefinition);
-                $metaData[$key] = $this->normalizeValueFromFieldDefinition($key, $value, $fieldDefinition);
-            }
-        }
-
-        return $metaData;
-    }
-
-    protected function applySystemDefaults(array $data, array $tableColumns, bool $isUpdate = false): array
-    {
-        $userId = auth()->id() ?? 0;
-        $timestamp = now();
-
-        if (! $isUpdate) {
-            if (in_array('uid', $tableColumns, true) && empty($data['uid'])) {
-                $data['uid'] = (string) Str::ulid();
-            }
-
-            if (in_array('status', $tableColumns, true) && ! array_key_exists('status', $data)) {
-                $data['status'] = EntityStatus::ACTIVE;
-            }
-
-            if (in_array('created_by', $tableColumns, true) && ! array_key_exists('created_by', $data)) {
-                $data['created_by'] = $userId;
-            }
-
-            if (in_array('created_at', $tableColumns, true) && ! array_key_exists('created_at', $data)) {
-                $data['created_at'] = $timestamp;
-            }
-        }
-
-        if (in_array('updated_by', $tableColumns, true) && ! array_key_exists('updated_by', $data)) {
-            $data['updated_by'] = $userId;
-        }
-
-        if (in_array('updated_at', $tableColumns, true) && ! array_key_exists('updated_at', $data)) {
-            $data['updated_at'] = $timestamp;
-        }
-
-        return $data;
-    }
-
-    protected function storeMetaData(string $entity, int $recordId, array $metaData): void
-    {
-        $metaTable = $this->resolveMetaTable($entity);
-
-        if (! $metaTable || empty($metaData)) {
-            return;
-        }
-
-        $metaColumns = Schema::getColumnListing($metaTable);
-        $userId = auth()->id() ?? 0;
-
-        foreach ($metaData as $key => $value) {
-            $row = [
-                'ref_parent' => $recordId,
-                'meta_key' => $key,
-                'meta_value' => $this->normalizeMetaValue($value),
-            ];
-
-            if (in_array('status', $metaColumns, true)) {
-                $row['status'] = EntityStatus::ACTIVE;
-            }
-
-            if (in_array('created_by', $metaColumns, true)) {
-                $row['created_by'] = $userId;
-            }
-
-            if (in_array('updated_by', $metaColumns, true)) {
-                $row['updated_by'] = $userId;
-            }
-
-            DB::table($metaTable)->insert($row);
-
-            $this->logDebug(sprintf(
-                'Dynamic entity meta row inserted | entity=%s | meta_table=%s | record_id=%s | meta_key=%s',
-                $entity,
-                $metaTable,
-                (string) $recordId,
-                (string) $key
-            ));
-        }
-    }
-
-    protected function upsertMetaData(string $entity, int $recordId, array $metaData): void
-    {
-        $metaTable = $this->resolveMetaTable($entity);
-
-        if (! $metaTable || empty($metaData)) {
-            return;
-        }
-
-        $metaColumns = Schema::getColumnListing($metaTable);
-        $userId = auth()->id() ?? 0;
-        $timestamp = now();
-
-        foreach ($metaData as $key => $value) {
-            $existingMeta = DB::table($metaTable)
-                ->where('ref_parent', $recordId)
-                ->where('meta_key', $key)
-                ->first();
-
-            $row = $this->buildMetaUpsertRow($metaColumns, $value, $userId, $timestamp, (bool) $existingMeta);
-
-            DB::table($metaTable)->updateOrInsert(
-                [
-                    'ref_parent' => $recordId,
-                    'meta_key' => $key,
-                ],
-                $row
-            );
-
-            $this->logDebug(sprintf(
-                'Dynamic entity meta row upserted | entity=%s | meta_table=%s | record_id=%s | meta_key=%s',
-                $entity,
-                $metaTable,
-                (string) $recordId,
-                (string) $key
-            ));
-        }
-    }
-
-    protected function buildMetaUpsertRow(
-        array $metaColumns,
-        mixed $value,
-        int $userId,
-        mixed $timestamp,
-        bool $metaExists
-    ): array {
-        $row = [
-            'meta_value' => $this->normalizeMetaValue($value),
-        ];
-
-        $columnValueMap = [
-            'status' => EntityStatus::ACTIVE,
-            'updated_by' => $userId,
-            'updated_at' => $timestamp,
-        ];
-
-        foreach ($columnValueMap as $column => $columnValue) {
-            if (in_array($column, $metaColumns, true)) {
-                $row[$column] = $columnValue;
-            }
-        }
-
-        if (! $metaExists) {
-            foreach ([
-                'created_by' => $userId,
-                'created_at' => $timestamp,
-            ] as $column => $columnValue) {
-                if (in_array($column, $metaColumns, true)) {
-                    $row[$column] = $columnValue;
-                }
-            }
-        }
-
-        return $row;
-    }
-
-    protected function resolveReferenceColumn(string $entity, string $dataUid): string
-    {
-        $hasUid = Schema::hasColumn($entity, 'uid');
-        $hasId = Schema::hasColumn($entity, 'id');
-
-        if ($hasUid && is_numeric($dataUid)) {
-            throw new \InvalidArgumentException(
-                "This table uses 'uid' as the primary reference. Please pass a valid UID instead of an ID."
-            );
-        }
-
-        if ($hasUid) {
-            return 'uid';
-        }
-
-        if ($hasId) {
-            return 'id';
-        }
-
-        throw new \InvalidArgumentException("Table {$entity} has no 'uid' or 'id' column to filter by.");
-    }
-
-    protected function attachMetaData(string $entity, $data)
-    {
-        $metaTable = $this->resolveMetaTable($entity);
-
-        if (! $metaTable || $data->isEmpty()) {
-            return $data;
-        }
-
-        $parentIds = $data
-            ->pluck('id')
-            ->filter()
-            ->values();
-
-        if ($parentIds->isEmpty()) {
-            return $data->map(function ($item) {
-                $item->meta = [];
-                return $item;
-            });
-        }
-
-        $metaData = DB::table($metaTable)
-            ->whereIn('ref_parent', $parentIds)
-            ->get();
-
-        $groupedMeta = $metaData->groupBy('ref_parent');
-
-        return $data->map(function ($item) use ($groupedMeta) {
-            $item->meta = $groupedMeta[$item->id] ?? [];
-            return $item;
-        });
-    }
-
-    protected function resolveMetaTable(string $entity): ?string
-    {
-        $possibleMetaTables = [
-            "{$entity}_metas",
-            "{$entity}_meta",
-            Str::singular($entity) . '_meta',
-            Str::singular($entity) . '_metas',
-        ];
-
-        return collect($possibleMetaTables)
-            ->first(fn ($table) => Schema::hasTable($table));
-    }
-
-    protected function resolveEntityDefinition(string $entityTable): FoundationEntity
-    {
-        $entity = FoundationEntity::query()
-            ->whereHas('metas', function ($query) use ($entityTable) {
-                $query->where(function ($metaQuery) use ($entityTable) {
-                    $metaQuery->where('meta_key', 'published_table_name')
-                        ->where('meta_value', $entityTable);
-                })->orWhere(function ($metaQuery) use ($entityTable) {
-                    $metaQuery->where('meta_key', 'table_name')
-                        ->where('meta_value', $entityTable);
-                });
-            })
-            ->first();
-
-        if (! $entity) {
-            throw new \RuntimeException("Entity definition for table {$entityTable} was not found.");
-        }
-
-        return $entity;
-    }
-
-    protected function getMainFieldDefinitions(FoundationEntity $entityDefinition): array
-    {
-        $fields = is_array($entityDefinition->fields) ? $entityDefinition->fields : [];
-        $definitions = [];
-
-        foreach ($fields as $key => $field) {
-            if (! is_array($field)) {
-                continue;
-            }
-
-            $fieldName = $field['name'] ?? (is_string($key) ? $key : null);
-            if (! $fieldName) {
-                continue;
-            }
-
-            $field['name'] = $fieldName;
-            $definitions[$fieldName] = $field;
-        }
-
-        return $definitions;
-    }
-
-    protected function getMetaFieldDefinitions(FoundationEntity $entityDefinition): array
-    {
-        $fields = is_array($entityDefinition->meta_fields) ? $entityDefinition->meta_fields : [];
-        $definitions = [];
-
-        foreach ($fields as $field) {
-            if (! is_array($field) || empty($field['meta_key'])) {
-                continue;
-            }
-
-            $definitions[$field['meta_key']] = $field;
-        }
-
-        return $definitions;
-    }
-
-    protected function getColumnTypes(string $entity, array $columns): array
-    {
-        $types = [];
-
-        foreach ($columns as $column) {
-            $types[$column] = Schema::getColumnType($entity, $column);
-        }
-
-        return $types;
-    }
-
-    protected function getWritableMainTableColumns(array $tableColumns, array $mainFieldDefinitions): array
-    {
-        $schemaColumns = array_keys($mainFieldDefinitions);
-
-        return array_values(array_filter($tableColumns, function ($column) use ($schemaColumns) {
-            return in_array($column, $schemaColumns, true)
-                && ! in_array($column, [
-                    'id',
-                    'uid',
-                    'status',
-                    'created_by',
-                    'updated_by',
-                    'deleted_by',
-                    'created_at',
-                    'updated_at',
-                    'deleted_at',
-                ], true);
-        }));
-    }
-
-    protected function isWritableMainTableColumn(string $column, array $writableMainColumns): bool
-    {
-        // Defense-in-depth guard: create/update already derive their schema from the entity table,
-        // but we keep this explicit allowlist check so only approved main-table columns can be written.
-        // If schema derivation becomes the only trusted source later, this extra check can be removed.
-        return in_array($column, $writableMainColumns, true);
-    }
-
-    protected function normalizeValueFromFieldDefinition(string $column, mixed $value, array $fieldDefinition): mixed
-    {
-        $columnType = $this->mapFieldTypeToColumnType($fieldDefinition['type'] ?? 'string');
-
-        return $this->normalizeValueForColumn($column, $value, $columnType);
-    }
-
-    protected function mapFieldTypeToColumnType(string $fieldType): string
-    {
-        return match (strtolower($fieldType)) {
-            'string', 'varchar' => 'varchar',
-            'text' => 'text',
-            'longtext' => 'longtext',
-            'integer', 'bigint', 'smallint', 'tinyint' => 'integer',
-            'decimal', 'float', 'double', 'real' => 'decimal',
-            'boolean', 'bool' => 'boolean',
-            'date' => 'date',
-            'datetime', 'timestamp' => 'datetime',
-            'time' => 'time',
-            'char', 'uuid', 'ulid' => 'char',
-            'json' => 'json',
-            default => 'text',
-        };
-    }
-
-    protected function validateNullability(string $column, mixed $value, array $fieldDefinition): void
-    {
-        $nullable = (bool) ($fieldDefinition['nullable'] ?? true);
-        $required = (bool) ($fieldDefinition['required'] ?? false);
-
-        if (($value === null || $value === '') && ($required || ! $nullable)) {
-            throw new \InvalidArgumentException("Field {$column} cannot be empty.");
-        }
-    }
-
-    protected function normalizeValueForColumn(string $column, mixed $value, string $columnType): mixed
-    {
-        if ($value === '' && ! in_array($columnType, ['string', 'text', 'mediumtext', 'longtext'], true)) {
-            return null;
-        }
-
-        if ($value === null) {
-            return null;
-        }
-
-        if ($column === 'password' && is_string($value) && $value !== '') {
-            return Hash::needsRehash($value) ? Hash::make($value) : $value;
-        }
-
-        // Column types come from the schema, so normalization stays table-agnostic.
-        return match ($columnType) {
-            'integer', 'bigint', 'mediumint', 'smallint', 'tinyint' => $this->normalizeIntegerValue($column, $value),
-            'float', 'double', 'decimal', 'real' => $this->normalizeFloatValue($column, $value),
-            'boolean', 'bool' => $this->normalizeBooleanValue($column, $value),
-            'json' => $this->normalizeJsonValue($column, $value),
-            'date' => $this->normalizeDateValue($column, $value, 'Y-m-d'),
-            'datetime', 'timestamp' => $this->normalizeDateValue($column, $value, 'Y-m-d H:i:s'),
-            'time' => $this->normalizeDateValue($column, $value, 'H:i:s'),
-            'string', 'text', 'mediumtext', 'longtext', 'char', 'varchar', 'uuid', 'ulid' => $this->normalizeStringValue($value),
-            default => is_array($value) ? json_encode($value) : $value,
-        };
-    }
-
-    protected function normalizeIntegerValue(string $column, mixed $value): ?int
-    {
-        if (is_bool($value)) {
-            return $value ? 1 : 0;
-        }
-
-        if (! is_numeric($value)) {
-            throw new \InvalidArgumentException("Column {$column} expects an integer value.");
-        }
-
-        return (int) $value;
-    }
-
-    protected function normalizeFloatValue(string $column, mixed $value): ?float
-    {
-        if (! is_numeric($value)) {
-            throw new \InvalidArgumentException("Column {$column} expects a numeric value.");
-        }
-
-        return (float) $value;
-    }
-
-    protected function normalizeBooleanValue(string $column, mixed $value): bool
-    {
-        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-
-        if ($normalized === null) {
-            throw new \InvalidArgumentException("Column {$column} expects a boolean value.");
-        }
-
-        return $normalized;
-    }
-
-    protected function normalizeJsonValue(string $column, mixed $value): string
-    {
-        if (is_string($value)) {
-            json_decode($value, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \InvalidArgumentException("Column {$column} expects valid JSON.");
-            }
-
-            return $value;
-        }
-
-        return json_encode($value);
-    }
-
-    protected function normalizeDateValue(string $column, mixed $value, string $format): string
-    {
-        try {
-            return Carbon::parse($value)->format($format);
-        } catch (Throwable) {
-            throw new \InvalidArgumentException("Column {$column} has an invalid date/time value.");
-        }
-    }
-
-    protected function normalizeStringValue(mixed $value): string
-    {
-        if (is_array($value)) {
-            return json_encode($value);
-        }
-
-        return (string) $value;
-    }
-
-    protected function normalizeMetaValue(mixed $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        return is_array($value) ? json_encode($value) : (string) $value;
-    }
-
-    protected function sanitizeRecordForResponse(object $record): object
-    {
-        foreach ($this->sensitiveResponseFields as $field) {
-            if (property_exists($record, $field)) {
-                unset($record->{$field});
-            }
-        }
-
-        if (! isset($record->meta) || ! is_iterable($record->meta)) {
-            return $record;
-        }
-
-        foreach ($record->meta as $metaItem) {
-            if (! isset($metaItem->meta_key)) {
-                continue;
-            }
-
-            if ($this->isSensitiveFieldName((string) $metaItem->meta_key)) {
-                $metaItem->meta_value = '***REDACTED***';
-            }
-        }
-
-        return $record;
-    }
-
-    protected function transformRecordsForResponse($records)
-    {
-        $records = collect($records);
-
-        if ($records->isEmpty()) {
-            return $records;
-        }
-
-        $userNames = $this->resolveUserNamesForRecords($records);
-
-        return $records->map(function ($record) use ($userNames) {
-            $record = $this->sanitizeRecordForResponse($record);
-            $record->detail_summary = $this->buildDetailSummary($record, $userNames);
-
-            return $record;
-        });
-    }
-
-    protected function resolveUserNamesForRecords($records): array
-    {
-        if (! Schema::hasTable('users')) {
-            return [];
-        }
-
-        $userIds = $records
-            ->flatMap(function ($record) {
-                return [
-                    $record->updated_by ?? null,
-                    $record->created_by ?? null,
-                ];
-            })
-            ->filter(fn ($id) => ! is_null($id) && $id !== '')
-            ->unique()
-            ->values();
-
-        if ($userIds->isEmpty()) {
-            return [];
-        }
-
-        return DB::table('users')
-            ->whereIn('id', $userIds)
-            ->pluck('name', 'id')
-            ->map(fn ($name) => (string) $name)
-            ->all();
-    }
-
-    protected function buildDetailSummary(object $record, array $userNames): array
-    {
-        $userId = $record->updated_by ?? $record->created_by ?? null;
-        $timestamp = $record->updated_at ?? $record->created_at ?? null;
-
-        return [
-            'user_name' => $userNames[$userId] ?? null,
-            'display_datetime' => DateTimeHelper::displayDateTime($timestamp),
-        ];
-    }
-
-    protected function isSensitiveFieldName(string $field): bool
-    {
-        $normalizedField = Str::lower($field);
-
-        foreach ($this->sensitiveResponseFields as $sensitiveField) {
-            if ($normalizedField === $sensitiveField || Str::contains($normalizedField, $sensitiveField)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    protected function handleException(Throwable $e, ?string $entity = null, ?string $dataUid = null)
-    {
-        [$status, $message, $errors] = match (true) {
-            $e instanceof ValidationException => [HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY, 'The given data was invalid.', $e->errors()],
-            $e instanceof AuthorizationException => [HttpStatusCode::HTTP_FORBIDDEN, $e->getMessage(), null],
-            $e instanceof \InvalidArgumentException => [HttpStatusCode::HTTP_BAD_REQUEST, $e->getMessage(), null],
-            $e instanceof UniqueConstraintViolationException,
-            $e instanceof QueryException => $this->mapQueryException($e),
-            $e instanceof \RuntimeException => [HttpStatusCode::HTTP_NOT_FOUND, $e->getMessage(), null],
-            default => [HttpStatusCode::HTTP_INTERNAL_SERVER_ERROR, 'Something went wrong while processing entity data.', null],
-        };
-
-        if (! $e instanceof \InvalidArgumentException
-            && ! $e instanceof ValidationException
-            && ! $e instanceof AuthorizationException
-            && ! $e instanceof UniqueConstraintViolationException
-            && ! $e instanceof QueryException
-            && ! $e instanceof \RuntimeException) {
-            $this->logError('Entity Data API Error: ' . $e->getMessage() . ' ' . json_encode([
-                'entity' => $entity ?? 'unknown',
-                'data_uid' => $dataUid,
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'timestamp' => now()->toDateTimeString(),
-            ]));
-        }
-
-        $this->logInfo(sprintf(
-            'Dynamic entity exception mapped | file=%s | entity=%s | data_uid=%s | exception_class=%s | mapped_status=%s | mapped_message=%s | has_errors=%s | timestamp=%s',
-            __FILE__,
-            $entity ?? 'null',
-            $dataUid ?? 'null',
-            get_class($e),
-            (string) $status,
-            $message,
-            ! empty($errors) ? 'true' : 'false',
-            now()->toDateTimeString()
-        ));
-
-        return ApiResponse::error($message, $status, $errors);
-    }
-
-    protected function mapQueryException(QueryException $e): array
-    {
-        $errorInfo = $e->errorInfo ?? [];
-        $sqlState = $errorInfo[0] ?? null;
-        $driverCode = (int) ($errorInfo[1] ?? 0);
-        $driverMessage = $errorInfo[2] ?? $e->getMessage();
-
-        $this->logError(sprintf(
-            'Entity Data DB Error | sql_state=%s | driver_code=%s | file=%s | timestamp=%s | message=%s',
-            $sqlState ?? 'null',
-            (string) $driverCode,
-            __FILE__,
-            now()->toDateTimeString(),
-            $driverMessage
-        ));
-
-        switch (true) {
-            case $sqlState === '23000' && $driverCode === 1062:
-                $field = $this->extractFieldFromDuplicateKeyMessage($driverMessage);
-                $message = $field ? ucfirst($field) . ' already exists.' : 'Duplicate value already exists.';
-                $errors = $field ? [$field => ["The {$field} has already been taken."]] : null;
-
-                return [HttpStatusCode::HTTP_CONFLICT, $message, $errors];
-
-            // Surface common relational integrity failures as client errors instead of leaking SQL details.
-            case $sqlState === '23000' && in_array($driverCode, [1451, 1452], true):
-                return [HttpStatusCode::HTTP_CONFLICT, 'Related record does not exist or cannot be modified because it is in use.', null];
-
-            case $sqlState === '23000' && $driverCode === 1048:
-                $field = $this->extractFieldFromNotNullMessage($driverMessage);
-                $message = $field ? ucfirst($field) . ' is required.' : 'A required field is missing.';
-                $errors = $field ? [$field => ["The {$field} field is required."]] : null;
-
-                return [HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY, $message, $errors];
-        }
-
-        return [HttpStatusCode::HTTP_INTERNAL_SERVER_ERROR, 'Unable to save the record due to a database constraint.', null];
-    }
-
-    protected function extractFieldFromDuplicateKeyMessage(string $message): ?string
-    {
-        if (preg_match("/for key '([^']+)'/i", $message, $matches) !== 1) {
-            return null;
-        }
-
-        $indexName = $matches[1];
-
-        if (str_ends_with($indexName, '_unique')) {
-            $indexName = substr($indexName, 0, -7);
-        }
-
-        $parts = explode('_', $indexName);
-
-        return count($parts) > 1 ? end($parts) : $indexName;
-    }
-
-    protected function extractFieldFromNotNullMessage(string $message): ?string
-    {
-        if (preg_match("/Column '([^']+)' cannot be null/i", $message, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return null;
     }
 }

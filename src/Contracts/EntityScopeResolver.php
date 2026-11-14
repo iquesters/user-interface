@@ -9,7 +9,7 @@ interface EntityScopeResolver
      * (e.g. 'organisation_id') on a dynamic entity table.
      *
      * Return null if this resolver has no opinion on the given column, so
-     * DynamicEntityController can ask the next registered resolver. Return an
+     * EntityScope can ask the next registered resolver. Return an
      * array (possibly empty) once a resolver claims the column — an empty
      * array means the actor has no accessible IDs for it.
      *
