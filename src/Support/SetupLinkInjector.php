@@ -9,6 +9,8 @@ class SetupLinkInjector
 {
     public static function inject(): void
     {
+        static::injectFavicon();
+
         $flagPath = storage_path('app/iquesters_ui_installed.flag');
         $marker = '<!-- IQUESTERS-SETUP-LINK -->';
         // Log::info('[UserInterface] SetupLinkInjector::inject() called.');
@@ -54,6 +56,50 @@ class SetupLinkInjector
         file_put_contents($flagPath, 'done');
 
         Log::info("[UserInterface] Setup link successfully injected into {$viewName}.blade.php");
+    }
+
+    /**
+     * Point the host app's home page favicon at the module's favicon (once).
+     * Separate marker + flag, so installs that already got the setup link get it too.
+     */
+    protected static function injectFavicon(): void
+    {
+        $flagPath = storage_path('app/iquesters_ui_favicon.flag');
+        $marker = '<!-- IQUESTERS-FAVICON -->';
+
+        if (file_exists($flagPath)) {
+            return;
+        }
+
+        $viewPath = resource_path('views/' . static::detectRootView() . '.blade.php');
+
+        if (! file_exists($viewPath)) {
+            return; // created by inject() below; picked up on the next request
+        }
+
+        $content = file_get_contents($viewPath);
+
+        if (str_contains($content, $marker)) {
+            file_put_contents($flagPath, 'done');
+            return;
+        }
+
+        if (! preg_match('/<head[^>]*>/i', $content)) {
+            return;
+        }
+
+        $link = <<<'BLADE'
+        <!-- IQUESTERS-FAVICON -->
+        @if (class_exists(\Iquesters\UserInterface\UserInterfaceServiceProvider::class))
+            <link rel="icon" type="image/png" href="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('img/favicon.png') }}">
+        @endif
+        <!-- IQUESTERS-FAVICON -->
+        BLADE;
+
+        file_put_contents($viewPath, preg_replace('/(<head[^>]*>)/i', '$1' . "\n" . $link, $content, 1));
+        file_put_contents($flagPath, 'done');
+
+        Log::info('[UserInterface] Favicon link injected into the home page.');
     }
 
     protected static function detectRootView(): string
