@@ -35,6 +35,9 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // by the entity API services.
         $this->app->scoped(\Iquesters\UserInterface\Services\Entity\EntitySchemaResolver::class);
 
+        // Module navigation is built once per request (see NavigationMenu).
+        $this->app->scoped(\Iquesters\UserInterface\Support\NavigationMenu::class);
+
         // Foundation's entity builder stores generated schemas in our models.
         $this->app->singleton(\Iquesters\Foundation\Contracts\SchemaModels::class, fn () => new class implements \Iquesters\Foundation\Contracts\SchemaModels {
             public function formSchemaModel(): string { return \Iquesters\UserInterface\Models\FormSchema::class; }
@@ -214,99 +217,10 @@ class UserInterfaceServiceProvider extends ServiceProvider
 
     protected function shareInstalledModules(): void
     {
+        // Still shared with every view (host-app views may use it), but the
+        // modules are loaded once per request by the scoped NavigationMenu.
         View::composer('*', function ($view) {
-
-            $modules = collect();
-
-            /**
-             * Safety checks
-             */
-            if (
-                !Auth::check() ||
-                !Schema::hasTable('modules') ||
-                !Schema::hasTable('navigations') ||
-                !Schema::hasTable('navigation_metas')
-            ) {
-                $view->with('installedModules', $modules);
-                return;
-            }
-
-            try {
-                $user = Auth::user();
-
-                /**
-                 * Fully-qualified package models
-                 */
-                $moduleModel = Module::class;
-                $navigationModel = Navigation::class;
-
-                /**
-                 * STEP 1: Get user-accessible modules
-                 */
-                $modules = $moduleModel::getForUser($user)->values();
-
-                if ($modules->isEmpty()) {
-                    $view->with('installedModules', collect());
-                    return;
-                }
-
-                $moduleIds = $modules->pluck('id')->toArray();
-
-                /**
-                 * STEP 2: Fetch primary navigation order
-                 */
-                $navigation = $navigationModel::where(
-                    'name',
-                    'primary_navigation'
-                )->first();
-
-                $savedOrder = [];
-
-                if ($navigation) {
-                    $savedOrder = json_decode(
-                        $navigation->getMeta('navigation_order') ?? '[]',
-                        true
-                    );
-                }
-
-                $savedOrder = is_array($savedOrder) ? $savedOrder : [];
-
-                /**
-                 * STEP 3: Clean invalid / old module IDs
-                 */
-                $savedOrder = array_values(
-                    array_intersect($savedOrder, $moduleIds)
-                );
-
-                /**
-                 * STEP 4: Append new modules
-                 */
-                $newModules = array_diff($moduleIds, $savedOrder);
-                $finalOrder = array_merge($savedOrder, $newModules);
-
-                /**
-                 * STEP 5: Build ordered module collection
-                 */
-                $orderedModules = collect($finalOrder)
-                    ->map(fn ($id) => $modules->firstWhere('id', $id))
-                    ->filter()
-                    ->values();
-
-                /**
-                 * STEP 6: Share globally
-                 */
-                $view->with('installedModules', $orderedModules);
-
-            } catch (\Throwable $e) {
-                /**
-                 * Fail silently to avoid breaking views
-                 */
-                static::logWarning('Navigation shareInstalledModules failed', [
-                    'error' => $e->getMessage(),
-                ]);
-
-                $view->with('installedModules', collect());
-            }
+            $view->with('installedModules', app(\Iquesters\UserInterface\Support\NavigationMenu::class)->modules());
         });
     }
     

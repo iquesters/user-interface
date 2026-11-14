@@ -25,7 +25,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - `DynamicEntityController` split into entity services.
 - Logging uses foundation's `Loggable`.
 
+### Performance
+- App pages: about 1,200 → 45 queries per page (dashboard ~1 s → ~0.25 s locally). Module navigation is built
+  once per request by the scoped `Support\NavigationMenu` instead of per view composed and per tab include.
+
 ### Fixed
+- Sidebar is rendered on the server: no "Loading menu…" flash after page load, and the current page's module
+  tab and menu item are highlighted. Pages not in any menu still reopen the last-used module.
 - Entity API hides soft-deleted records.
 - Sanctum auto-publish created duplicate migrations.
 - Blade echoes inside HTML comments broke `/form/list`.
