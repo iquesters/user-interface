@@ -51,9 +51,8 @@ class UserInterfaceServiceProvider extends ServiceProvider
         }
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'userinterface');
-        
-        // allow config publish
-        $this->mergeConfigFrom(__DIR__.'/../config/userinterface.php', 'userinterface');
+
+        // Settings live in the DB-backed conf (UserInterfaceConf), not a config file.
         $this->registerAssetRoute();
 
         $uiConf = ConfProvider::from(ModuleEnum::USER_INFE);
