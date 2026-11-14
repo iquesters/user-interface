@@ -1633,7 +1633,12 @@ function setupFormFooter(cardFooter, formMeta, formElement) {
             const rowActions = rows.get(rowKey);
             // A lone action in a row has nothing to space between, so it
             // reads better centered than pinned to the left.
-            const rowJustify = rowActions.length === 1 ? 'justify-content-center' : 'justify-content-between';
+            // An action may set align: 'start' | 'center' | 'end' to override this.
+            const ALIGN_CLASSES = { start: 'justify-content-start', center: 'justify-content-center', end: 'justify-content-end' };
+            const requestedAlign = rowActions.map(a => a.align).find(a => ALIGN_CLASSES[a]);
+            const rowJustify = requestedAlign
+                ? ALIGN_CLASSES[requestedAlign]
+                : (rowActions.length === 1 ? 'justify-content-center' : 'justify-content-between');
 
             const rowFragment = document.createElement('div');
             rowFragment.id = `${cardFooter.id}-item-row-${rowKey}`;
