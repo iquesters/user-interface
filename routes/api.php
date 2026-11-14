@@ -48,8 +48,9 @@ Route::prefix('api')
                 ->name('auth.table');
         });
 
-        // Generic entity CRUD: admin only until per-entity permissions exist.
-        Route::middleware(['auth:sanctum', 'ensure.admin'])->group(function () {
+        // Generic entity CRUD. Each action checks entity.{table}.{view|create|update|delete}
+        // (admins always pass) inside DynamicEntityController.
+        Route::middleware(['auth:sanctum'])->group(function () {
 
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
                 ->name('api.entity.list');

@@ -21,6 +21,8 @@ use Iquesters\UserInterface\Constants\EntityStatus;
 use Iquesters\UserInterface\Http\Query\DynamicEntityListQuery;
 use Iquesters\UserInterface\Services\Entity\EntityValidator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Iquesters\Foundation\Support\EntityPermission;
 use Throwable;
 
 class DynamicEntityController extends Controller
@@ -56,6 +58,7 @@ class DynamicEntityController extends Controller
     public function list(string $entity)
     {
         try {
+            $this->authorizeEntity($entity, 'view');
             $this->ensureEntityTableExists($entity);
 
             $offset = max((int) request()->get('offset', 0), 0);
@@ -171,6 +174,7 @@ class DynamicEntityController extends Controller
     public function show(string $entity, string $data_uid)
     {
         try {
+            $this->authorizeEntity($entity, 'view');
             $this->ensureEntityTableExists($entity);
 
             $query = DB::table($entity);
@@ -199,6 +203,7 @@ class DynamicEntityController extends Controller
     public function store(Request $request, string $entity)
     {
         try {
+            $this->authorizeEntity($entity, 'create');
             $this->logStoreRequest($request, $entity);
 
             $schema = $this->resolveEntitySchema($request, $entity);
@@ -241,6 +246,7 @@ class DynamicEntityController extends Controller
     public function update(Request $request, string $entity, string $data_uid)
     {
         try {
+            $this->authorizeEntity($entity, 'update');
             $this->logUpdateRequest($request, $entity, $data_uid);
 
             $schema = $this->resolveEntitySchema($request, $entity);
@@ -287,6 +293,7 @@ class DynamicEntityController extends Controller
     public function delete(string $entity, string $data_uid)
     {
         try {
+            $this->authorizeEntity($entity, 'delete');
             $this->logDeleteRequest($entity, $data_uid);
 
             $record = $this->softDeleteEntityRecord($entity, $data_uid);
@@ -371,6 +378,20 @@ class DynamicEntityController extends Controller
             'meta_field_definitions' => $metaFieldDefinitions,
             'writable_main_columns' => $writableMainColumns,
         ];
+    }
+
+    /**
+     * Per-entity permission check (entity.{table}.{action}); admins always pass.
+     * Runs before the allowlist so callers without permission get 403 whether
+     * or not the table exists, which avoids revealing registered entity names.
+     *
+     * @throws AuthorizationException
+     */
+    protected function authorizeEntity(string $entity, string $action): void
+    {
+        if (! EntityPermission::allows(auth()->user(), $entity, $action)) {
+            throw new AuthorizationException("You do not have permission to {$action} {$entity}.");
+        }
     }
 
     /**
@@ -1256,6 +1277,7 @@ class DynamicEntityController extends Controller
     {
         [$status, $message, $errors] = match (true) {
             $e instanceof ValidationException => [HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY, 'The given data was invalid.', $e->errors()],
+            $e instanceof AuthorizationException => [HttpStatusCode::HTTP_FORBIDDEN, $e->getMessage(), null],
             $e instanceof \InvalidArgumentException => [HttpStatusCode::HTTP_BAD_REQUEST, $e->getMessage(), null],
             $e instanceof UniqueConstraintViolationException,
             $e instanceof QueryException => $this->mapQueryException($e),
@@ -1265,6 +1287,7 @@ class DynamicEntityController extends Controller
 
         if (! $e instanceof \InvalidArgumentException
             && ! $e instanceof ValidationException
+            && ! $e instanceof AuthorizationException
             && ! $e instanceof UniqueConstraintViolationException
             && ! $e instanceof QueryException
             && ! $e instanceof \RuntimeException) {

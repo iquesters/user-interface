@@ -8,7 +8,8 @@ use Iquesters\UserInterface\Tests\TestCase;
 class RouteProtectionTest extends TestCase
 {
     /** Route-name prefixes that must be admin-only. */
-    private const ADMIN_ROUTE_PREFIXES = ['ui.', 'form.', 'table.', 'api.entity.', 'master-data.update'];
+    /** Builder routes stay admin-only; the entity API and ui.* screens use per-entity permissions. */
+    private const ADMIN_ROUTE_PREFIXES = ['form.', 'table.', 'master-data.update'];
 
     public function test_builder_entity_and_generic_ui_routes_require_admin(): void
     {
@@ -26,7 +27,7 @@ class RouteProtectionTest extends TestCase
             $checked++;
         }
 
-        $this->assertGreaterThan(20, $checked, 'Expected the builder/entity routes to be registered.');
+        $this->assertGreaterThan(14, $checked, 'Expected the builder/entity routes to be registered.');
     }
 
     public function test_save_form_requires_admin(): void
