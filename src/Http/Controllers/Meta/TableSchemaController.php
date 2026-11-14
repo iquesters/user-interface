@@ -2,16 +2,18 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
+use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Routing\Controller;
 use Iquesters\UserInterface\Models\TableSchema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class TableSchemaController extends Controller
 {
+    use Loggable;
+
 
     /**
      * Display a listing of the resource.
@@ -132,7 +134,7 @@ class TableSchemaController extends Controller
         //     $table_data['slug'] = $request['slug'];
         // }
 
-        Log::info('table id=' . json_encode($id));
+        static::logInfo('table id=' . json_encode($id));
         // Log::info('table_data=' . json_encode($table_data));
         // create table
         $result = TableSchema::where(['id' => $id])->update([

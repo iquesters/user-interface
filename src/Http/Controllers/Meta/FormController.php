@@ -2,12 +2,12 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
+use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Routing\Controller;
 use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
 use Iquesters\UserInterface\Models\FormSchema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Iquesters\UserInterface\Http\Requests\DynamicFormRequest;
@@ -15,6 +15,8 @@ use Iquesters\UserInterface\Support\DynamicFormSchema;
 
 class FormController extends Controller
 {
+    use Loggable;
+
     /**
      * Display a listing of the resource.
      * 
@@ -127,7 +129,7 @@ class FormController extends Controller
         //     $form_data['slug'] = $request['slug'];
         // }
 
-        Log::info('form id=' . json_encode($id));
+        static::logInfo('form id=' . json_encode($id));
         // Log::info('form_data=' . json_encode($form_data));
         // create form
         $result = FormSchema::where(['id' => $id])->update([
@@ -166,7 +168,7 @@ class FormController extends Controller
             $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
-        Log::info('Form data: ' . json_encode($data));
+        static::logInfo('Form data: ' . json_encode($data));
         return view('userinterface::form-schemas.formcreation', compact('data'));
     }
 
@@ -182,7 +184,7 @@ class FormController extends Controller
             $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
-        Log::info('Form data: ' . json_encode($data));
+        static::logInfo('Form data: ' . json_encode($data));
         return view('userinterface::form-schemas.formcreation_new', compact('data'));
     }
 
@@ -207,7 +209,7 @@ class FormController extends Controller
 
             return back()->with('success', 'Form submitted successfully');
         } catch (\Throwable $e) {
-            Log::error('Form submission error: ' . $e->getMessage());
+            static::logError('Form submission error: ' . $e->getMessage());
 
             return back()->withErrors(['form_error' => 'An error occurred while submitting the form.'])->withInput();
         }
@@ -240,7 +242,7 @@ class FormController extends Controller
 
     public function getNoAuthFormSchema($slug)
     {
-        Log::info("No Auth: Fetching form schema for slug: " . $slug);
+        static::logInfo("No Auth: Fetching form schema for slug: " . $slug);
         return $this->getFormSchema($slug);
     }
 

@@ -2,6 +2,7 @@
 
 namespace Iquesters\UserInterface;
 
+use Iquesters\Foundation\System\Traits\Loggable;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Console\Command;
@@ -15,12 +16,13 @@ use Iquesters\Foundation\Models\Module;
 use Iquesters\Foundation\Models\Navigation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Log;
 use Diglactic\Breadcrumbs\Breadcrumbs;
 use Illuminate\Support\Facades\File;
 
 class UserInterfaceServiceProvider extends ServiceProvider
 {
+    use Loggable;
+
     public function register()
     {
         // Register User Interface configuration
@@ -210,22 +212,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
         Route::get('/vendor/userinterface/{path}', $serve)->where('path', '.*')->name('userinterface.asset.legacy');
     }
     
-    /**
-     * Share installed modules with all views.
-     */
-    // protected function shareInstalledModules(): void
-    // {
-    //     View::composer('*', function ($view) {
-    //         $modules = collect();
-            
-    //         if (Schema::hasTable('modules') && Auth::check()) {
-    //             $user = Auth::user();
-    //             $modules = Module::getForUser($user);
-    //         }
 
-    //         $view->with('installedModules', $modules);
-    //     });
-    // }
     protected function shareInstalledModules(): void
     {
         View::composer('*', function ($view) {
@@ -315,7 +302,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
                 /**
                  * Fail silently to avoid breaking views
                  */
-                logger()->warning('Navigation shareInstalledModules failed', [
+                static::logWarning('Navigation shareInstalledModules failed', [
                     'error' => $e->getMessage(),
                 ]);
 
@@ -424,7 +411,7 @@ class UserInterfaceServiceProvider extends ServiceProvider
             }
             return $userTheme;
         } catch (\Exception $e) {
-            Log::error('Failed to get user theme', ['error' => $e->getMessage()]);
+            static::logError('Failed to get user theme', ['error' => $e->getMessage()]);
             return 'default';
         }
     }
