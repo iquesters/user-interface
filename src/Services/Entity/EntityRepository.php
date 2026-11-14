@@ -26,7 +26,7 @@ class EntityRepository
     }
 
     /** @return array{0: int, 1: Collection} [total count, page of records with meta] */
-    public function paginate(string $table, array $filters, array $sorts, int $offset, int $length): array
+    public function paginate(string $table, array $filters, array $sorts, int $offset, int $length, ?string $search = null): array
     {
         [$main, $meta] = $this->schema->fieldDefinitions($table);
 
@@ -35,6 +35,7 @@ class EntityRepository
 
         $listQuery = (new DynamicEntityListQuery($query, $table, $main, $meta, $this->schema->metaTable($table)))
             ->applyFilters($filters)
+            ->applySearch($search)
             ->applySort($sorts);
 
         $total = $listQuery->count();

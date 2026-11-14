@@ -87,6 +87,47 @@ class DynamicEntityListQuery
     }
 
     /**
+     * Free-text search: a row matches when any text-like main column or any
+     * of its meta values contains the term (case-insensitive under the
+     * default collations). LIKE wildcards in the term are matched literally.
+     */
+    public function applySearch(?string $term): static
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $this;
+        }
+
+        $term = mb_substr($term, 0, EntityListParams::MAX_SEARCH_LENGTH);
+        $like = '%' . addcslashes($term, '\\%_') . '%';
+
+        $columns = array_keys(array_filter(
+            $this->mainFieldDefinitions,
+            fn (array $definition) => $this->isSearchableType($definition['type'] ?? 'string')
+        ));
+        $metaTable = $this->metaTable;
+
+        if (empty($columns) && ! $metaTable) {
+            return $this;
+        }
+
+        $this->query->where(function (Builder $where) use ($columns, $metaTable, $like) {
+            foreach ($columns as $column) {
+                $where->orWhere($column, 'LIKE', $like);
+            }
+
+            if ($metaTable) {
+                $where->orWhereIn('id', function (Builder $sub) use ($metaTable, $like) {
+                    $sub->select('ref_parent')->from($metaTable)->where('meta_value', 'LIKE', $like);
+                });
+            }
+        });
+
+        return $this;
+    }
+
+    /**
      * @param array<int, array{column: string, direction: string}> $sorts
      */
     public function applySort(array $sorts): static
@@ -252,6 +293,11 @@ class DynamicEntityListQuery
             EntityListParams::OP_LTE => '<=',
             default                  => '=',
         };
+    }
+
+    private function isSearchableType(string $type): bool
+    {
+        return in_array(strtolower($type), ['string', 'varchar', 'text', 'char', 'longtext', 'mediumtext', 'tinytext', 'email'], true);
     }
 
     private function isStringSortableType(string $type): bool

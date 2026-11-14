@@ -117,14 +117,22 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         .map(col => ({
             data: null,
             title: col.title,
-            orderable: col.orderable !== false, // ✅ Respect column's orderable setting
+            // Sortable only when the server can sort it (main column or meta key).
+            orderable: col.orderable !== false && resolveSortField(col) !== null,
             render: (row) => renderCell(col, row, rootFormSchemaUid),
         }))
 ];
 
+    // Server field per DataTables column index (0 = checkbox) for sorting.
+    tableElement.__sortFields = [
+        null,
+        ...columns.filter(c => c.visible !== false).map(col => resolveSortField(col)),
+    ];
+
     $(tableElement).DataTable({
         ...dtConfig,
         pageLength: cache.pageSize,
+        order: [],
         columns: resolvedColumns,
         columnDefs: [
             {
@@ -179,6 +187,39 @@ function renderCell(col, row, rootFormSchemaUid) {
     return val;
 }
 
+/**
+ * Server field a column sorts by: "name" → name, "meta.city" → city (meta
+ * key); nested relation paths ("creator.name") can't be sorted server-side.
+ */
+function resolveSortField(col) {
+    const data = typeof col?.data === 'string' ? col.data : '';
+    if (!data) return null;
+    if (data.startsWith('meta.')) return data.slice(5) || null;
+    return data.includes('.') ? null : data;
+}
+
+/**
+ * Search term + sort from the DataTables request, in the list API's format
+ * (?search=term&sort=name,-created_at).
+ */
+function buildListQuery(params, tableElement) {
+    const query = {};
+    const search = (params.search?.value || '').trim();
+    if (search) query.search = search;
+
+    const sortFields = tableElement?.__sortFields || [];
+    const sort = (params.order || [])
+        .map(({ column, dir }) => {
+            const field = sortFields[column];
+            return field ? (dir === 'desc' ? `-${field}` : field) : null;
+        })
+        .filter(Boolean)
+        .join(',');
+    if (sort) query.sort = sort;
+
+    return query;
+}
+
 // ---------------------------
 // 🔁 ENHANCED AJAX FETCH HANDLER
 // ---------------------------
@@ -192,6 +233,16 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     if (cache.pageSize !== length) {
         console.log(`${TABLE_LOG_PAGE_SIZE_CHANGED} ${cache.pageSize} → ${length}`);
         cache.pageSize = length;
+    }
+
+    // Cached rows belong to one search/sort; a new one starts a fresh cache.
+    const query = buildListQuery(params, tableElement);
+    const queryKey = JSON.stringify(query);
+    if (cache.queryKey !== queryKey) {
+        cache.clear();
+        cache.total = 0;
+        cache.queryKey = queryKey;
+        cache.query = query;
     }
 
     // Check cache first
@@ -217,8 +268,14 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     console.log(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
-    const result = await fetchEntityData(entityName, start, length);
-    
+    const result = await fetchEntityData(entityName, start, length, query);
+
+    // The user changed the search/sort while this was loading: drop it
+    // (DataTables also ignores the stale draw).
+    if (cache.queryKey !== queryKey) {
+        return;
+    }
+
     if (result.success && result.data) {
         cache.set(start, result.data, result.total);
         
@@ -255,10 +312,12 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
     if (cache.hasRange(nextOffset, currentLength)) return;
 
     console.log(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
-    
-    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength)
+
+    const queryKey = cache.queryKey;
+    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {})
         .then(result => {
-            if (result.success && result.data?.length) {
+            // Ignore a prefetch for a search/sort that is no longer active.
+            if (cache.queryKey === queryKey && result.success && result.data?.length) {
                 cache.set(nextOffset, result.data, result.total);
                 console.log(`${TABLE_LOG_PREFETCH_COMPLETE} ${result.data.length} rows`);
             }

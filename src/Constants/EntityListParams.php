@@ -9,9 +9,13 @@ class EntityListParams
     const PARAM_LENGTH = 'length';
     const PARAM_SORT   = 'sort';
     const PARAM_FILTER = 'filter';
+    const PARAM_SEARCH = 'search';
 
     // Upper bound for the `length` page-size parameter
     const MAX_LENGTH = 100;
+
+    // Longer free-text search terms are cut to this length
+    const MAX_SEARCH_LENGTH = 100;
 
     // Filter operators
     const OP_EQ     = 'eq';

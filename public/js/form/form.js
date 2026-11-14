@@ -194,13 +194,104 @@ function buildFormRoute(formId, entityUid, mode = 'view') {
     return `/${mode}/${formId}/${entityUid}`;
 }
 
-function getInlineLoaderHtml() {
-    return `
-        <div class="d-flex justify-content-center align-items-center gap-2 text-muted py-4">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading...</span>
-        </div>
-    `;
+/**
+ * Loading placeholder shaped like the form setupForm() will render, so the
+ * swap to the real form doesn't jump: same card padding, header (title, plus
+ * the Edit/Delete links in view mode), field grid (same column classes via
+ * resolveFieldSizeConfig/addFieldSize), label height, value box / input /
+ * textarea heights, and footer buttons only when the form will have them.
+ *
+ * @param {object|null} schema   form schema if known (cached); null → generic shape
+ * @param {string}      formMode 'view' | 'edit' | 'create' | 'delete'
+ * @returns {HTMLElement} element with class "form-skeleton"
+ */
+function buildFormSkeletonElement(schema = null, formMode = 'edit') {
+    const meta = schema ? applyModeOverrides({ ...schema, formMode }) : { formMode };
+    const readOnly = formMode === 'view';
+    const bar = (classes, style) => `<div class="bg-info-subtle rounded ${classes}" style="${style}"></div>`;
+
+    const skeleton = document.createElement(HTML_TAG.DIV);
+    skeleton.className = 'form-skeleton placeholder-wave w-100 p-1';
+    skeleton.dataset.shaped = schema ? '1' : '0';
+    skeleton.setAttribute('aria-busy', 'true');
+
+    // Header: title bar; view mode also shows the Edit / Delete links.
+    const hasHeader = schema ? Boolean(resolveFormHeaderConfig(meta).text) : true;
+    if (hasHeader) {
+        const header = document.createElement(HTML_TAG.DIV);
+        header.className = 'd-flex align-items-center justify-content-between gap-2 mb-2';
+        header.style.minHeight = '31px';
+        header.innerHTML = bar('', 'width: 40%; height: 1.1rem;')
+            + (readOnly ? `<div class="d-flex gap-3">${bar('', 'width: 2.5rem; height: 0.9rem;')}${bar('', 'width: 3rem; height: 0.9rem;')}</div>` : '');
+        skeleton.appendChild(header);
+    }
+
+    // Fields: real column classes; label line + control at its real height.
+    const fields = schema && Array.isArray(schema.fields)
+        ? schema.fields.filter((field) => field && field.type !== 'hidden')
+        : [{}, {}, {}, {}];
+    const row = document.createElement(HTML_TAG.DIV);
+    row.className = 'row g-2';
+
+    fields.forEach((field) => {
+        const col = document.createElement(HTML_TAG.DIV);
+        const isSpacer = typeof isSpacerField === 'function' && isSpacerField(field);
+        const sizeConfig = isSpacer ? resolveSpacerSizeConfig(field) : resolveFieldSizeConfig(field, meta);
+        addFieldSize({ _resolvedSize: sizeConfig }, col);
+
+        if (!isSpacer) {
+            const rows = Math.max(1, parseInt(field.rows, 10) || 2);
+            const controlHeight = readOnly
+                ? 'calc(1.5rem + 0.5rem + 2px)'                    // plaintext box: p-1 + border
+                : (field.type === 'textarea'
+                    ? `calc(${rows} * 1.5rem + 0.75rem + 2px)`     // textarea rows
+                    : 'calc(1.5rem + 0.75rem + 2px)');             // .form-control
+            const hasLabel = !schema || Boolean(field.label);
+
+            col.innerHTML = (hasLabel
+                ? `<div class="d-flex align-items-center mb-2" style="height: 1.5rem;">${bar('col-5', 'height: 1rem;')}</div>`
+                : '')
+                + bar('col-12', `height: ${controlHeight};`);
+        }
+
+        row.appendChild(col);
+    });
+    skeleton.appendChild(row);
+
+    // Footer: none in view mode; otherwise the action/submit/cancel buttons.
+    if (!readOnly) {
+        const actions = Array.isArray(meta.actions) ? meta.actions : [];
+        const buttonCount = actions.length > 0
+            ? actions.length + (meta.allowCancel && !actions.some((a) => a?.type === 'cancel') ? 1 : 0)
+            : (meta.allowCancel ? 1 : 0) + ((meta.submitButtonLabel || meta.allowSubmit) ? 1 : 0);
+        const align = { start: 'justify-content-start', center: 'justify-content-center', end: 'justify-content-end' }[
+            actions.map((a) => a?.align).find(Boolean)
+        ] || 'justify-content-end';
+
+        if (buttonCount > 0) {
+            const footer = document.createElement(HTML_TAG.DIV);
+            footer.className = `d-flex align-items-center ${align} gap-2 mt-2`;
+            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 80px; height: 31px;')).join('');
+            skeleton.appendChild(footer);
+        }
+    }
+
+    return skeleton;
+}
+
+/**
+ * Show a form-shaped skeleton in a container while a form loads.
+ */
+function showFormSkeleton(container, schema = null, formMode = 'edit') {
+    container.innerHTML = '';
+    container.appendChild(buildFormSkeletonElement(schema, formMode));
+}
+
+/**
+ * Cached schema for a form id, if already fetched (no request).
+ */
+function getCachedFormSchema(formId) {
+    return formId && typeof formSchemaCache !== 'undefined' ? formSchemaCache.get(formId) || null : null;
 }
 
 function resolveInboxDetailContext(formElement) {
@@ -281,7 +372,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
         return;
     }
 
-    detailContainer.innerHTML = getInlineLoaderHtml();
+    showFormSkeleton(detailContainer, getCachedFormSchema(formMeta.id), nextMode);
 
     const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.lab-form');
 
@@ -474,6 +565,15 @@ function appendViewModeActions(container, formMeta, formElement) {
 async function setupForm(formElement) {
     console.log("setuping lab-form...")
     console.log("formId = " + formElement.id)
+
+    // The server renders a generic skeleton when it can't resolve the schema
+    // (e.g. reusable form templates in the table split view). If the schema
+    // is already cached, swap in the exact shape before the first paint.
+    const serverSkeleton = formElement.querySelector('.form-skeleton');
+    const cachedSchema = getCachedFormSchema(formElement.id);
+    if (serverSkeleton && serverSkeleton.dataset.shaped !== '1' && cachedSchema) {
+        serverSkeleton.replaceWith(buildFormSkeletonElement(cachedSchema, formElement.dataset.formMode || 'edit'));
+    }
 
     let schemaMeta = formElement.dataset.formMeta
     if (schemaMeta) {

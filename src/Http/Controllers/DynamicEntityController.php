@@ -57,7 +57,8 @@ class DynamicEntityController extends Controller
                 $this->parseListFilters($request->query()),
                 $this->parseListSorts((string) $request->query('sort', '')),
                 $offset,
-                $length
+                $length,
+                is_string($request->query(EntityListParams::PARAM_SEARCH)) ? $request->query(EntityListParams::PARAM_SEARCH) : null
             );
 
             return ApiResponse::paginated(
@@ -199,6 +200,7 @@ class DynamicEntityController extends Controller
             EntityListParams::PARAM_LENGTH,
             EntityListParams::PARAM_SORT,
             EntityListParams::PARAM_FILTER,
+            EntityListParams::PARAM_SEARCH,
         ];
 
         $filters = [];

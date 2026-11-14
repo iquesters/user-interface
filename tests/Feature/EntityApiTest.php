@@ -123,6 +123,41 @@ class EntityApiTest extends TestCase
         $this->deleteJson("/api/entity/delete/demo_items/{$uid}")->assertNotFound();
     }
 
+    public function test_search_matches_text_columns(): void
+    {
+        $this->actingAsAdmin();
+
+        // "Item 11" matches Item 11 and Item 110..119.
+        $this->getJson('/api/entity/list/demo_items?search=item%2011&length=100')
+            ->assertOk()
+            ->assertJsonPath('response_schema.meta.pagination.total', 11);
+
+        // Empty search returns everything.
+        $this->getJson('/api/entity/list/demo_items?search=&length=10')
+            ->assertJsonPath('response_schema.meta.pagination.total', 120);
+    }
+
+    public function test_search_treats_like_wildcards_literally(): void
+    {
+        $this->actingAsAdmin();
+        DB::table('demo_items')->insert(['uid' => (string) Str::ulid(), 'name' => '100% done', 'status' => 'active']);
+
+        $this->getJson('/api/entity/list/demo_items?search=' . rawurlencode('%') . '&length=100')
+            ->assertOk()
+            ->assertJsonPath('response_schema.meta.pagination.total', 1);
+        $this->getJson('/api/entity/list/demo_items?search=_&length=100')
+            ->assertJsonPath('response_schema.meta.pagination.total', 0);
+    }
+
+    public function test_search_combines_with_sort(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->getJson('/api/entity/list/demo_items?search=item%2011&sort=-name&length=1')
+            ->assertOk()
+            ->assertJsonPath('response_schema.data.0.name', 'Item 119');
+    }
+
     public function test_unregistered_table_is_not_modified(): void
     {
         $this->actingAsAdmin();

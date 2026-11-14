@@ -160,7 +160,8 @@
       @if($recaptchaAction) data-recaptcha-action="{{ $recaptchaAction }}" @endif>
     @csrf
 
-  <div class="form-skeleton">
+  {{-- data-shaped: 1 when built from the real schema; form.js replaces a generic one when it has the schema cached --}}
+  <div class="form-skeleton" data-shaped="{{ $rawSchema ?? null ? '1' : '0' }}">
     @if ($skeletonHasHeader)
     <!-- Header Section -->
     <div class="mb-4">

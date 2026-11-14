@@ -9,11 +9,15 @@ function removeTableSkeleton(tableElement) {
     tableElement.classList.remove(TABLE_CLASS_HIDDEN);
 }
 
-async function fetchEntityData(entity, offset = 0, length = 50) {
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, {
-        offset,
-        length
-    });
+/**
+ * @param {object} query optional { search, sort } list parameters (see buildListQuery)
+ */
+async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
+    const params = { offset, length };
+    if (query.search) params.search = query.search;
+    if (query.sort) params.sort = query.sort;
+
+    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
