@@ -43,6 +43,6 @@
     </main>
 
     @include('userinterface::layouts.common.snackbar')
-    @include('userinterface::layouts.common.js')
+    @include('userinterface::layouts.common.js', ['isAuth' => true])
 </body>
 </html>

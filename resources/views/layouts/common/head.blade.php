@@ -27,7 +27,7 @@
     <!-- Title -->
     <title>@yield('page-title', config('app.name', 'Iquesters'))</title>
 
-    <link rel="icon" type="image/x-icon" href="{{ route('userinterface.asset', ['path' => 'img/favicon.png']) }}">
+    <link rel="icon" type="image/x-icon" href="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('img/favicon.png') }}">
 
     {{-- ✅ Only load reCAPTCHA when on auth layout --}}
     @if (!empty($isAuth) && class_exists(\Iquesters\UserManagement\UserManagementServiceProvider::class))

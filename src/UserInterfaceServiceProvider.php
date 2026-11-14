@@ -81,9 +81,11 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // Share installed modules globally
         $this->shareInstalledModules();
 
+        // 'laravel-assets' is re-published by every Laravel app after `composer update`
+        // (post-update-cmd), so module JS/CSS updates reach public/ automatically.
         $this->publishes([
             __DIR__ . '/../public' => public_path('vendor/userinterface'),
-        ], 'user-userinterface-assets');
+        ], ['laravel-assets', 'user-userinterface-assets']);
     }
 
     /**
@@ -198,9 +200,14 @@ class UserInterfaceServiceProvider extends ServiceProvider
     protected function registerAssetRoute(): void
     {
         // Serve only files inside this module's public/ dir (no path traversal, static types only).
-        Route::get('/vendor/userinterface/{path}', function ($path) {
-            return \Iquesters\Foundation\Support\PackageAsset::response(__DIR__ . '/../public', $path);
-        })->where('path', '.*')->name('userinterface.asset');
+        // The fallback lives under /module-assets/ so it never collides with the published
+        // copy in public/vendor/userinterface (which the web server serves directly).
+        $serve = fn ($path) => \Iquesters\Foundation\Support\PackageAsset::response(__DIR__ . '/../public', $path);
+
+        Route::get('/module-assets/userinterface/{path}', $serve)->where('path', '.*')->name('userinterface.asset');
+
+        // Legacy URL, kept for hard-coded links (when assets are not published).
+        Route::get('/vendor/userinterface/{path}', $serve)->where('path', '.*')->name('userinterface.asset.legacy');
     }
     
     /**
@@ -343,11 +350,11 @@ class UserInterfaceServiceProvider extends ServiceProvider
         // If it contains "::" format, convert to path
         if (str_contains($customLogo, '::')) {
             $path = str_replace('::', '/', $customLogo);
-            return route('userinterface.asset', ['path' => $path]);
+            return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $path, 'userinterface.asset');
         }
 
         // For regular relative paths, use the asset route
-        return route('userinterface.asset', ['path' => ltrim($customLogo, '/')]);
+        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', ltrim($customLogo, '/'), 'userinterface.asset');
     }
 
 
@@ -370,37 +377,17 @@ class UserInterfaceServiceProvider extends ServiceProvider
     /**
      * Get the CSS URL for the package
      */
-    public static function getCssUrl(string $file = 'css/app.css',bool $defaultcache = true): string
+    public static function getCssUrl(string $file = 'css/app.css', bool $defaultcache = true): string
     {
-        return route('userinterface.asset', [
-            'path' => $file,
-            'v'    => self::getAssetVersion($file),
-        ]);
-        // $params = ['path' => $file];
-
-        // if ($defaultcache) {
-        //     $params['v'] = self::getAssetVersion($file);
-        // }
-
-        // return route('userinterface.asset', $params);
+        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $file, 'userinterface.asset');
     }
     
     /**
      * Get the JS URL for the package
      */
-    public static function getJsUrl(string $file = 'js/app.js',bool $defaultcache = true): string
+    public static function getJsUrl(string $file = 'js/app.js', bool $defaultcache = true): string
     {
-        return route('userinterface.asset', [
-            'path' => $file,
-            'v'    => self::getAssetVersion($file),
-        ]);
-        // $params = ['path' => $file];
-
-        // if ($defaultcache) {
-        //     $params['v'] = self::getAssetVersion($file);
-        // }
-
-        // return route('userinterface.asset', $params);
+        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $file, 'userinterface.asset');
     }
 
 
