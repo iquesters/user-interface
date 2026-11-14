@@ -1643,6 +1643,10 @@ function setupFormFooter(cardFooter, formMeta, formElement) {
             const rowFragment = document.createElement('div');
             rowFragment.id = `${cardFooter.id}-item-row-${rowKey}`;
             rowFragment.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, rowJustify, STYLE_CLASS.GAP_2, 'mb-3']);
+            // Keep the first action row from touching the last field.
+            if (rowKey === sortedRowKeys[0]) {
+                rowFragment.classList.add('mt-2');
+            }
             cardFooter.appendChild(rowFragment);
 
             rowActions.forEach((action) => {

@@ -195,6 +195,9 @@ async function addField(field, addTo,formMeta) {
 
         // Apply textarea Frontend validation
         // applyTextareaValidation(field, textarea);
+        if (field.rows) {
+            textarea.setAttribute('rows', field.rows);
+        }
         formContainer.appendChild(textarea);
 
         // ✅ ERROR HANDLING: Same for both structures

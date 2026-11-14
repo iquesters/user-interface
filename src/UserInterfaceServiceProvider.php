@@ -197,43 +197,9 @@ class UserInterfaceServiceProvider extends ServiceProvider
     
     protected function registerAssetRoute(): void
     {
+        // Serve only files inside this module's public/ dir (no path traversal, static types only).
         Route::get('/vendor/userinterface/{path}', function ($path) {
-            $filePath = __DIR__ . '/../public/' . $path;
-
-            if (!file_exists($filePath)) {
-                abort(404);
-            }
-
-            $mimeTypes = [
-                'css' => 'text/css',
-                'js' => 'application/javascript',
-                'png' => 'image/png',
-                'jpg' => 'image/jpeg',
-                'jpeg' => 'image/jpeg',
-                'gif' => 'image/gif',
-                'svg' => 'image/svg+xml',
-                'ico' => 'image/x-icon',
-                'woff' => 'font/woff',
-                'woff2' => 'font/woff2',
-                'ttf' => 'font/ttf',
-                'eot' => 'application/vnd.ms-fontobject',
-            ];
-
-            $extension = pathinfo($filePath, PATHINFO_EXTENSION);
-            $mimeType = $mimeTypes[$extension] ?? 'application/octet-stream';
-
-            $cacheControl = in_array($extension, ['css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'eot'])
-                ? 'public, max-age=31536000'
-                : 'no-cache';
-
-            $lastModified = filemtime($filePath);
-
-            return response()->file($filePath, [
-                'Content-Type'  => $mimeType,
-                'Cache-Control' => 'public, max-age=31536000, immutable',
-                'Last-Modified' => gmdate('D, d M Y H:i:s', $lastModified) . ' GMT',
-            ]);
-
+            return \Iquesters\Foundation\Support\PackageAsset::response(__DIR__ . '/../public', $path);
         })->where('path', '.*')->name('userinterface.asset');
     }
     
