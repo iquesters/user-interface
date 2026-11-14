@@ -144,12 +144,21 @@ class UserInterfaceServiceProvider extends ServiceProvider
             return;
         }
 
-        // Use Artisan command to publish Sanctum
+        // Publish only what is missing. Publishing the migration again (e.g.
+        // because only the config was missing) creates a second, timestamped
+        // copy and `migrate` then fails with "table already exists".
         try {
-            Artisan::call('vendor:publish', [
-                '--provider' => 'Laravel\Sanctum\SanctumServiceProvider',
-                '--force' => true
-            ]);
+            $tags = [];
+            if (empty($sanctumFiles)) {
+                $tags[] = 'sanctum-migrations';
+            }
+            if (! $configExists) {
+                $tags[] = 'sanctum-config';
+            }
+
+            foreach ($tags as $tag) {
+                Artisan::call('vendor:publish', ['--tag' => $tag]);
+            }
 
             echo " Sanctum files published successfully!" . PHP_EOL;
             echo "📋 You can now run 'php artisan migrate' to create the Sanctum tables." . PHP_EOL . PHP_EOL;
