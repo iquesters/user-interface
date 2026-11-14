@@ -3,9 +3,9 @@
   "description": "A modern, reusable, and customizable UI interface built for creating clean and responsive user experiences. Designed with simplicity, scalability, and flexibility in mind.",
   "type": "library",
   "require": {
-    "php": ">=8.1",
-    "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
-    "iquesters/foundation": "^1.0",
+    "php": "^8.3",
+    "laravel/framework": "^12.0|^13.0",
+    "iquesters/foundation": "^2.0",
     "diglactic/laravel-breadcrumbs": "^10.0"
   },
   "suggest": {
@@ -15,13 +15,13 @@
   "require-dev": {
     "orchestra/testbench": "^10.0|^11.0",
     "laravel/sanctum": "^4.0",
-    "spatie/laravel-permission": "^6.16"
+    "spatie/laravel-permission": "^8.0"
   },
   "repositories": [
     {
       "type": "path",
       "url": "../foundation",
-      "options": { "symlink": true, "versions": { "iquesters/foundation": "1.x-dev" } }
+      "options": { "symlink": true, "versions": { "iquesters/foundation": "2.x-dev" } }
     }
   ],
   "license": "MIT",
