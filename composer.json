@@ -52,6 +52,14 @@
       "providers": [
         "Iquesters\\UserInterface\\UserInterfaceServiceProvider"
       ]
+    },
+    "platform": {
+      "api": {
+        "prefix": "user-interface",
+        "versions": {
+          "v1": "routes/api.v1.php"
+        }
+      }
     }
   }
 }

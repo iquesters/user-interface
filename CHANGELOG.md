@@ -29,6 +29,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - App pages: about 1,200 → 45 queries per page (dashboard ~1 s → ~0.25 s locally). Module navigation is built
   once per request by the scoped `Support\NavigationMenu` instead of per view composed and per tab include.
 
+### Changed (API)
+- API served at `/api/user-interface/v1/...` (`routes/api.v1.php`, declared in `composer.json`), rate-limited
+  to 300 requests/min. The module's JS uses it via `uiApiUrl()` (base in `window.UI_API_BASE`).
+- The unversioned `/api/entity/...`, `/api/noauth/form/...`, `/api/form/...`, `/api/auth/table/...` and
+  `/api/components/templates/...` URLs are **deprecated aliases**, removed in a later release.
+
+### Fixed
+- Duplicate `master-data.update` route (also defined by foundation) broke `php artisan route:cache`.
+
+### Changed
+- `Support\Assets` extends foundation's `ModuleAssets` (shared asset route/URL logic).
+- `UserInterfaceServiceProvider` (407 → ~110 lines) extends foundation's `BaseServiceProvider`, configured by
+  `Package\UserInterfacePackageInfo`. Asset route/URLs, theme and CSS/JS discovery moved to `Support\Assets`, the
+  Sanctum install step to `Install\InstallSteps`. The static helpers views use stay on the provider.
+- Form-level errors (not tied to a field) show as an error toast instead of a red box in the form; error toasts stay ~8 s.
+
+### Removed
+- Unused `getAssetVersion()` and the unused `$defaultcache` parameter of `getCssUrl()` / `getJsUrl()`.
+
+### Security
+- Toast messages are inserted as text, not HTML (server messages could inject markup).
+
 ### Added
 - Entity list API: free-text `?search=` across text columns and meta values (LIKE wildcards matched literally, 100-char cap).
 

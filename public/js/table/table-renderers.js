@@ -620,7 +620,7 @@ async function handleHybridDetailDelete(detailContext) {
         return;
     }
 
-    const endpoint = `/api/entity/delete/${entity}/${entityUid}`;
+    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
     console.log(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,

@@ -158,6 +158,28 @@ class EntityApiTest extends TestCase
             ->assertJsonPath('response_schema.data.0.name', 'Item 119');
     }
 
+    public function test_versioned_api_serves_the_entity_endpoints(): void
+    {
+        $this->getJson('/api/user-interface/v1/entity/list/demo_items')->assertUnauthorized();
+
+        $this->actingAsAdmin();
+
+        $this->getJson('/api/user-interface/v1/entity/list/demo_items?length=5')
+            ->assertOk()
+            ->assertJsonPath('response_schema.meta.pagination.total', 120);
+
+        $uid = DB::table('demo_items')->value('uid');
+        $this->getJson("/api/user-interface/v1/entity/show/demo_items/{$uid}")->assertOk();
+        $this->assertTrue(app('router')->has('api.user-interface.v1.entity.list'));
+    }
+
+    public function test_versioned_public_form_schema_needs_no_login(): void
+    {
+        $this->getJson('/api/user-interface/v1')->assertOk()->assertJsonPath('response_schema.data.module', 'user-interface');
+        // Reaches the controller without auth (an unknown slug is answered by it, not by auth).
+        $this->getJson('/api/user-interface/v1/noauth/form/no-such-form')->assertOk()->assertJsonPath('success', false);
+    }
+
     public function test_unregistered_table_is_not_modified(): void
     {
         $this->actingAsAdmin();

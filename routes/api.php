@@ -1,5 +1,11 @@
 <?php
 
+/*
+| DEPRECATED: unversioned aliases of the v1 API in routes/api.v1.php
+| (/api/user-interface/v1/...). Kept for existing callers; the module's own JS
+| uses the versioned URLs. Will be removed in a later release.
+*/
+
 use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
@@ -21,10 +27,6 @@ Route::get('ping', function () {
     ]);
 });
 
-// Route::middleware(['api'])->group(function () {
-//     Route::get('api/noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
-//     ->name('noauth.form');
-// });
 /*
 |--------------------------------------------------------------------------
 | Protected APIs - Sanctum tokens ONLY
@@ -85,12 +87,3 @@ Route::prefix('api')
             ->name('api.components.template');
 
     });
-
-
-// Route::get('form/{slug}', [FormController::class, 'show']);
-
-// ApiRouteRegistry::register(
-//     'GET',
-//     'form/{slug}',
-//     'iquesters/user-interface'
-// );

@@ -1094,15 +1094,29 @@ function appendDynamicFormFieldError(form, field, message) {
     return setFieldMessage(fieldDomId, message, fieldContainer);
 }
 
+/**
+ * Show a form-level error (one not tied to a field) as an error toast.
+ * Falls back to the inline banner at the top of the form only when toasts
+ * aren't available or the schema opted out (disableSnackbar).
+ */
 function appendDynamicFormSubmitSummary(form, message, generalErrors = []) {
+    const lines = [message, ...generalErrors.filter((item) => item && item !== message)].filter(Boolean);
+    const formMeta = form?.__formMeta || null;
+
+    if (typeof window.showSnackbar === 'function' && !formMeta?.disableSnackbar) {
+        window.showSnackbar(lines.join(' '), 'error');
+        return;
+    }
+
     const summary = document.createElement('div');
     summary.classList.add(STYLE_CLASS.ALERT, STYLE_CLASS.ALERT_DANGER, STYLE_CLASS.MB_3);
     summary.dataset.serverError = 'true';
 
-    const lines = [message, ...generalErrors.filter((item) => item && item !== message)];
-    summary.innerHTML = lines
-        .map((line) => `<div>${line}</div>`)
-        .join('');
+    lines.forEach((line) => {
+        const row = document.createElement('div');
+        row.textContent = line;
+        summary.appendChild(row);
+    });
 
     form.prepend(summary);
 }
@@ -1238,7 +1252,10 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 applyDynamicFormSubmitErrors(form, formMeta, errors, errorMessage, payload);
             } else {
                 const errorMessage = resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.');
-                appendDynamicFormSubmitSummary(form, errorMessage, []);
+                // `error` is only sent by the server in debug mode (APP_DEBUG).
+                const detail = result?.detail || (typeof result?.error === 'string' ? result.error : null);
+                const debugDetail = detail ? [`Details: ${detail}`] : [];
+                appendDynamicFormSubmitSummary(form, errorMessage, debugDetail);
             }
 
             dispatchDynamicFormEvent('lab-form:submit-failed', {
@@ -1445,14 +1462,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return `/api/entity/update/${formMeta.entity}/${entityUid}`;
+        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return `/api/entity/delete/${formMeta.entity}/${entityUid}`;
+        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
     }
 
-    return `/api/entity/store/${formMeta.entity}`;
+    return uiApiUrl(`entity/store/${formMeta.entity}`);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {

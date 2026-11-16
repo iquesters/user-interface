@@ -780,11 +780,13 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
+        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+
         if (typeof apiClient !== 'undefined' && apiClient) {
-            return await apiClient.get(`/api/entity/show/${entity}/${entityUId}`);
+            return await apiClient.get(showUrl);
         }
 
-        const res = await fetch(`/api/entity/show/${entity}/${entityUId}`, {
+        const res = await fetch(showUrl, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'

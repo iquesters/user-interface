@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
-use Iquesters\Foundation\Http\Controllers\MasterDataController;
 
 
 Route::middleware(['web'])->group(function () {
@@ -30,8 +29,6 @@ Route::middleware(['web'])->group(function () {
         });
 
         Route::get('/theme', [UIController::class, 'setTheme'])->name('ui.theme');
-
-        Route::put('/master-data/{master_datum}', [MasterDataController::class, 'update'])->middleware('ensure.admin')->name('master-data.update');
 
         Route::prefix('form')->name('form')->middleware('ensure.admin')->group(function () {
             Route::get('/list', [FormController::class, 'list'])->name('.list');

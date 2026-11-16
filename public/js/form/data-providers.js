@@ -24,7 +24,7 @@ async function getFormSchema(formID) {
     }
 
     console.log("Fetching form schema for formID: " + formID);
-    const pendingRequest = fetch('/api/noauth/form/'+formID)
+    const pendingRequest = fetch(uiApiUrl('noauth/form/' + encodeURIComponent(formID)))
         .then(response => response.json())
         .then(formSchema => {
             const resolvedSchema = formSchema?.response_schema?.data ?? formSchema?.data ?? null;

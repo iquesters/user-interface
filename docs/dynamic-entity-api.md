@@ -4,11 +4,15 @@
 This document describes the generic dynamic entity API exposed by `DynamicEntityController`.
 
 ## Endpoints
-- `GET /api/entity/list/{entity_name}`
-- `GET /api/entity/show/{entity_name}/{data_uid}`
-- `POST /api/entity/store/{entity_name}`
-- `PUT /api/entity/update/{entity_name}/{data_uid}`
-- `DELETE /api/entity/delete/{entity_name}/{data_uid}`
+- `GET /api/user-interface/v1/entity/list/{entity_name}`
+- `GET /api/user-interface/v1/entity/show/{entity_name}/{data_uid}`
+- `POST /api/user-interface/v1/entity/store/{entity_name}`
+- `PUT /api/user-interface/v1/entity/update/{entity_name}/{data_uid}`
+- `DELETE /api/user-interface/v1/entity/delete/{entity_name}/{data_uid}`
+
+All endpoints need a Sanctum token. Free-text search: `?search=term` (text columns and meta values).
+The unversioned `/api/entity/...` URLs still work as deprecated aliases and will be removed in a later release.
+Routing (`/api/{module}/{version}`) is explained in foundation's `docs/developer/api.md`.
 
 ## List Flow
 1. Resolve the target table from `{entity_name}` and confirm it exists.
@@ -49,26 +53,26 @@ This document describes the generic dynamic entity API exposed by `DynamicEntity
 - `in`
 
 ### Filter examples
-- `GET /api/entity/list/users?status=active`
-- `GET /api/entity/list/users?email=john@example.com`
-- `GET /api/entity/list/users?name[like]=john`
-- `GET /api/entity/list/users?name[starts]=jo`
-- `GET /api/entity/list/users?email[ends]=@gmail.com`
-- `GET /api/entity/list/users?created_at[gte]=2025-01-01`
-- `GET /api/entity/list/users?status[in]=active,inactive`
-- `GET /api/entity/list/users?status[neq]=deleted`
+- `GET /api/user-interface/v1/entity/list/users?status=active`
+- `GET /api/user-interface/v1/entity/list/users?email=john@example.com`
+- `GET /api/user-interface/v1/entity/list/users?name[like]=john`
+- `GET /api/user-interface/v1/entity/list/users?name[starts]=jo`
+- `GET /api/user-interface/v1/entity/list/users?email[ends]=@gmail.com`
+- `GET /api/user-interface/v1/entity/list/users?created_at[gte]=2025-01-01`
+- `GET /api/user-interface/v1/entity/list/users?status[in]=active,inactive`
+- `GET /api/user-interface/v1/entity/list/users?status[neq]=deleted`
 
 ### Sort examples
-- `GET /api/entity/list/users?sort=-created_at`
-- `GET /api/entity/list/users?sort=name,-created_at`
+- `GET /api/user-interface/v1/entity/list/users?sort=-created_at`
+- `GET /api/user-interface/v1/entity/list/users?sort=name,-created_at`
 
 ### Pagination examples
-- `GET /api/entity/list/users?offset=0&length=20`
-- `GET /api/entity/list/users?status=active&sort=-created_at&offset=0&length=20`
+- `GET /api/user-interface/v1/entity/list/users?offset=0&length=20`
+- `GET /api/user-interface/v1/entity/list/users?status=active&sort=-created_at&offset=0&length=20`
 
 ### Combined example
 ```text
-GET /api/entity/list/users?status=active&name[like]=john&created_at[gte]=2025-01-01&sort=name,-created_at&offset=0&length=20
+GET /api/user-interface/v1/entity/list/users?status=active&name[like]=john&created_at[gte]=2025-01-01&sort=name,-created_at&offset=0&length=20
 ```
 
 ## List Query Behavior
@@ -145,7 +149,7 @@ GET /api/entity/list/users?status=active&name[like]=john&created_at[gte]=2025-01
 - Meta records are stored using `ref_parent`, `meta_key`, and `meta_value`.
 
 ## Form Submit Contract
-- Generic rendered forms submit to the dynamic entity API using the entity table name, for example `POST /api/entity/store/test_entities`.
+- Generic rendered forms submit to the dynamic entity API using the entity table name, for example `POST /api/user-interface/v1/entity/store/test_entities`.
 - The frontend payload shape is:
 
 ```json

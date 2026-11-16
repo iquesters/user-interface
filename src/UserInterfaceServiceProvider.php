@@ -2,406 +2,103 @@
 
 namespace Iquesters\UserInterface;
 
-use Iquesters\Foundation\System\Traits\Loggable;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Console\Command;
-use Iquesters\UserInterface\Database\Seeders\UserInterfaceSeeder;
-use Iquesters\Foundation\Support\ConfProvider;
-use Iquesters\Foundation\Enums\Module as ModuleEnum;
-use Iquesters\UserInterface\Config\UserInterfaceConf;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\Facades\Schema;
-use Iquesters\Foundation\Models\Module;
-use Iquesters\Foundation\Models\Navigation;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Artisan;
 use Diglactic\Breadcrumbs\Breadcrumbs;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\View;
+use Iquesters\Foundation\Contracts\SchemaModels;
+use Iquesters\Foundation\Enums\Module;
+use Iquesters\Foundation\Support\ConfProvider;
+use Iquesters\Foundation\System\Providers\BaseServiceProvider;
+use Iquesters\UserInterface\Install\InstallSteps;
+use Iquesters\UserInterface\Models\FormSchema;
+use Iquesters\UserInterface\Models\TableSchema;
+use Iquesters\UserInterface\Services\Entity\EntitySchemaResolver;
+use Iquesters\UserInterface\Support\Assets;
+use Iquesters\UserInterface\Support\NavigationMenu;
+use Iquesters\UserInterface\Support\SetupLinkInjector;
 
-class UserInterfaceServiceProvider extends ServiceProvider
+/**
+ * Migrations, views (userinterface::), routes/web.php (+ api.php), the
+ * user-interface:seed command and the conf are loaded by BaseServiceProvider
+ * via Package\UserInterfacePackageInfo. This class only adds what is specific
+ * to the module.
+ */
+class UserInterfaceServiceProvider extends BaseServiceProvider
 {
-    use Loggable;
-
-    public function register()
+    public function register(): void
     {
-        // Register User Interface configuration
-        ConfProvider::register(ModuleEnum::USER_INFE, UserInterfaceConf::class);
-
-        // Register seeder command
-        $this->registerSeedCommand();
+        parent::register();
 
         // One schema resolver per request, so its introspection cache is shared
         // by the entity API services.
-        $this->app->scoped(\Iquesters\UserInterface\Services\Entity\EntitySchemaResolver::class);
+        $this->app->scoped(EntitySchemaResolver::class);
 
-        // Module navigation is built once per request (see NavigationMenu).
-        $this->app->scoped(\Iquesters\UserInterface\Support\NavigationMenu::class);
+        // Module navigation is built once per request.
+        $this->app->scoped(NavigationMenu::class);
 
         // Foundation's entity builder stores generated schemas in our models.
-        $this->app->singleton(\Iquesters\Foundation\Contracts\SchemaModels::class, fn () => new class implements \Iquesters\Foundation\Contracts\SchemaModels {
-            public function formSchemaModel(): string { return \Iquesters\UserInterface\Models\FormSchema::class; }
-            public function tableSchemaModel(): string { return \Iquesters\UserInterface\Models\TableSchema::class; }
+        $this->app->singleton(SchemaModels::class, fn () => new class implements SchemaModels {
+            public function formSchemaModel(): string { return FormSchema::class; }
+            public function tableSchemaModel(): string { return TableSchema::class; }
         });
     }
 
-    public function boot()
+    public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-        // ✅ LOAD BREADCRUMBS
+        parent::boot();
+
         if (class_exists(Breadcrumbs::class)) {
-            require __DIR__.'/../routes/breadcrumbs.php';
-        }
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'userinterface');
-
-        // Settings live in the DB-backed conf (UserInterfaceConf), not a config file.
-        $this->registerAssetRoute();
-
-        $uiConf = ConfProvider::from(ModuleEnum::USER_INFE);
-        if (method_exists($uiConf, 'loadConfigOnce')) {
-            $uiConf->ensureLoaded();
+            require __DIR__ . '/../routes/breadcrumbs.php';
         }
 
-        // Now safely access the auth_layout property
-        $layout = $uiConf->app_layout;
+        Assets::registerRoutes();
 
-        $this->app->instance('app.layout', $layout);
-        
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                'command.user-interface.seed'
-            ]);
-            
-            // Auto-publish Sanctum files during package discovery
-            $this->autoPublishSanctumFiles();
-        }
+        $this->app->instance('app.layout', ConfProvider::from(Module::USER_INFE)->app_layout);
 
-        // Defer until routes are ready
-        $this->app->booted(function () {
-            \Iquesters\UserInterface\Support\SetupLinkInjector::inject();
-        });
+        // Modules for the navigation, shared with every view (host-app views may
+        // use it); loaded once per request by NavigationMenu.
+        View::composer('*', fn ($view) => $view->with('installedModules', app(NavigationMenu::class)->modules()));
 
-        // Share installed modules globally
-        $this->shareInstalledModules();
+        // One-time: setup link + favicon in the app's home page (after routes exist).
+        $this->app->booted(fn () => SetupLinkInjector::inject());
 
-        // 'laravel-assets' is re-published by every Laravel app after `composer update`
-        // (post-update-cmd), so module JS/CSS updates reach public/ automatically.
+        // 'laravel-assets' is re-published by the app after every `composer update`.
         $this->publishes([
             __DIR__ . '/../public' => public_path('vendor/userinterface'),
         ], ['laravel-assets', 'user-userinterface-assets']);
+
+        // composer install/update: publish Sanctum files.
+        $this->onPackageDiscover(fn () => InstallSteps::run());
     }
 
-    /**
-     * Auto-publish Sanctum migrations AND config
-     */
-    protected function autoPublishSanctumFiles(): void
-    {
-        // Only run during package discovery
-        if (!$this->isDuringPackageDiscovery()) {
-            return;
-        }
+    /* Asset helpers, kept here because views call them on the provider. */
 
-        // Use deferred execution
-        $this->app->booted(function () {
-            $this->publishSanctumFilesNow();
-        });
-    }
-
-    /**
-     * Check if we're during package discovery
-     */
-    protected function isDuringPackageDiscovery(): bool
-    {
-        return isset($_SERVER['argv'][1]) && $_SERVER['argv'][1] === 'package:discover';
-    }
-
-    /**
-     * Actually publish the Sanctum migrations AND config
-     */
-    protected function publishSanctumFilesNow(): void
-    {
-        // Check if Sanctum is available
-        if (!class_exists(\Laravel\Sanctum\SanctumServiceProvider::class)) {
-            echo "⚠️  Laravel Sanctum package is not installed." . PHP_EOL;
-            echo "📝 Please install it via: composer require laravel/sanctum" . PHP_EOL . PHP_EOL;
-            return;
-        }
-
-        $migrationPath = database_path('migrations');
-        $configPath = config_path('sanctum.php');
-
-        // Check if Sanctum migrations are already published
-        $sanctumFiles = glob($migrationPath . '/*_create_personal_access_tokens_table.php');
-        $configExists = file_exists($configPath);
-
-        // Check if tables already exist in database
-        $tablesExist = false;
-        try {
-            $tablesExist = Schema::hasTable('personal_access_tokens');
-        } catch (\Exception $e) {
-            // Database might not be available
-        }
-
-        if ($tablesExist) {
-            echo " Sanctum tables already exist in database." . PHP_EOL;
-            return;
-        }
-
-        if (!empty($sanctumFiles) && $configExists) {
-            echo " Sanctum migrations and config already published." . PHP_EOL;
-            echo "📋 You can now run 'php artisan migrate' to create the Sanctum tables." . PHP_EOL . PHP_EOL;
-            return;
-        }
-
-        // Publish only what is missing. Publishing the migration again (e.g.
-        // because only the config was missing) creates a second, timestamped
-        // copy and `migrate` then fails with "table already exists".
-        try {
-            $tags = [];
-            if (empty($sanctumFiles)) {
-                $tags[] = 'sanctum-migrations';
-            }
-            if (! $configExists) {
-                $tags[] = 'sanctum-config';
-            }
-
-            foreach ($tags as $tag) {
-                Artisan::call('vendor:publish', ['--tag' => $tag]);
-            }
-
-            echo " Sanctum files published successfully!" . PHP_EOL;
-            echo "📋 You can now run 'php artisan migrate' to create the Sanctum tables." . PHP_EOL . PHP_EOL;
-            
-        } catch (\Exception $e) {
-            echo "⚠️  Could not automatically publish Sanctum files: " . $e->getMessage() . PHP_EOL;
-            echo "📝 Please run manually:" . PHP_EOL;
-            echo "   php artisan vendor:publish --provider=\"Laravel\Sanctum\SanctumServiceProvider\"" . PHP_EOL;
-            echo "   php artisan migrate" . PHP_EOL . PHP_EOL;
-        }
-    }
-
-    protected function registerSeedCommand(): void
-    {
-        $this->app->singleton('command.user-interface.seed', function ($app) {
-            return new class extends Command {
-                protected $signature = 'user-interface:seed';
-                protected $description = 'Seed User Interface module data';
-
-                public function handle()
-                {
-                    $this->info('Running User Interface Seeder...');
-                    $seeder = new UserInterfaceSeeder();
-                    $seeder->setCommand($this);
-                    $seeder->run();
-                    $this->info('User Interface seeding completed!');
-                    return 0;
-                }
-            };
-        });
-    }
-    
-    protected function registerAssetRoute(): void
-    {
-        // Serve only files inside this module's public/ dir (no path traversal, static types only).
-        // The fallback lives under /module-assets/ so it never collides with the published
-        // copy in public/vendor/userinterface (which the web server serves directly).
-        $serve = fn ($path) => \Iquesters\Foundation\Support\PackageAsset::response(__DIR__ . '/../public', $path);
-
-        Route::get('/module-assets/userinterface/{path}', $serve)->where('path', '.*')->name('userinterface.asset');
-
-        // Legacy URL, kept for hard-coded links (when assets are not published).
-        Route::get('/vendor/userinterface/{path}', $serve)->where('path', '.*')->name('userinterface.asset.legacy');
-    }
-    
-
-    protected function shareInstalledModules(): void
-    {
-        // Still shared with every view (host-app views may use it), but the
-        // modules are loaded once per request by the scoped NavigationMenu.
-        View::composer('*', function ($view) {
-            $view->with('installedModules', app(\Iquesters\UserInterface\Support\NavigationMenu::class)->modules());
-        });
-    }
-    
-    /**
-     * Get the logo URL - works with both package assets and custom paths
-     */
     public static function getLogoUrl(): string
     {
-        $customLogo = ConfProvider::from(ModuleEnum::USER_INFE)->logo;
-
-        // If it's a full URL, return as is
-        if (filter_var($customLogo, FILTER_VALIDATE_URL)) {
-            return $customLogo;
-        }
-
-        // If it's an absolute path (starts with /), return as is
-        if (str_starts_with($customLogo, '/')) {
-            return $customLogo;
-        }
-        
-        // Check if file actually exists in public/
-        $publicPath = public_path($customLogo);
-        if (file_exists($publicPath)) {
-            return asset($customLogo);
-        }
-
-        // If it contains "::" format, convert to path
-        if (str_contains($customLogo, '::')) {
-            $path = str_replace('::', '/', $customLogo);
-            return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $path, 'userinterface.asset');
-        }
-
-        // For regular relative paths, use the asset route
-        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', ltrim($customLogo, '/'), 'userinterface.asset');
+        return Assets::logoUrl();
     }
 
-
-    /**
-     * Get version string for cache-busting
-     */
-    public static function getAssetVersion(string $file): string
+    public static function getCssUrl(string $file = 'css/app.css'): string
     {
-        $path = __DIR__ . '/../public/' . ltrim($file, '/');
-
-        if (file_exists($path)) {
-            clearstatcache(true, $path);
-            return (string) filemtime($path);
-        }
-
-        return '1'; // stable fallback (NEVER time())
+        return Assets::url($file);
     }
 
-
-    /**
-     * Get the CSS URL for the package
-     */
-    public static function getCssUrl(string $file = 'css/app.css', bool $defaultcache = true): string
+    public static function getJsUrl(string $file = 'js/app.js'): string
     {
-        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $file, 'userinterface.asset');
-    }
-    
-    /**
-     * Get the JS URL for the package
-     */
-    public static function getJsUrl(string $file = 'js/app.js', bool $defaultcache = true): string
-    {
-        return \Iquesters\Foundation\Support\PackageAsset::url(__DIR__ . '/../public', 'vendor/userinterface', $file, 'userinterface.asset');
-    }
-
-
-    /**
-     * Get the current theme from MasterData
-     */
-    public static function getCurrentTheme(): ?string
-    {
-        try {
-            $user = Auth::user();
-
-            $userTheme = null;
-            // Check user-specific theme (stored by iquesters/user-management when installed)
-            $userMetaModel = 'Iquesters\\UserManagement\\Models\\UserMeta';
-            if ($user && class_exists($userMetaModel)) {
-                $userTheme = $userMetaModel::where('ref_parent', $user->id)
-                    ->where('meta_key', 'theme')
-                    ->where('status', 'active')
-                    ->first(); 
-
-                if (!empty($userTheme)) {
-                    return $userTheme->meta_value;
-                }
-            }
-
-            // Check MasterData global theme
-            $themeData = \Iquesters\Foundation\Models\MasterData::where([
-                ['key', '=', 'current_theme'],
-                ['status', '=', \Iquesters\Foundation\Constants\EntityStatus::ACTIVE],
-            ])->first();
-
-            if (!empty($themeData)) {
-                return $themeData->value;
-            }
-            return $userTheme;
-        } catch (\Exception $e) {
-            static::logError('Failed to get user theme', ['error' => $e->getMessage()]);
-            return 'default';
-        }
-    }
-    
-    protected static function discoverAssets(
-        string $type,          // css | js
-        array $options = []
-    ): array {
-        $basePath = __DIR__ . '/../public/' . $type;
-
-        if (!File::exists($basePath)) {
-            return [];
-        }
-
-        return collect(File::allFiles($basePath))
-            ->filter(fn ($file) => $file->getExtension() === $type)
-            ->when(
-                $options['exclude'] ?? false,
-                fn ($q) => $q->reject(
-                    fn ($file) => str_starts_with(
-                        $file->getRelativePathname(),
-                        $options['exclude']
-                    )
-                )
-            )
-            ->sortBy(fn ($file) => $file->getRelativePathname())
-            ->map(function ($file) use ($type, $options) {
-
-                $relativePath = $type . '/' . str_replace(
-                    DIRECTORY_SEPARATOR,
-                    '/',
-                    $file->getRelativePathname()
-                );
-
-                return [
-                    'type'  => $type,
-                    'path'  => $relativePath,
-                    'media' => $type === 'css'
-                        ? self::resolveCssMedia($file->getFilename())
-                        : null,
-                ];
-            })
-            ->values()
-            ->toArray();
-    }
-    
-    protected static function resolveCssMedia(string $filename): string
-    {
-        return match (true) {
-            str_contains($filename, '-sm.css')   => 'screen and (min-width: 576px)',
-            str_contains($filename, '-md.css')   => 'screen and (min-width: 768px)',
-            str_contains($filename, '-lg.css')   => 'screen and (min-width: 992px)',
-            str_contains($filename, '-xl.css')   => 'screen and (min-width: 1200px)',
-            str_contains($filename, '-xxl.css')  => 'screen and (min-width: 1400px)',
-            str_contains($filename, 'print.css') => 'print',
-            default                              => 'screen',
-        };
-    }
-    public static function getJsAssets(): array
-    {
-        return self::discoverAssets('js');
+        return Assets::url($file);
     }
 
     public static function getCssAssets(): array
     {
-        $theme = self::getCurrentTheme() ?? 'default';
-
-        // Step 1: Include theme CSS dynamically
-        $themeCss = [
-            ['type' => 'css', 'path' => "css/theme/$theme/bootstrap.min.css", 'media' => 'screen'],
-            // ['type' => 'css', 'path' => "css/bootstrap-override.css", 'media' => 'screen'],
-        ];
-
-        // Step 2: Include other CSS dynamically
-        $otherCss = self::discoverAssets('css', ['exclude' => 'theme']);
-
-        return array_merge($themeCss, $otherCss);
+        return Assets::cssAssets();
     }
 
+    public static function getJsAssets(): array
+    {
+        return Assets::jsAssets();
+    }
+
+    public static function getCurrentTheme(): ?string
+    {
+        return Assets::currentTheme();
+    }
 }

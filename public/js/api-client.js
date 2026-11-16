@@ -22,6 +22,19 @@ const API_CONFIG = {
     followRedirects: true, // Auto-follow 3xx redirects
 };
 
+/**
+ * Versioned user-interface API: /api/{module}/{version} (foundation ModuleApi).
+ * Override window.UI_API_BASE before this file loads to point elsewhere.
+ * The unversioned /api/... routes are deprecated aliases.
+ */
+window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
+
+/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+function uiApiUrl(path = '') {
+    return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.uiApiUrl = uiApiUrl;
+
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,
     SWITCHING_PROTOCOLS: 101,
@@ -396,6 +409,8 @@ class ApiClient {
             links: json.response_schema?.links || null,
             ui_context: json.ui_context || {},
             redirect_url: json.redirect_url || json.ui_context?.redirect || null,
+            // Server-side cause, only sent in debug mode (APP_DEBUG).
+            detail: typeof json.error === 'string' ? json.error : null,
         };
 
         // Process UI context
@@ -422,6 +437,8 @@ class ApiClient {
             links: json.links || null,
             ui_context: {},
             redirect_url: json.redirect_url || null,
+            // Server-side cause, only sent in debug mode (APP_DEBUG).
+            detail: typeof json.error === 'string' ? json.error : null,
         };
     }
 

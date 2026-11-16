@@ -3,7 +3,6 @@
 namespace Iquesters\UserInterface\Config;
 
 use Iquesters\Foundation\Support\BaseConf;
-use Iquesters\Foundation\Support\ApiConf;
 use Iquesters\Foundation\Enums\Module;
 
 class UserInterfaceConf extends BaseConf
@@ -22,8 +21,6 @@ class UserInterfaceConf extends BaseConf
     protected string $small_screen_featured_position;
     protected SnackbarConf $snackbar_conf;
 
-    protected ApiConf $api_conf;
-    
     protected function prepareDefault(BaseConf $default_values)
     {
         $default_values->auth_layout = 'userinterface::layouts.auth';
@@ -37,10 +34,6 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_featured_tab = '';
         $default_values->small_screen_featured_position = 'center';
         $default_values->snackbar_conf = new SnackbarConf();
-        
-        $default_values->api_conf = new ApiConf();
-        $default_values->api_conf->prefix = 'user-interface'; // Must be auto generated from module enum - the vendor name  
-        $default_values->api_conf->prepareDefault($default_values->api_conf);
     }
 
 }

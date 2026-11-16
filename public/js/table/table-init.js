@@ -217,7 +217,7 @@ async function initLabTable(tableElement) {
     console.log(`${TABLE_LOG_INITIALIZING_TABLE} ${slug}`);
     
     // Fetch schema using API client
-    const schemaResponse = await apiClient.get(`/api/auth/table/${slug}`);
+    const schemaResponse = await apiClient.get(uiApiUrl(`auth/table/${slug}`));
     
     if (!schemaResponse.success || !schemaResponse.data) {
         removeTableSkeleton(tableElement);
