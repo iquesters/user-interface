@@ -68,27 +68,22 @@
     window.UI_SNACKBAR_CONFIG = window.USER_INTERFACE_CONFIG.snackbar;
 </script>
 
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js" integrity="sha384-NXgwF8Kv9SSAr+jemKKcbvQsz+teULH/a5UNJvZc6kP47hZgl62M1vGnw6gHQhb1" crossorigin="anonymous"></script>
+{{-- Third-party JS (jQuery, Bootstrap, + DataTables/JSON Editor outside auth pages):
+     self-hosted or CDN per the vendor_assets setting (Support\VendorLibraries). --}}
+{!! \Iquesters\UserInterface\Support\VendorLibraries::scripts(isAuthPage: ! empty($isAuth)) !!}
 
-<!-- Bootstrap 5 JS (includes Popper.js) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-
-{{-- ~1.7 MB; not used on auth pages (login/register/setup). --}}
-@if (empty($isAuth))
-<!-- DataTables JS -->
-<script src="https://cdn.datatables.net/v/bs5/jq-3.7.0/moment-2.29.4/jszip-3.10.1/dt-2.2.2/af-2.7.0/b-3.2.2/b-colvis-3.2.2/b-html5-3.2.2/b-print-3.2.2/cr-2.0.4/date-1.5.5/fc-5.0.4/fh-4.0.1/kt-2.12.1/r-3.0.4/rg-1.5.1/rr-1.5.0/sc-2.4.3/sb-1.8.2/sp-2.3.3/sl-3.0.0/sr-1.4.1/datatables.min.js" integrity="sha384-pdpncyjMFzkxj3N8+5wWQGxGZCFzkWFpInHw4/e5Eg98sIg19W5HYwuEocBQGTtO" crossorigin="anonymous"></script>
-
-<!-- JSON Editor -->
-<script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js" integrity="sha384-XMmehxwkAgGyArCAd+T/AHykv4Ws/sOgqfB8vMvHBXvmeuQ5LtfMCo0a4TiFjk+7" crossorigin="anonymous"></script>
+{{-- The module's own scripts: one bundled file (npm run build) when APP_DEBUG is off,
+     the individual files while debugging. --}}
+@if ($jsBundleUrl = \Iquesters\UserInterface\Support\Assets::jsBundleUrl())
+    <script src="{{ $jsBundleUrl }}"></script>
+@else
+    @foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getJsAssets() as $asset)
+        <script
+            src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($asset['path']) }}"
+            @if(str_contains($asset['path'], '.defer.')) defer @endif
+        ></script>
+    @endforeach
 @endif
-
-@foreach(\Iquesters\UserInterface\UserInterfaceServiceProvider::getJsAssets() as $asset)
-    <script
-        src="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl($asset['path']) }}"
-        @if(str_contains($asset['path'], '.defer.')) defer @endif
-    ></script>
-@endforeach
 
 
 <!-- Reverb WebSocket Client -->
@@ -103,7 +98,7 @@
             userId: '{{ auth()->id() ?? "anonymous" }}'
         };
         
-        console.log('⚙️ Reverb Configuration:', window.REVERB_CONFIG);
+        window.uiDebug?.('⚙️ Reverb Configuration:', window.REVERB_CONFIG);
     </script>
 
      <!-- Initialize Reverb -->
@@ -113,17 +108,17 @@
             window.reverb = new ReverbClient(window.REVERB_CONFIG);
             
             // Connect to Reverb
-            console.log('🚀 Initializing Reverb connection...');
+            window.uiDebug?.('🚀 Initializing Reverb connection...');
             window.reverb.connect();
             
             // Handle connection events
             window.reverb.on('connected', function() {
-                console.log('✅ Reverb client is connected');
+                window.uiDebug?.('✅ Reverb client is connected');
                 // You can subscribe to channels here if needed
             });
             
             window.reverb.on('disconnected', function(data) {
-                console.log('🔌 Reverb client disconnected:', data);
+                window.uiDebug?.('🔌 Reverb client disconnected:', data);
             });
             
             window.reverb.on('error', function(error) {

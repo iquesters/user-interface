@@ -68,6 +68,17 @@ jobs:
         working-directory: user-interface
         run: vendor/bin/phpunit
 
+  assets:
+    name: JS bundle up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # public/dist/userinterface.js must match public/js (run `npm run build` and commit).
+      - run: npm run build:check
+
   lint:
     runs-on: ubuntu-latest
     # Report-only until the code base has been formatted once (separate commit).

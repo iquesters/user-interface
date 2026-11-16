@@ -66,6 +66,16 @@ composer lint      # Pint in check mode
 composer analyse   # PHPStan (Larastan)
 ```
 
+## Front-end (JS)
+
+The module's scripts in `public/js` ship as one bundle. After changing any of them:
+
+```bash
+npm run build      # updates public/dist/userinterface.js — commit it
+```
+
+CI fails when the bundle is out of date. Third-party libraries: see `docs/frontend-assets.md`.
+
 ## Pull requests
 
 - One topic per pull request; add or update tests for what you change.

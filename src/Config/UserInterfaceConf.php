@@ -20,6 +20,8 @@ class UserInterfaceConf extends BaseConf
     protected string $small_screen_featured_tab;
     protected string $small_screen_featured_position;
     protected SnackbarConf $snackbar_conf;
+    /** Third-party JS/CSS (jQuery, Bootstrap, Font Awesome, DataTables, JSON Editor): local | cdn */
+    protected string $vendor_assets;
 
     protected function prepareDefault(BaseConf $default_values)
     {
@@ -34,6 +36,7 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_featured_tab = '';
         $default_values->small_screen_featured_position = 'center';
         $default_values->snackbar_conf = new SnackbarConf();
+        $default_values->vendor_assets = 'local';
     }
 
 }

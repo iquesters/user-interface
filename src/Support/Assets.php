@@ -78,7 +78,27 @@ final class Assets extends ModuleAssets
         return self::discover('js');
     }
 
-    /** All public/{type} files of that type, sorted, optionally excluding a sub-folder. */
+    /**
+     * URL of the single bundled script (public/dist/userinterface.js, built by
+     * `npm run build`), or null to load the scripts one by one. The bundle is
+     * used when APP_DEBUG is off; while debugging, the individual files are
+     * loaded so edits show up without rebuilding.
+     */
+    public static function jsBundleUrl(): ?string
+    {
+        if (config('app.debug') || !file_exists(self::publicPath() . '/dist/userinterface.js')) {
+            return null;
+        }
+
+        return static::url('dist/userinterface.js');
+    }
+
+    /**
+     * All public/{type} files of that type, optionally excluding a sub-folder.
+     * Order: forward-slash relative path, plain byte comparison. The same rule
+     * as scripts/build-js.mjs, so the bundle matches the one-by-one load order
+     * on every OS.
+     */
     private static function discover(string $type, ?string $excludePrefix = null): array
     {
         $basePath = self::publicPath() . '/' . $type;
@@ -87,17 +107,22 @@ final class Assets extends ModuleAssets
             return [];
         }
 
-        return collect(File::allFiles($basePath))
+        $files = collect(File::allFiles($basePath))
             ->filter(fn ($file) => $file->getExtension() === $type)
-            ->reject(fn ($file) => $excludePrefix && str_starts_with($file->getRelativePathname(), $excludePrefix))
-            ->sortBy(fn ($file) => $file->getRelativePathname())
             ->map(fn ($file) => [
-                'type' => $type,
-                'path' => $type . '/' . str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()),
-                'media' => $type === 'css' ? self::cssMedia($file->getFilename()) : null,
+                'relative' => str_replace(DIRECTORY_SEPARATOR, '/', $file->getRelativePathname()),
+                'name' => $file->getFilename(),
             ])
-            ->values()
+            ->reject(fn ($file) => $excludePrefix && str_starts_with($file['relative'], $excludePrefix))
             ->all();
+
+        usort($files, fn ($a, $b) => strcmp($a['relative'], $b['relative']));
+
+        return array_map(fn ($file) => [
+            'type' => $type,
+            'path' => $type . '/' . $file['relative'],
+            'media' => $type === 'css' ? self::cssMedia($file['name']) : null,
+        ], $files);
     }
 
     /** Breakpoint-specific CSS (e.g. 4-userinterface-lg.css) only applies from that width. */

@@ -29,6 +29,7 @@ There is no `config/userinterface.php` and no `.env` keys; the DB is the only so
 | `small_screen_featured_tab` | empty | Featured module on mobile (e.g. `dashboard`) |
 | `small_screen_featured_position` | `center` | `center`, `left` or `right` |
 | `snackbar_conf.*` | | Toast position, stacking and timing |
+| `vendor_assets` | `local` | Third-party JS/CSS (jQuery, Bootstrap, Font Awesome, DataTables, JSON Editor): `local` = self-hosted copies shipped in `public/libs`, `cdn` = public CDNs. See [frontend-assets.md](frontend-assets.md) |
 
 ## Auth layout notes
 

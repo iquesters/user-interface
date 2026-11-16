@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased] – 2.0.0
 
+### Front-end assets
+- **One bundled script:** `public/js` is built into `public/dist/userinterface.js` (`npm run build`, no npm
+  dependencies). The layout loads the bundle when `APP_DEBUG` is off (1 request instead of ~37) and the individual
+  files while debugging. CI checks the bundle is up to date.
+- **Self-hosted libraries:** jQuery, Bootstrap JS, Font Awesome (+ webfonts), DataTables and JSON Editor ship in
+  `public/libs` (downloaded and SRI-verified by `npm run libs`). New setting `vendor_assets` (`local` default, `cdn`).
+  Removed the unused Google Font request. See `docs/frontend-assets.md`.
+
 ### Housekeeping
 - `console.log` calls go through `window.uiDebug` (only with `APP_DEBUG`); removed the `/pkg-test` debug route and commented-out code; added Pint/Larastan, test CI, `.gitattributes`, `SECURITY.md`, `CONTRIBUTING.md`, `UPGRADE.md` and composer metadata.
 

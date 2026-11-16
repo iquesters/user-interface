@@ -11,3 +11,9 @@
 /phpstan.neon.dist  export-ignore
 /pint.json          export-ignore
 /CONTRIBUTING.md    export-ignore
+/scripts            export-ignore
+/package.json       export-ignore
+
+# Generated, shipped with the package (do not diff line by line)
+/public/dist/**     linguist-generated=true -diff
+/public/libs/**     linguist-vendored=true -diff
