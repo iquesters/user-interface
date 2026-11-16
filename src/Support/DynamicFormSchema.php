@@ -71,10 +71,7 @@ class DynamicFormSchema
             //         return '[' . str_replace('-', '\-', $matches[1]) . ']';
             //     }, $pattern);
 
-            //     $fieldRules[] = 'regex:/' . $pattern . '/';
-            // }
-
-           if (!empty($field['pattern'])) {
+if (!empty($field['pattern'])) {
                 $pattern = $field['pattern'];
                 // wrap with # delimiter
                 $wrapped = '#' . $pattern . '#';
@@ -100,11 +97,7 @@ class DynamicFormSchema
     {
         $messages = [];
 
-        // foreach ($schema['fields'] as $field) {
-        //     $fieldId = $field['id'];
-        //     $fieldMessages = $field['messages'] ?? [];
-
-        //     // Map custom messages only if present
+//     // Map custom messages only if present
         //     if (!empty($fieldMessages['required'])) {
         //         $messages["{$fieldId}.required"] = $fieldMessages['required'];
         //     }

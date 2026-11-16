@@ -165,7 +165,7 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
 
-    console.log(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
+    window.uiDebug?.(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
 }
 
 function renderCell(col, row, rootFormSchemaUid) {
@@ -228,10 +228,10 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     const length = params.length || cache.pageSize;
     const page = Math.floor(start / length) + 1;
 
-    console.log(`${TABLE_LOG_REQUEST_PAGE} ${page} (offset=${start}, length=${length})`);
+    window.uiDebug?.(`${TABLE_LOG_REQUEST_PAGE} ${page} (offset=${start}, length=${length})`);
 
     if (cache.pageSize !== length) {
-        console.log(`${TABLE_LOG_PAGE_SIZE_CHANGED} ${cache.pageSize} → ${length}`);
+        window.uiDebug?.(`${TABLE_LOG_PAGE_SIZE_CHANGED} ${cache.pageSize} → ${length}`);
         cache.pageSize = length;
     }
 
@@ -248,7 +248,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     // Check cache first
     if (cache.hasRange(start, length)) {
         const cachedData = cache.get(start, length);
-        console.log(`${TABLE_LOG_SERVING_FROM_CACHE} (${start}-${start + length})`);
+        window.uiDebug?.(`${TABLE_LOG_SERVING_FROM_CACHE} (${start}-${start + length})`);
         
         callback({
             draw: params.draw,
@@ -265,7 +265,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     }
 
     // Fetch from API
-    console.log(TABLE_LOG_CACHE_MISS);
+    window.uiDebug?.(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
     const result = await fetchEntityData(entityName, start, length, query);
@@ -311,7 +311,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
     if (nextOffset >= cache.total) return;
     if (cache.hasRange(nextOffset, currentLength)) return;
 
-    console.log(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
+    window.uiDebug?.(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
 
     const queryKey = cache.queryKey;
     const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {})
@@ -319,7 +319,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
             // Ignore a prefetch for a search/sort that is no longer active.
             if (cache.queryKey === queryKey && result.success && result.data?.length) {
                 cache.set(nextOffset, result.data, result.total);
-                console.log(`${TABLE_LOG_PREFETCH_COMPLETE} ${result.data.length} rows`);
+                window.uiDebug?.(`${TABLE_LOG_PREFETCH_COMPLETE} ${result.data.length} rows`);
             }
         })
         .catch(err => console.warn(`${TABLE_MESSAGE_FAILED_LOAD_DATA} (prefetch):`, err))
@@ -421,11 +421,11 @@ function setupCheckboxHandlers(tableElement, isInboxView = false) {
 
 function updateSelectionCount(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`);
-    console.log(`${TABLE_LOG_SELECTED_ROWS} ${checkedBoxes.length}`);
+    window.uiDebug?.(`${TABLE_LOG_SELECTED_ROWS} ${checkedBoxes.length}`);
     
     // Get selected UIDs
     const selectedUids = Array.from(checkedBoxes).map(cb => cb.dataset.uid);
-    console.log(TABLE_MESSAGE_SELECTED_UIDS, selectedUids);
+    window.uiDebug?.(TABLE_MESSAGE_SELECTED_UIDS, selectedUids);
     
     // Dispatch event on document for bulk actions to catch
     const event = new CustomEvent(TABLE_EVENT_ROW_SELECTION_CHANGED, {

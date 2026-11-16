@@ -1,7 +1,30 @@
 {
   "name": "iquesters/user-interface",
   "description": "A modern, reusable, and customizable UI interface built for creating clean and responsive user experiences. Designed with simplicity, scalability, and flexibility in mind.",
+  "keywords": [
+    "laravel",
+    "admin",
+    "ui",
+    "forms",
+    "datatables",
+    "schema",
+    "iquesters"
+  ],
   "type": "library",
+  "license": "MIT",
+  "homepage": "https://github.com/iquesters/user-interface",
+  "support": {
+    "issues": "https://github.com/iquesters/user-interface/issues",
+    "source": "https://github.com/iquesters/user-interface",
+    "security": "https://github.com/iquesters/user-interface/security/policy",
+    "docs": "https://github.com/iquesters/user-interface/tree/main/docs"
+  },
+  "authors": [
+    {
+      "name": "Pritam Bag",
+      "email": "pritam02b@gmail.com"
+    }
+  ],
   "require": {
     "php": "^8.3",
     "laravel/framework": "^12.0|^13.0",
@@ -15,16 +38,22 @@
   "require-dev": {
     "orchestra/testbench": "^10.0|^11.0",
     "laravel/sanctum": "^4.0",
-    "spatie/laravel-permission": "^8.0"
+    "spatie/laravel-permission": "^8.0",
+    "laravel/pint": "^1.18",
+    "larastan/larastan": "^3.0"
   },
   "repositories": [
     {
       "type": "path",
       "url": "../foundation",
-      "options": { "symlink": true, "versions": { "iquesters/foundation": "2.x-dev" } }
+      "options": {
+        "symlink": true,
+        "versions": {
+          "iquesters/foundation": "2.x-dev"
+        }
+      }
     }
   ],
-  "license": "MIT",
   "autoload": {
     "psr-4": {
       "Iquesters\\UserInterface\\": "src/",
@@ -37,14 +66,11 @@
     }
   },
   "scripts": {
-    "test": "phpunit"
+    "test": "phpunit",
+    "format": "pint",
+    "lint": "pint --test",
+    "analyse": "phpstan analyse --memory-limit=1G"
   },
-  "authors": [
-    {
-      "name": "Pritam Bag",
-      "email": "pritam02b@gmail.com"
-    }
-  ],
   "minimum-stability": "dev",
   "prefer-stable": true,
   "extra": {

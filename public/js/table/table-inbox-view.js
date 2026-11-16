@@ -49,7 +49,7 @@ function styleInboxRows(tableElement) {
 // 📧 INBOX VIEW RENDERING
 // ---------------------------
 function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targetParent = null) {
-    console.log(TABLE_LOG_RENDER_INBOX_VIEW, entityName);
+    window.uiDebug?.(TABLE_LOG_RENDER_INBOX_VIEW, entityName);
     
     const { columns = [] } = dtConfig;
     
@@ -58,7 +58,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     container.className = `${TABLE_SELECTOR_INBOX_VIEW_CONTAINER.slice(1)} ${TABLE_CLASS_W_100}`;
     container.style.cssText = TABLE_STYLE_INBOX_CONTAINER;
     
-    console.log(TABLE_LOG_CREATED_INBOX_CONTAINER);
+    window.uiDebug?.(TABLE_LOG_CREATED_INBOX_CONTAINER);
     
     // Left panel (list view) - flex container with flex-column
     const leftPanel = document.createElement('div');
@@ -82,7 +82,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     container.appendChild(resizer);
     container.appendChild(rightPanelEle);
     
-    console.log(TABLE_LOG_ASSEMBLED_INBOX_CONTAINER);
+    window.uiDebug?.(TABLE_LOG_ASSEMBLED_INBOX_CONTAINER);
     
     // Use provided parent or fall back to table's parent
     const parentNode = targetParent || tableElement.parentNode;
@@ -92,24 +92,24 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         return;
     }
     
-    console.log(TABLE_LOG_PARENT_NODE_FOUND, parentNode.className);
+    window.uiDebug?.(TABLE_LOG_PARENT_NODE_FOUND, parentNode.className);
     
     // Check if table is actually a child of parentNode
     if (tableElement.parentNode === parentNode) {
         // Table is in the parent, insert before it
-        console.log(TABLE_LOG_INSERTING_CONTAINER_BEFORE_TABLE);
+        window.uiDebug?.(TABLE_LOG_INSERTING_CONTAINER_BEFORE_TABLE);
         parentNode.insertBefore(container, tableElement);
     } else {
         // Table is not in parent (or was removed), just append container
-        console.log(TABLE_LOG_APPENDING_CONTAINER);
+        window.uiDebug?.(TABLE_LOG_APPENDING_CONTAINER);
         parentNode.appendChild(container);
     }
     
     // Hide the table
     tableElement.style.display = 'none';
     
-    console.log(TABLE_LOG_INBOX_CONTAINER_INSERTED);
-    console.log(TABLE_LOG_CONTAINER_PARENT, container.parentNode?.className);
+    window.uiDebug?.(TABLE_LOG_INBOX_CONTAINER_INSERTED);
+    window.uiDebug?.(TABLE_LOG_CONTAINER_PARENT, container.parentNode?.className);
     
     // Create DataTable
     const listTable = document.createElement('table');
@@ -152,7 +152,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         }
     ];
     
-    console.log(TABLE_LOG_INITIALIZING_INBOX_DATATABLE);
+    window.uiDebug?.(TABLE_LOG_INITIALIZING_INBOX_DATATABLE);
     
     // Initialize DataTable
     const dt = $(listTable).DataTable({
@@ -206,7 +206,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Setup checkbox handlers
     setupCheckboxHandlers(listTable, true);
 
-    console.log(`${TABLE_LOG_INBOX_VIEW_READY} ${entityName}`);
+    window.uiDebug?.(`${TABLE_LOG_INBOX_VIEW_READY} ${entityName}`);
 
     // Handle row selection
     $(listTable).on('click', TABLE_SELECTOR_INBOX_ROW, function(e) {
@@ -226,7 +226,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         }
     });
     
-    console.log(`${TABLE_LOG_INBOX_VIEW_FULLY_READY} ${entityName}`);
+    window.uiDebug?.(`${TABLE_LOG_INBOX_VIEW_FULLY_READY} ${entityName}`);
     
     // Force a reflow to ensure rendering
     container.offsetHeight;
@@ -236,7 +236,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
  * Apply sticky positioning to DataTables elements in inbox view
  */
 function applyInboxStickyStyles(leftPanel) {
-    console.log(TABLE_LOG_APPLYING_INBOX_STICKY);
+    window.uiDebug?.(TABLE_LOG_APPLYING_INBOX_STICKY);
     
     // Find the DataTables container that was created by DataTables
     const dtContainer = leftPanel.querySelector(TABLE_SELECTOR_DT_CONTAINER);
@@ -245,7 +245,7 @@ function applyInboxStickyStyles(leftPanel) {
         return;
     }
     
-    console.log(TABLE_LOG_DT_CONTAINER_FOUND);
+    window.uiDebug?.(TABLE_LOG_DT_CONTAINER_FOUND);
     
     // Make the dt-container fill the leftPanel and use flexbox
     dtContainer.style.display = 'flex';
@@ -261,7 +261,7 @@ function applyInboxStickyStyles(leftPanel) {
         el.classList.contains(TABLE_CLASS_DT_LAYOUT_ROW) || el.classList.contains(TABLE_CLASS_DT_LAYOUT_TABLE)
     );
     
-    console.log(`${TABLE_LOG_LAYOUT_ELEMENTS_FOUND} ${layoutRows.length}`);
+    window.uiDebug?.(`${TABLE_LOG_LAYOUT_ELEMENTS_FOUND} ${layoutRows.length}`);
     
     // Identify each row by its content
     layoutRows.forEach((row, index) => {
@@ -271,7 +271,7 @@ function applyInboxStickyStyles(leftPanel) {
         const hasPagination = row.querySelector(TABLE_SELECTOR_DT_PAGING_OR_PAGINATE);
         const hasInfo = row.querySelector(TABLE_SELECTOR_DT_INFO_OR_INFO);
         
-        console.log(`${TABLE_LOG_ROW_LAYOUT} ${index}:`, {
+        window.uiDebug?.(`${TABLE_LOG_ROW_LAYOUT} ${index}:`, {
             hasSearch: !!hasSearch,
             hasLength: !!hasLength,
             hasTable: !!hasTable,
@@ -283,7 +283,7 @@ function applyInboxStickyStyles(leftPanel) {
         // Top row: Contains search or page length controls
         if ((hasSearch || hasLength) && !hasTable && !hasPagination) {
             row.classList.add(TABLE_CLASS_FLEX_SHRINK_0, TABLE_CLASS_STICKY_TOP, TABLE_CLASS_Z_3, TABLE_CLASS_BORDER_BOTTOM);
-            console.log(`${TABLE_LOG_STYLED_TOP_CONTROLS} ${index}`);
+            window.uiDebug?.(`${TABLE_LOG_STYLED_TOP_CONTROLS} ${index}`);
         }
         
         // Table row: Contains the actual table
@@ -336,19 +336,19 @@ function applyInboxStickyStyles(leftPanel) {
                 thead.style.top = TABLE_STYLE_TOP_ZERO;
                 thead.style.zIndex = TABLE_STYLE_ZINDEX_STICKY;
             }
-            console.log(`${TABLE_LOG_STYLED_SCROLL_TABLE} ${index}`);
+            window.uiDebug?.(`${TABLE_LOG_STYLED_SCROLL_TABLE} ${index}`);
         }
         
         // Bottom row: Contains pagination or info
         else if (hasPagination || hasInfo) {
             row.classList.add(TABLE_CLASS_FLEX_SHRINK_0, TABLE_CLASS_POSITION_STICKY, TABLE_CLASS_BOTTOM_0, TABLE_CLASS_Z_3, TABLE_CLASS_BORDER_TOP);
-            console.log(`${TABLE_LOG_STYLED_BOTTOM_PAGINATION} ${index}`);
+            window.uiDebug?.(`${TABLE_LOG_STYLED_BOTTOM_PAGINATION} ${index}`);
         }
     });
     
     applyCompactDataTableControls(dtContainer);
 
-    console.log(TABLE_LOG_STICKY_STYLES_COMPLETE);
+    window.uiDebug?.(TABLE_LOG_STICKY_STYLES_COMPLETE);
 }
 
 function applyTableModeLayout(tableElement) {

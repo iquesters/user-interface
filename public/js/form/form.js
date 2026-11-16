@@ -358,7 +358,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     }
 
     if (detailContext?.componentBackedEdit && nextMode === 'view') {
-        console.log('🔁 Returning inbox detail to component view from form mode.', {
+        window.uiDebug?.('🔁 Returning inbox detail to component view from form mode.', {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
             nextMode,
@@ -469,7 +469,7 @@ async function handleFormCancelAction(formElement, formMeta) {
     const detailContext = resolveInboxDetailContext(formElement);
 
     if (detailContext?.componentBackedEdit && formMeta.formMode === 'edit') {
-        console.log('↩️ Canceling inbox detail edit and restoring component view.', {
+        window.uiDebug?.('↩️ Canceling inbox detail edit and restoring component view.', {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
         });
@@ -563,8 +563,8 @@ function appendViewModeActions(container, formMeta, formElement) {
 }
 
 async function setupForm(formElement) {
-    console.log("setuping lab-form...")
-    console.log("formId = " + formElement.id)
+    window.uiDebug?.("setuping lab-form...")
+    window.uiDebug?.("formId = " + formElement.id)
 
     // The server renders a generic skeleton when it can't resolve the schema
     // (e.g. reusable form templates in the table split view). If the schema
@@ -596,7 +596,7 @@ async function setupForm(formElement) {
         getUserFormPersonalization(formElement.id)
     );
 
-    console.log("formMeta>>>>>>>>>>>", formMeta)
+    window.uiDebug?.("formMeta>>>>>>>>>>>", formMeta)
 
 
     //Skeleton remove
@@ -670,7 +670,7 @@ async function setupForm(formElement) {
 
         // Submit button
         if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-            console.log("Adding submit button with label:", formMeta.submitButtonLabel);
+            window.uiDebug?.("Adding submit button with label:", formMeta.submitButtonLabel);
             const submitBtn = document.createElement(HTML_TAG.BUTTON);
             submitBtn.type = "submit";
             submitBtn.textContent = formMeta.submitButtonLabel || "Submit";
@@ -687,7 +687,7 @@ async function setupForm(formElement) {
     }
 
     if (formMeta.cardElevation) {
-        console.log("Applying Bootstrap card elevation styles");
+        window.uiDebug?.("Applying Bootstrap card elevation styles");
 
         formElement.classList.add(
             STYLE_CLASS.SHADOW,
@@ -707,7 +707,7 @@ async function setupForm(formElement) {
 
     // Skeleton screen rendering
     // if (formMeta.skeletonRender) {
-    //     // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
+    //     // window.uiDebug?.("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
     //     // ✅ Create skeleton container
     //     const skeletonWrapper = document.createElement(HTML_TAG.DIV);
@@ -783,7 +783,7 @@ async function setupForm(formElement) {
     //     setTimeout(() => {
     //         skeletonWrapper.remove();
     //         formElement.classList.remove("d-none");
-    //         // console.log("Skeleton render complete, real form displayed");
+    //         // window.uiDebug?.("Skeleton render complete, real form displayed");
     //     }, formMeta.skeletonRenderDelay || 25000);
     // }
 
@@ -1300,7 +1300,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 result
             );
 
-            console.log('✅ Form submitted from inbox detail; restoring component-backed detail view.', {
+            window.uiDebug?.('✅ Form submitted from inbox detail; restoring component-backed detail view.', {
                 entity: detailContext.schema?.entity,
                 uid: nextDetailData?.uid || detailContext.data?.uid || null,
                 method,
@@ -1644,7 +1644,7 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
 
         // ✅ On click handler
         editIcon.addEventListener('click', function () {
-            console.log('Edit icon clicked');
+            window.uiDebug?.('Edit icon clicked');
         });
         headingDiv.appendChild(editIcon);
     }
@@ -1857,7 +1857,7 @@ function addAction(action, addTo) {
 
 
         //     // actionElement.addEventListener("click", (e) => {
-        //     //     console.log("Submit button clicked for form:");
+        //     //     window.uiDebug?.("Submit button clicked for form:");
         //     // });
 
 
@@ -2015,7 +2015,7 @@ function addFieldFeedback(feedback, addTo) {
 
 
 function setupCoreFormElement() {
-    console.log("setuping lab-form-elements ...")
+    window.uiDebug?.("setuping lab-form-elements ...")
     $('.shoz-form-element').each(function (e) {
         setupOneCoreFormElement(this)
     })
@@ -2049,7 +2049,7 @@ function setupOneCoreFormElement(element) {
             } else {
                 defaultOption = "-- select an option --"
             }
-            //console.log("Selected Option: "element.val())
+            //window.uiDebug?.("Selected Option: "element.val())
             // create new option element
 
             let selectedFlag = "selected"
@@ -2061,7 +2061,7 @@ function setupOneCoreFormElement(element) {
         // checking if type is given
         if (element.attr('type')) {
             let type = element.attr('type') // get the given type of the input element
-            console.log("type::" + type)
+            window.uiDebug?.("type::" + type)
 
             //password type
             if (type == INPUT_TYPE.TYPE_PASSWORD) {
@@ -2077,7 +2077,7 @@ function setupOneCoreFormElement(element) {
             let dataType = element.attr('data-type') // get the given
             // overruled data-type
             // of shoz-form-element
-            console.log("dataType::" + dataType)
+            window.uiDebug?.("dataType::" + dataType)
 
             if (dataType == INPUT_TYPE.DATA_TYPE_DATETIME) {
                 //TODO: Send datetime field value format along with it's value in the hidden input field
@@ -2094,10 +2094,10 @@ function setupOneCoreFormElement(element) {
                 /* if value is there then set it to date time picker */
                 let dateValue
                 if (element.val()) {
-                    console.log("value = " + element.val())
+                    window.uiDebug?.("value = " + element.val())
                     let value = element.val()
                     if ($.isNumeric(value)) {
-                        console.log("value isNumeric - and in milliseconds")
+                        window.uiDebug?.("value isNumeric - and in milliseconds")
                         dateValue = new Date()
                         dateValue.setTime(value)
                     } //TODO else if other formats 
@@ -2132,8 +2132,8 @@ function setupOneCoreFormElement(element) {
                     dtpOption = { format: INPUT_TYPE.DTP_FORMAT_DATE_TIME }
                 }
 
-                console.log("dtpOption:: " + JSON.stringify(dtpOption))
-                console.log("parent: " + element.parent().attr('class'))
+                window.uiDebug?.("dtpOption:: " + JSON.stringify(dtpOption))
+                window.uiDebug?.("parent: " + element.parent().attr('class'))
                 let dateTimePickerId = element.attr('id') + "-datetimepicker"
                 $('#' + dateTimePickerId).datetimepicker(dtpOption).on('dp.change', function () {
                     //TODO
@@ -2220,11 +2220,11 @@ function checkFormAccess(formMeta, formElement) {
 (() => {
     'use strict'
     document.addEventListener('readystatechange', () => {
-        console.log("document.readyState>>>>>>>>>>>>>>", document.readyState);
+        window.uiDebug?.("document.readyState>>>>>>>>>>>>>>", document.readyState);
         if (document.readyState === "complete") {
             // Fetch all the forms marked as lab-form
             const forms = document.querySelectorAll('.lab-form, .shoz-form')
-            // console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
+            // window.uiDebug?.("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {
                 setupForm(form)

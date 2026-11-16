@@ -515,7 +515,7 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
 
     if (updatedRow) {
         dt.draw(false);
-        console.log(TABLE_LOG_SUMMARY_SYNC_COMPLETE, {
+        window.uiDebug?.(TABLE_LOG_SUMMARY_SYNC_COMPLETE, {
             entity,
             entityUid,
         });
@@ -537,7 +537,7 @@ async function openDetailInPreferredMode(context, overrides = {}) {
     const nextPreferredMode = overrides.preferredMode || context.preferredMode;
     const nextFormMode = overrides.formMode || 'view';
 
-    console.log(TABLE_LOG_SWITCHING_DETAIL_MODE, {
+    window.uiDebug?.(TABLE_LOG_SWITCHING_DETAIL_MODE, {
         entity: context.schema?.entity,
         uid: context.data?.uid || context.data?.id || null,
         preferredMode: nextPreferredMode,
@@ -566,7 +566,7 @@ function appendHybridDetailEditButton(header, detailContext) {
         event.preventDefault();
         event.stopPropagation();
 
-        console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
+        window.uiDebug?.(TABLE_LOG_OPENING_DETAIL_EDITOR, {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
             formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -616,12 +616,12 @@ async function handleHybridDetailDelete(detailContext) {
 
     const confirmed = window.confirm(TABLE_MESSAGE_CONFIRM_DELETE);
     if (!confirmed) {
-        console.log(TABLE_LOG_DETAIL_DELETE_CANCELLED, { entity, entityUid });
+        window.uiDebug?.(TABLE_LOG_DETAIL_DELETE_CANCELLED, { entity, entityUid });
         return;
     }
 
     const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
-    console.log(TABLE_LOG_DELETING_DETAIL_RECORD, {
+    window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
         endpoint,
@@ -680,7 +680,7 @@ async function handleHybridDetailDelete(detailContext) {
             }
         }
 
-        console.log(TABLE_LOG_DETAIL_DELETE_SUCCESS, {
+        window.uiDebug?.(TABLE_LOG_DETAIL_DELETE_SUCCESS, {
             entity,
             entityUid,
         });
@@ -716,7 +716,7 @@ function appendHybridDetailActions(rightPanelEle, contentContainer, detailContex
             event.preventDefault();
             event.stopPropagation();
 
-            console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
+            window.uiDebug?.(TABLE_LOG_OPENING_DETAIL_EDITOR, {
                 entity: detailContext.schema?.entity,
                 uid: detailContext.data?.uid || detailContext.data?.id || null,
                 formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -759,7 +759,7 @@ function getNestedDetailValue(source, paths = []) {
 }
 
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
-    console.log(TABLE_LOG_LOADING_DETAIL_PANEL, {
+    window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
         requestedPreferredMode: options?.preferredMode || null,
@@ -936,7 +936,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             }
         }
 
-        console.log(TABLE_LOG_RESOLVED_DETAIL_STRATEGY, {
+        window.uiDebug?.(TABLE_LOG_RESOLVED_DETAIL_STRATEGY, {
             entity: schema?.entity,
             uid: data?.uid || data?.id || null,
             preferredMode,
@@ -957,7 +957,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         let rendered = false;
 
         for (const attempt of detailAttempts) {
-            console.log(`${TABLE_LOG_LOADING_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`);
+            window.uiDebug?.(`${TABLE_LOG_LOADING_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`);
 
             let result = null;
 
@@ -1019,7 +1019,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             
             initializeDetailViewScripts(contentContainer);
             
-            console.log(`${TABLE_LOG_DETAIL_COMPONENT_LOADED} ${data.uid}`);
+            window.uiDebug?.(`${TABLE_LOG_DETAIL_COMPONENT_LOADED} ${data.uid}`);
             rendered = true;
             break;
         }

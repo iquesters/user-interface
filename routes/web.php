@@ -5,7 +5,6 @@ use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
 
-
 Route::middleware(['web'])->group(function () {
     Route::middleware(['auth'])->group(function () {
 
@@ -24,10 +23,6 @@ Route::middleware(['web'])->group(function () {
             Route::get('/delete/{form_schema_id}/{entity_uid}', [UIController::class, 'delete'])->name('.delete');
         });
 
-        Route::get('/pkg-test', function () {
-            return "✅ User Interface Package is working!";
-        });
-
         Route::get('/theme', [UIController::class, 'setTheme'])->name('ui.theme');
 
         Route::prefix('form')->name('form')->middleware('ensure.admin')->group(function () {
@@ -39,8 +34,7 @@ Route::middleware(['web'])->group(function () {
             Route::post('/{id}/update', [FormController::class, 'update'])->name('.update.schema');
             Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
 
-
-            Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
+Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
             Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
             Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
         });
@@ -55,17 +49,7 @@ Route::middleware(['web'])->group(function () {
             Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
         });
 
-        // Route::get('userinterface/assets/{path}', function ($path) {
-        //     $file = __DIR__ . '/../public/' . $path;
-
-        //     if (!File::exists($file)) {
-        //         abort(404);
-        //     }
-
-        //     return response()->file($file);
-        // })->where('path', '.*')->name('userinterface.asset');
-
-    });
+});
 });
 
 require __DIR__ . '/api.php';

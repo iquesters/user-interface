@@ -17,7 +17,7 @@ class EntityCache {
         data.forEach((row, idx) => {
             this.cache.set(offset + idx, row);
         });
-        console.log(`📦 Cached ${data.length} rows starting at offset ${offset} (total cached: ${this.cache.size})`);
+        window.uiDebug?.(`📦 Cached ${data.length} rows starting at offset ${offset} (total cached: ${this.cache.size})`);
     }
 
     get(start, length) {
@@ -55,7 +55,7 @@ class EntityCache {
     clear() {
         this.cache.clear();
         this.prefetchPromises.clear();
-        console.log(`🧹 Cache cleared for ${this.entity}`);
+        window.uiDebug?.(`🧹 Cache cleared for ${this.entity}`);
     }
 
     updateRowByUid(entityUid, nextRow) {
@@ -67,7 +67,7 @@ class EntityCache {
             const cachedUid = cachedRow?.uid || cachedRow?.id || null;
             if (cachedUid === entityUid) {
                 this.cache.set(offset, nextRow);
-                console.log('🔄 Updated cached row by uid.', {
+                window.uiDebug?.('🔄 Updated cached row by uid.', {
                     entity: this.entity,
                     entityUid,
                     offset,

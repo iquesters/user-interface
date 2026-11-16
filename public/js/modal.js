@@ -247,7 +247,7 @@ function showModalSnackbar(message, type = 'info') {
         return
     }
 
-    console.log(`[${type.toUpperCase()}] ${text}`)
+    window.uiDebug?.(`[${type.toUpperCase()}] ${text}`)
 }
 
 function handleSchemaFormSubmitted(event) {

@@ -49,9 +49,9 @@ async function setupFormBlock(formCol, formMeta) {
             formData = JSON.parse(formData)
             delete form.dataset.formData
         } else {
-            console.log("data-form-data is not provided")
+            window.uiDebug?.("data-form-data is not provided")
         }
-        console.log("formData = " + formData)
+        window.uiDebug?.("formData = " + formData)
 
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;

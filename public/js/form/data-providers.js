@@ -23,7 +23,7 @@ async function getFormSchema(formID) {
         return formSchemaPendingRequests.get(formID);
     }
 
-    console.log("Fetching form schema for formID: " + formID);
+    window.uiDebug?.("Fetching form schema for formID: " + formID);
     const pendingRequest = fetch(uiApiUrl('noauth/form/' + encodeURIComponent(formID)))
         .then(response => response.json())
         .then(formSchema => {
@@ -36,7 +36,7 @@ async function getFormSchema(formID) {
             return resolvedSchema;
         })
         .catch(err => {
-            console.log(err);
+            window.uiDebug?.(err);
             return null;
         })
         .finally(() => {
@@ -58,7 +58,7 @@ async function getFormSchema(formID) {
 async function getTableSchema(tableID) {
    let tableSchema = await fetch('/api/noauth/table/'+tableID)
        .then(response => response.json())
-       .catch(err => console.log(err))
+       .catch(err => window.uiDebug?.(err))
    
    return tableSchema?.response_schema?.data ?? tableSchema?.data;
 }

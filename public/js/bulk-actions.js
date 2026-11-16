@@ -31,7 +31,7 @@ class BulkActionsManager {
             return;
         }
 
-        console.log('🎯 Initializing bulk actions');
+        window.uiDebug?.('🎯 Initializing bulk actions');
         
         this.currentEntity = entityName;
 
@@ -49,12 +49,12 @@ class BulkActionsManager {
 
         // Listen for selection changes
         document.addEventListener('rowSelectionChanged', (e) => {
-            console.log('📢 Selection changed event received:', e.detail);
+            window.uiDebug?.('📢 Selection changed event received:', e.detail);
             this.handleSelectionChange(e.detail);
         });
 
         window.addEventListener('rowSelectionChanged', (e) => {
-            console.log('📢 Selection changed event received on window:', e.detail);
+            window.uiDebug?.('📢 Selection changed event received on window:', e.detail);
             this.handleSelectionChange(e.detail);
         });
 
@@ -83,7 +83,7 @@ class BulkActionsManager {
         }, 500);
 
         this.initialized = true;
-        console.log('✅ Bulk actions initialized');
+        window.uiDebug?.('✅ Bulk actions initialized');
     }
 
     /**
@@ -92,7 +92,7 @@ class BulkActionsManager {
     checkForExistingSelections() {
         const selectedUids = this.getSelectedUids();
         if (selectedUids.length > 0) {
-            console.log('📋 Found existing selections:', selectedUids.length);
+            window.uiDebug?.('📋 Found existing selections:', selectedUids.length);
             this.handleSelectionChange({ 
                 count: selectedUids.length, 
                 uids: selectedUids 
@@ -282,7 +282,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('📝 Bulk editing:', selectedUids);
+        window.uiDebug?.('📝 Bulk editing:', selectedUids);
         this.showToast(`Ready to edit ${selectedUids.length} item(s)`, 'info');
     }
 
@@ -301,7 +301,7 @@ class BulkActionsManager {
         
         if (!confirmed) return;
 
-        console.log('🗑️ Bulk deleting:', selectedUids);
+        window.uiDebug?.('🗑️ Bulk deleting:', selectedUids);
         
         try {
             this.setButtonLoading('bulkDeleteBtn', true);
@@ -334,7 +334,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('📥 Bulk exporting:', selectedUids);
+        window.uiDebug?.('📥 Bulk exporting:', selectedUids);
         
         try {
             this.setButtonLoading('bulkExportBtn', true);
@@ -367,7 +367,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('📦 Bulk archiving:', selectedUids);
+        window.uiDebug?.('📦 Bulk archiving:', selectedUids);
         
         try {
             const response = await apiClient.post('/api/bulk-archive', {
@@ -394,7 +394,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('📋 Bulk duplicating:', selectedUids);
+        window.uiDebug?.('📋 Bulk duplicating:', selectedUids);
         
         try {
             const response = await apiClient.post('/api/bulk-duplicate', {
@@ -421,7 +421,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('🔄 Bulk status change:', selectedUids, 'to', status);
+        window.uiDebug?.('🔄 Bulk status change:', selectedUids, 'to', status);
         
         try {
             const response = await apiClient.post('/api/bulk-status', {
@@ -449,7 +449,7 @@ class BulkActionsManager {
         const selectedUids = this.validateSelection();
         if (!selectedUids) return;
 
-        console.log('👤 Bulk assigning:', selectedUids, 'to', assignTo);
+        window.uiDebug?.('👤 Bulk assigning:', selectedUids, 'to', assignTo);
         
         try {
             const response = await apiClient.post('/api/bulk-assign', {
@@ -544,7 +544,7 @@ class BulkActionsManager {
         // Update UI
         this.updateUI(0);
         
-        console.log('✨ Selection cleared');
+        window.uiDebug?.('✨ Selection cleared');
     }
 
     // ---------------------------
@@ -561,7 +561,7 @@ class BulkActionsManager {
             return;
         }
 
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        window.uiDebug?.(`[${type.toUpperCase()}] ${message}`);
     }
 }
 

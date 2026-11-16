@@ -78,7 +78,6 @@ class FormController extends Controller
 
         // create form
         $result = FormSchema::create([
-            // 'uid' => Str::ulid()->toString(),
             'uid' => (string) Str::ulid(),
             'name' => $request['name'],
             'slug' => $slug,
@@ -156,8 +155,7 @@ class FormController extends Controller
 
     public function delete() {}
 
-
-    public function formCreation($id = 0){
+public function formCreation($id = 0){
         $parent_id = $id;
 
         $data = (object)array(
@@ -172,8 +170,7 @@ class FormController extends Controller
         return view('userinterface::form-schemas.formcreation', compact('data'));
     }
 
-
-    public function formCreation_new($id = 0){
+public function formCreation_new($id = 0){
         $parent_id = $id;
 
         $data = (object)array(
@@ -188,9 +185,7 @@ class FormController extends Controller
         return view('userinterface::form-schemas.formcreation_new', compact('data'));
     }
 
-
-
-    /**
+/**
      * Validate a submission against the form schema (no save). Web form post.
      */
     public function formsubmit(Request $request, $uid)
@@ -245,8 +240,5 @@ class FormController extends Controller
         static::logInfo("No Auth: Fetching form schema for slug: " . $slug);
         return $this->getFormSchema($slug);
     }
-
-
-
 
 }

@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased] – 2.0.0
 
+### Housekeeping
+- `console.log` calls go through `window.uiDebug` (only with `APP_DEBUG`); removed the `/pkg-test` debug route and commented-out code; added Pint/Larastan, test CI, `.gitattributes`, `SECURITY.md`, `CONTRIBUTING.md`, `UPGRADE.md` and composer metadata.
+
 ### Breaking
 - Requires PHP 8.3, Laravel 12/13 and spatie/laravel-permission 8.
 - `config/userinterface.php` removed; all settings come from the DB conf (`UserInterfaceConf`). See [docs/configuration.md](docs/configuration.md).

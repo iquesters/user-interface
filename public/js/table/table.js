@@ -15,7 +15,7 @@ function registerTableGlobals() {
 }
 
 async function initializeLabTables() {
-    console.log('📄 DOM Ready - Initializing tables from main entry.', {
+    window.uiDebug?.('📄 DOM Ready - Initializing tables from main entry.', {
         tableSelector: TABLE_SELECTOR_LAB_TABLE,
     });
 

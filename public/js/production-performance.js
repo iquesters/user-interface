@@ -31,8 +31,8 @@ window.addEventListener('load', () => {
     currPE.startTimestamp = currPE.startTimestamp || currPE.endTimestamp
     currPE.loadTime = currPE.endTimestamp - currPE.startTimestamp
 
-    console.log("Recent Performance Entry: " + JSON.stringify(currPE, null, 2))
-    console.log("Recent load time: " + (currPE.loadTime / 1000).toFixed(2) + "secs")
+    window.uiDebug?.("Recent Performance Entry: " + JSON.stringify(currPE, null, 2))
+    window.uiDebug?.("Recent load time: " + (currPE.loadTime / 1000).toFixed(2) + "secs")
 
     localStorage.setItem(CURRENT_PERFORMANCE_ENTRY_KEY, JSON.stringify(currPE))
 })

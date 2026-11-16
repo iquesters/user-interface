@@ -38,6 +38,16 @@
     window.CSRF_TOKEN = "{{ csrf_token() }}";
 
     window.USER_INTERFACE_CONFIG = window.USER_INTERFACE_CONFIG || {};
+
+    // Debug logging for the module JS (window.uiDebug?.(...)): only with APP_DEBUG,
+    // so production consoles stay clean. console.warn/error are always shown.
+    window.USER_INTERFACE_CONFIG.debug = @json((bool) config('app.debug'));
+    window.uiDebug = (...args) => {
+        if (window.USER_INTERFACE_CONFIG?.debug) {
+            console.log(...args);
+        }
+    };
+
     window.USER_INTERFACE_CONFIG.snackbar = {
         position: @json($uiSnackbarConf->position ?? 'bottom-right'),
         duration: @json($uiSnackbarConf->duration ?? 3000),

@@ -1,5 +1,5 @@
 window.applyValidationMessage = function (type, field, input, messages) {
-  // console.log("type received:", type, "input:", input); 
+  // window.uiDebug?.("type received:", type, "input:", input); 
 
   // ✅ Attach "change" event listener for file inputs (only once)
   if (type === VALIDATION_KEYS.FILE && !input.dataset.validationAttached) {
@@ -103,7 +103,7 @@ window.applyValidationMessage = function (type, field, input, messages) {
       break;
 
     case VALIDATION_KEYS.FILE:
-      console.log("file");
+      window.uiDebug?.("file");
       switch (true) {
         case input.validity.typeMismatch && !!messages.accept:
           input.setCustomValidity(messages.accept);
