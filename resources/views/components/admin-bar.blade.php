@@ -1,4 +1,6 @@
-@if(auth()->check() && auth()->user()->hasRole('super-admin'))
+{{-- dashboard / admin.dashboard are provided by iquesters/user-management --}}
+@if(auth()->check() && method_exists(auth()->user(), 'hasRole') && auth()->user()->hasRole('super-admin')
+    && Route::has('dashboard') && Route::has('admin.dashboard'))
     @php
         $currentRoute = Route::currentRouteName();
     @endphp

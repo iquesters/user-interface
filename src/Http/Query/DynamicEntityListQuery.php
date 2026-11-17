@@ -9,7 +9,7 @@ use Iquesters\UserInterface\Constants\EntityListParams;
 use Throwable;
 
 /**
- * @mixin \Iquesters\Foundation\System\Traits\Loggable
+ * @mixin Loggable
  */
 class DynamicEntityListQuery
 {
@@ -37,14 +37,14 @@ class DynamicEntityListQuery
     ) {}
 
     /**
-     * @param array<int, array{field: string, op: string, value: mixed}> $filters
+     * @param  array<int, array{field: string, op: string, value: mixed}>  $filters
      */
     public function applyFilters(array $filters): static
     {
         try {
             foreach ($filters as $filter) {
                 $field = $filter['field'] ?? null;
-                $op    = $filter['op']    ?? EntityListParams::OP_EQ;
+                $op = $filter['op'] ?? EntityListParams::OP_EQ;
                 $value = $filter['value'] ?? null;
 
                 if (! is_string($field) || $value === null || $value === '') {
@@ -58,6 +58,7 @@ class DynamicEntityListQuery
                         $field,
                         $op
                     ));
+
                     continue;
                 }
 
@@ -87,13 +88,54 @@ class DynamicEntityListQuery
     }
 
     /**
-     * @param array<int, array{column: string, direction: string}> $sorts
+     * Free-text search: a row matches when any text-like main column or any
+     * of its meta values contains the term (case-insensitive under the
+     * default collations). LIKE wildcards in the term are matched literally.
+     */
+    public function applySearch(?string $term): static
+    {
+        $term = trim((string) $term);
+
+        if ($term === '') {
+            return $this;
+        }
+
+        $term = mb_substr($term, 0, EntityListParams::MAX_SEARCH_LENGTH);
+        $like = '%'.addcslashes($term, '\\%_').'%';
+
+        $columns = array_keys(array_filter(
+            $this->mainFieldDefinitions,
+            fn (array $definition) => $this->isSearchableType($definition['type'] ?? 'string')
+        ));
+        $metaTable = $this->metaTable;
+
+        if (empty($columns) && ! $metaTable) {
+            return $this;
+        }
+
+        $this->query->where(function (Builder $where) use ($columns, $metaTable, $like) {
+            foreach ($columns as $column) {
+                $where->orWhere($column, 'LIKE', $like);
+            }
+
+            if ($metaTable) {
+                $where->orWhereIn('id', function (Builder $sub) use ($metaTable, $like) {
+                    $sub->select('ref_parent')->from($metaTable)->where('meta_value', 'LIKE', $like);
+                });
+            }
+        });
+
+        return $this;
+    }
+
+    /**
+     * @param  array<int, array{column: string, direction: string}>  $sorts
      */
     public function applySort(array $sorts): static
     {
         try {
             foreach ($sorts as $sort) {
-                $column    = $sort['column']    ?? null;
+                $column = $sort['column'] ?? null;
                 $direction = $sort['direction'] ?? EntityListParams::DIR_ASC;
 
                 if (! is_string($column) || $column === '') {
@@ -155,6 +197,7 @@ class DynamicEntityListQuery
 
         if (array_key_exists($column, $this->mainFieldDefinitions)) {
             $this->query->orderBy($column, $direction);
+
             return;
         }
 
@@ -192,11 +235,13 @@ class DynamicEntityListQuery
                 explode(',', (string) $value)
             );
             $this->query->whereIn($field, $values);
+
             return;
         }
 
         if (in_array($op, [EntityListParams::OP_LIKE, EntityListParams::OP_STARTS, EntityListParams::OP_ENDS], true)) {
             $this->query->where($field, 'LIKE', $this->buildLikeValue($op, $value));
+
             return;
         }
 
@@ -213,11 +258,13 @@ class DynamicEntityListQuery
             if ($op === EntityListParams::OP_IN) {
                 $values = array_map(fn ($v) => trim($v), explode(',', (string) $value));
                 $sub->whereIn('meta_value', $values);
+
                 return;
             }
 
             if (in_array($op, [EntityListParams::OP_LIKE, EntityListParams::OP_STARTS, EntityListParams::OP_ENDS], true)) {
                 $sub->where('meta_value', 'LIKE', $this->buildLikeValue($op, $value));
+
                 return;
             }
 
@@ -236,9 +283,9 @@ class DynamicEntityListQuery
     private function buildLikeValue(string $op, mixed $value): string
     {
         return match ($op) {
-            EntityListParams::OP_STARTS => $value . '%',
-            EntityListParams::OP_ENDS   => '%' . $value,
-            default                     => '%' . $value . '%',
+            EntityListParams::OP_STARTS => $value.'%',
+            EntityListParams::OP_ENDS => '%'.$value,
+            default => '%'.$value.'%',
         };
     }
 
@@ -246,12 +293,17 @@ class DynamicEntityListQuery
     {
         return match ($op) {
             EntityListParams::OP_NEQ => '!=',
-            EntityListParams::OP_GT  => '>',
+            EntityListParams::OP_GT => '>',
             EntityListParams::OP_GTE => '>=',
-            EntityListParams::OP_LT  => '<',
+            EntityListParams::OP_LT => '<',
             EntityListParams::OP_LTE => '<=',
-            default                  => '=',
+            default => '=',
         };
+    }
+
+    private function isSearchableType(string $type): bool
+    {
+        return in_array(strtolower($type), ['string', 'varchar', 'text', 'char', 'longtext', 'mediumtext', 'tinytext', 'email'], true);
     }
 
     private function isStringSortableType(string $type): bool

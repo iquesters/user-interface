@@ -77,4 +77,15 @@ class SnackbarConf extends BaseConf
         $default_values->body_class = '';
         $default_values->close_button_class = '';
     }
+
+    protected function rules(): array
+    {
+        return [
+            'position' => 'in:top-right,top-left,top-center,bottom-right,bottom-left,bottom-center,top,bottom,left,right',
+            'duration' => 'integer|between:500,60000',
+            'stack_mode' => 'in:stack,replace',
+            'max_visible' => 'integer|between:1,10',
+            'variant' => 'in:light,filled',
+        ];
+    }
 }

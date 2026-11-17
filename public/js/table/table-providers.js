@@ -9,11 +9,15 @@ function removeTableSkeleton(tableElement) {
     tableElement.classList.remove(TABLE_CLASS_HIDDEN);
 }
 
-async function fetchEntityData(entity, offset = 0, length = 50) {
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, {
-        offset,
-        length
-    });
+/**
+ * @param {object} query optional { search, sort } list parameters (see buildListQuery)
+ */
+async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
+    const params = { offset, length };
+    if (query.search) params.search = query.search;
+    if (query.sort) params.sort = query.sort;
+
+    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
@@ -186,21 +190,21 @@ function handleUIContext(uiContext) {
 
     // Handle redirect
     if (uiContext.redirect) {
-        console.log(TABLE_LOG_REDIRECTING, uiContext.redirect);
+        window.uiDebug?.(TABLE_LOG_REDIRECTING, uiContext.redirect);
         window.location.href = uiContext.redirect;
         return;
     }
 
     // Handle page refresh
     if (uiContext.refresh) {
-        console.log(TABLE_LOG_REFRESHING_PAGE);
+        window.uiDebug?.(TABLE_LOG_REFRESHING_PAGE);
         window.location.reload();
         return;
     }
 
     // Handle close action (for modals, panels, etc.)
     if (uiContext.close) {
-        console.log(TABLE_LOG_CLOSING_VIEW);
+        window.uiDebug?.(TABLE_LOG_CLOSING_VIEW);
         // Dispatch event for application to handle
         window.dispatchEvent(new CustomEvent(TABLE_EVENT_UI_CLOSE));
     }

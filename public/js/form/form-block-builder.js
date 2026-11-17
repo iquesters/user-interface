@@ -49,9 +49,9 @@ async function setupFormBlock(formCol, formMeta) {
             formData = JSON.parse(formData)
             delete form.dataset.formData
         } else {
-            console.log("data-form-data is not provided")
+            window.uiDebug?.("data-form-data is not provided")
         }
-        console.log("formData = " + formData)
+        window.uiDebug?.("formData = " + formData)
 
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;
@@ -195,6 +195,9 @@ async function addField(field, addTo,formMeta) {
 
         // Apply textarea Frontend validation
         // applyTextareaValidation(field, textarea);
+        if (field.rows) {
+            textarea.setAttribute('rows', field.rows);
+        }
         formContainer.appendChild(textarea);
 
         // ✅ ERROR HANDLING: Same for both structures
@@ -777,11 +780,13 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
+        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+
         if (typeof apiClient !== 'undefined' && apiClient) {
-            return await apiClient.get(`/api/entity/show/${entity}/${entityUId}`);
+            return await apiClient.get(showUrl);
         }
 
-        const res = await fetch(`/api/entity/show/${entity}/${entityUId}`, {
+        const res = await fetch(showUrl, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -839,7 +844,7 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
     for (const [key, value] of Object.entries(entityData)) {
         const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
             ? CSS.escape(key)
-            : key.replace(/"/g, '\\"');
+            : String(key).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
         const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
 
@@ -866,7 +871,7 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         const metaValue = item?.meta_value ?? "";
         const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
             ? CSS.escape(metaKey)
-            : metaKey.replace(/"/g, '\\"');
+            : String(metaKey).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
         const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
 

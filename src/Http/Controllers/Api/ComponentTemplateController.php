@@ -53,7 +53,7 @@ class ComponentTemplateController extends Controller
                 ],
             ]);
         } catch (\Throwable $th) {
-            $this->logError('Component template load failed: ' . $th->getMessage());
+            $this->logError('Component template load failed: '.$th->getMessage());
             Log::error('ComponentTemplateController@show failed', [
                 'component' => $componentName,
                 'exception' => $th->getMessage(),
@@ -69,5 +69,4 @@ class ComponentTemplateController extends Controller
             $this->logMethodEnd("component={$componentName}");
         }
     }
-
 }

@@ -316,17 +316,6 @@ function renderInboxListCell(col, row) {
     return `<span class="inbox-list-cell">${val}</span>`;
 }
 
-function getLoaderComponentHTML() {
-    return `
-        <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER}" style="height: 100%;">
-            <div class="${TABLE_CLASS_TEXT_CENTER}">
-                <div class="spinner-border text-primary ${TABLE_CLASS_MB_2}" role="status"></div>
-                <div class="${TABLE_CLASS_TEXT_MUTED}">${TABLE_MESSAGE_LOADING_DETAILS}</div>
-            </div>
-        </div>
-    `;
-}
-
 function escapeDetailHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -526,7 +515,7 @@ function syncInboxSummaryRow(detailContext, nextRowData) {
 
     if (updatedRow) {
         dt.draw(false);
-        console.log(TABLE_LOG_SUMMARY_SYNC_COMPLETE, {
+        window.uiDebug?.(TABLE_LOG_SUMMARY_SYNC_COMPLETE, {
             entity,
             entityUid,
         });
@@ -548,7 +537,7 @@ async function openDetailInPreferredMode(context, overrides = {}) {
     const nextPreferredMode = overrides.preferredMode || context.preferredMode;
     const nextFormMode = overrides.formMode || 'view';
 
-    console.log(TABLE_LOG_SWITCHING_DETAIL_MODE, {
+    window.uiDebug?.(TABLE_LOG_SWITCHING_DETAIL_MODE, {
         entity: context.schema?.entity,
         uid: context.data?.uid || context.data?.id || null,
         preferredMode: nextPreferredMode,
@@ -577,7 +566,7 @@ function appendHybridDetailEditButton(header, detailContext) {
         event.preventDefault();
         event.stopPropagation();
 
-        console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
+        window.uiDebug?.(TABLE_LOG_OPENING_DETAIL_EDITOR, {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
             formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -627,12 +616,12 @@ async function handleHybridDetailDelete(detailContext) {
 
     const confirmed = window.confirm(TABLE_MESSAGE_CONFIRM_DELETE);
     if (!confirmed) {
-        console.log(TABLE_LOG_DETAIL_DELETE_CANCELLED, { entity, entityUid });
+        window.uiDebug?.(TABLE_LOG_DETAIL_DELETE_CANCELLED, { entity, entityUid });
         return;
     }
 
-    const endpoint = `/api/entity/delete/${entity}/${entityUid}`;
-    console.log(TABLE_LOG_DELETING_DETAIL_RECORD, {
+    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
+    window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
         endpoint,
@@ -691,7 +680,7 @@ async function handleHybridDetailDelete(detailContext) {
             }
         }
 
-        console.log(TABLE_LOG_DETAIL_DELETE_SUCCESS, {
+        window.uiDebug?.(TABLE_LOG_DETAIL_DELETE_SUCCESS, {
             entity,
             entityUid,
         });
@@ -727,7 +716,7 @@ function appendHybridDetailActions(rightPanelEle, contentContainer, detailContex
             event.preventDefault();
             event.stopPropagation();
 
-            console.log(TABLE_LOG_OPENING_DETAIL_EDITOR, {
+            window.uiDebug?.(TABLE_LOG_OPENING_DETAIL_EDITOR, {
                 entity: detailContext.schema?.entity,
                 uid: detailContext.data?.uid || detailContext.data?.id || null,
                 formSchemaUid: detailContext.detailConfig?.formSchemaUid || null,
@@ -770,7 +759,7 @@ function getNestedDetailValue(source, paths = []) {
 }
 
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
-    console.log(TABLE_LOG_LOADING_DETAIL_PANEL, {
+    window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
         requestedPreferredMode: options?.preferredMode || null,
@@ -907,8 +896,10 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     // Content container - using Bootstrap classes
     const contentContainer = document.createElement('div');
     contentContainer.className = `${TABLE_SELECTOR_DETAIL_CONTENT.slice(1)} flex-grow-1 ${TABLE_CLASS_W_100} overflow-auto p-2`;
-    contentContainer.innerHTML = getLoaderComponentHTML();
-    
+    // Form-shaped skeleton (no spinner); refined below once the schema is known.
+    const detailFormMode = options.formMode || 'view';
+    showFormSkeleton(contentContainer, null, detailFormMode);
+
     // Assemble the panel
     rightPanelEle.appendChild(header);
     rightPanelEle.appendChild(contentContainer);
@@ -927,7 +918,25 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
-        console.log(TABLE_LOG_RESOLVED_DETAIL_STRATEGY, {
+        // Shape the skeleton like the form that will render: use the cached
+        // schema now, or fetch it in parallel with the template (setupForm
+        // then gets it from the same cache / pending request).
+        const skeletonSchemaId = detailAttempts.find((attempt) => attempt.schemaId)?.schemaId;
+        if (skeletonSchemaId) {
+            const cachedSchema = getCachedFormSchema(skeletonSchemaId);
+            if (cachedSchema) {
+                showFormSkeleton(contentContainer, cachedSchema, detailFormMode);
+            } else {
+                getFormSchema(skeletonSchemaId).then((schema) => {
+                    const placeholder = contentContainer.firstElementChild;
+                    if (schema && placeholder?.classList.contains('form-skeleton') && placeholder.dataset.shaped !== '1') {
+                        showFormSkeleton(contentContainer, schema, detailFormMode);
+                    }
+                });
+            }
+        }
+
+        window.uiDebug?.(TABLE_LOG_RESOLVED_DETAIL_STRATEGY, {
             entity: schema?.entity,
             uid: data?.uid || data?.id || null,
             preferredMode,
@@ -948,7 +957,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         let rendered = false;
 
         for (const attempt of detailAttempts) {
-            console.log(`${TABLE_LOG_LOADING_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`);
+            window.uiDebug?.(`${TABLE_LOG_LOADING_DETAIL_ATTEMPT} ${attempt.type}: ${attempt.componentName}`);
 
             let result = null;
 
@@ -1010,7 +1019,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             
             initializeDetailViewScripts(contentContainer);
             
-            console.log(`${TABLE_LOG_DETAIL_COMPONENT_LOADED} ${data.uid}`);
+            window.uiDebug?.(`${TABLE_LOG_DETAIL_COMPONENT_LOADED} ${data.uid}`);
             rendered = true;
             break;
         }

@@ -2,11 +2,12 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Api\Meta;
 
-use Iquesters\UserInterface\Constants\EntityStatus;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
-use Iquesters\UserInterface\Models\TableSchema;
 use Illuminate\Support\Facades\Log;
+use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Models\TableSchema;
 use stdClass;
 
 class TableController extends Controller
@@ -14,22 +15,22 @@ class TableController extends Controller
     /**
      * Fetch table schema by slug
      *
-     * @param string $slug
-     * @return \Illuminate\Http\JsonResponse
+     * @param  string  $slug
+     * @return JsonResponse
      */
     public function getAuthTableSchema($slug)
     {
-        Log::info("Fetching table schema for slug: " . $slug);
-        
-         // Check if user is authenticated via Sanctum
-        if (!Auth::check()) {
+        Log::info('Fetching table schema for slug: '.$slug);
+
+        // Check if user is authenticated via Sanctum
+        if (! Auth::check()) {
             return response()->json([
                 'message' => 'Unauthenticated',
-                'error' => 'Authentication required'
+                'error' => 'Authentication required',
             ], 401);
         }
-        Log::info("User accessing table schema: " . Auth::id());
-        
+        Log::info('User accessing table schema: '.Auth::id());
+
         // As application is not ready so we decided not to use uid
         return $this->getTableSchema($slug);
 
@@ -40,14 +41,14 @@ class TableController extends Controller
     /**
      * Fetch table schema by unique identifier (UID)
      *
-     * @param string $uid
-     * @return \Illuminate\Http\JsonResponse
+     * @param  string  $uid
+     * @return JsonResponse
      */
     private function getTableSchema($uid)
     {
-        Log::info("Fetching table schema for UID: " . $uid);
+        Log::info('Fetching table schema for UID: '.$uid);
 
-        $response = new stdClass();
+        $response = new stdClass;
         $response->message = 'Schema is empty';
         $response->data = null;
 
@@ -56,11 +57,11 @@ class TableController extends Controller
                 // ✅ Find table schema by UID and ensure it's active
                 $table = TableSchema::where([
                     'uid' => $uid,
-                    'status' => EntityStatus::ACTIVE
+                    'status' => EntityStatus::ACTIVE,
                 ])->first();
 
                 if ($table) {
-                    $response->message = "Table schema found";
+                    $response->message = 'Table schema found';
 
                     // ✅ Decode schema safely whether it's a JSON string or array
                     $schema = $table->schema;
@@ -75,10 +76,10 @@ class TableController extends Controller
 
                     $response->data = $schema;
                 } else {
-                    $response->message = "Table schema not found";
+                    $response->message = 'Table schema not found';
                 }
             } else {
-                $response->message = "Table UID not provided";
+                $response->message = 'Table UID not provided';
             }
 
             return response()->json($response);
@@ -102,14 +103,14 @@ class TableController extends Controller
     /**
      * Fetch table schema by slug
      *
-     * @param string $slug
-     * @return \Illuminate\Http\JsonResponse
+     * @param  string  $slug
+     * @return JsonResponse
      */
     private function getTableSchemaBySlug($slug)
     {
-        Log::info("Fetching table schema for slug: " . $slug);
+        Log::info('Fetching table schema for slug: '.$slug);
 
-        $response = new stdClass();
+        $response = new stdClass;
         $response->message = 'Schema is empty';
         $response->data = null;
 
@@ -118,11 +119,11 @@ class TableController extends Controller
                 // Find table schema by slug and ensure it's active
                 $table = TableSchema::where([
                     'slug' => $slug,
-                    'status' => EntityStatus::ACTIVE
+                    'status' => EntityStatus::ACTIVE,
                 ])->first();
 
                 if ($table) {
-                    $response->message = "Table schema found";
+                    $response->message = 'Table schema found';
 
                     // ✅ Handle both string or array cases safely
                     $schema = $table->schema;
@@ -137,10 +138,10 @@ class TableController extends Controller
 
                     $response->data = $schema;
                 } else {
-                    $response->message = "Table schema not found";
+                    $response->message = 'Table schema not found';
                 }
             } else {
-                $response->message = "Table slug not provided";
+                $response->message = 'Table slug not provided';
             }
 
             return response()->json($response);

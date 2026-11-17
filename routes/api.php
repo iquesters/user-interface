@@ -1,11 +1,18 @@
 <?php
 
+/*
+| DEPRECATED: unversioned aliases of the v1 API in routes/api.v1.php
+| (/api/user-interface/v1/...). Kept for existing callers; the module's own JS
+| uses the versioned URLs. Will be removed in a later release.
+*/
+
 use Illuminate\Support\Facades\Route;
+use Iquesters\Foundation\System\Http\Middleware\RequestMiddleware;
+use Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware;
 use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
 use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
-use Iquesters\UserInterface\Http\Controllers\UIController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,10 +28,6 @@ Route::get('ping', function () {
     ]);
 });
 
-// Route::middleware(['api'])->group(function () {
-//     Route::get('api/noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
-//     ->name('noauth.form');
-// });
 /*
 |--------------------------------------------------------------------------
 | Protected APIs - Sanctum tokens ONLY
@@ -33,19 +36,24 @@ Route::get('ping', function () {
 Route::prefix('api')
     ->middleware([
         'api',
-        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
-        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+        RequestMiddleware::class,
+        ResponseMiddleware::class,
     ])
     ->group(function () {
         // Public API (No Sanctum)
         Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
             ->name('noauth.form');
-        
+
         // Protected APIs (Require Sanctum)
         Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])
                 ->name('auth.table');
+        });
+
+        // Generic entity CRUD. Each action checks entity.{table}.{view|create|update|delete}
+        // (admins always pass) inside DynamicEntityController.
+        Route::middleware(['auth:sanctum'])->group(function () {
 
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
                 ->name('api.entity.list');
@@ -62,32 +70,20 @@ Route::prefix('api')
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
         });
-});
-
+    });
 
 Route::prefix('api')
     ->middleware([
         'api',
-        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
-        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+        RequestMiddleware::class,
+        ResponseMiddleware::class,
         'auth:sanctum',
     ])
     ->group(function () {
         Route::get('form/{slug}', [FormController::class, 'getFormSchema'])
             ->name('auth.form');
 
-        Route::post('form/save-form/{uid}', [FormController::class, 'saveformdata']);
-
         Route::get('components/templates/{component}', [ComponentTemplateController::class, 'show'])
             ->name('api.components.template');
 
     });
-
-
-// Route::get('form/{slug}', [FormController::class, 'show']);
-
-// ApiRouteRegistry::register(
-//     'GET',
-//     'form/{slug}',
-//     'iquesters/user-interface'
-// );

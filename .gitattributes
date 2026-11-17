@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+/.github            export-ignore
+/docs               export-ignore
+/tests              export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/.editorconfig      export-ignore
+/phpunit.xml        export-ignore
+/phpunit.xml.dist   export-ignore
+/phpstan.neon.dist  export-ignore
+/pint.json          export-ignore
+/CONTRIBUTING.md    export-ignore
+/scripts            export-ignore
+/package.json       export-ignore
+
+# Generated, shipped with the package (do not diff line by line)
+/public/dist/**     linguist-generated=true -diff
+/public/libs/**     linguist-vendored=true -diff

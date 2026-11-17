@@ -1,19 +1,23 @@
 {
   "name": "iquesters/user-interface",
   "description": "A modern, reusable, and customizable UI interface built for creating clean and responsive user experiences. Designed with simplicity, scalability, and flexibility in mind.",
+  "keywords": [
+    "laravel",
+    "admin",
+    "ui",
+    "forms",
+    "datatables",
+    "schema",
+    "iquesters"
+  ],
   "type": "library",
-  "require": {
-    "php": ">=8.1",
-    "laravel/framework": "^10.0|^11.0|^12.0|^13.0",
-    "iquesters/foundation": "^1.0",
-    "diglactic/laravel-breadcrumbs": "^10.0"
-  },
   "license": "MIT",
-  "autoload": {
-    "psr-4": {
-      "Iquesters\\UserInterface\\": "src/",
-      "Iquesters\\UserInterface\\Database\\Seeders\\": "database/seeders/"
-    }
+  "homepage": "https://github.com/iquesters/user-interface",
+  "support": {
+    "issues": "https://github.com/iquesters/user-interface/issues",
+    "source": "https://github.com/iquesters/user-interface",
+    "security": "https://github.com/iquesters/user-interface/security/policy",
+    "docs": "https://github.com/iquesters/user-interface/tree/main/docs"
   },
   "authors": [
     {
@@ -21,12 +25,67 @@
       "email": "pritam02b@gmail.com"
     }
   ],
+  "require": {
+    "php": "^8.3",
+    "laravel/framework": "^12.0|^13.0",
+    "iquesters/foundation": "^2.0",
+    "diglactic/laravel-breadcrumbs": "^10.0"
+  },
+  "suggest": {
+    "iquesters/user-management": "Login, per-user theme and the sanctum token used by the in-app API client",
+    "spatie/laravel-permission": "Role checks (setup link, admin-only routes)"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^10.0|^11.0",
+    "laravel/sanctum": "^4.0",
+    "spatie/laravel-permission": "^8.0",
+    "laravel/pint": "^1.18",
+    "larastan/larastan": "^3.0"
+  },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../foundation",
+      "options": {
+        "symlink": true,
+        "versions": {
+          "iquesters/foundation": "2.x-dev"
+        }
+      }
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Iquesters\\UserInterface\\": "src/",
+      "Iquesters\\UserInterface\\Database\\Seeders\\": "database/seeders/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Iquesters\\UserInterface\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "format": "pint",
+    "lint": "pint --test",
+    "analyse": "phpstan analyse --memory-limit=1G"
+  },
   "minimum-stability": "dev",
+  "prefer-stable": true,
   "extra": {
     "laravel": {
       "providers": [
         "Iquesters\\UserInterface\\UserInterfaceServiceProvider"
       ]
+    },
+    "platform": {
+      "api": {
+        "prefix": "user-interface",
+        "versions": {
+          "v1": "routes/api.v1.php"
+        }
+      }
     }
   }
 }

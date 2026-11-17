@@ -2,27 +2,30 @@
 
 namespace Iquesters\UserInterface\Support;
 
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\View;
+use Iquesters\Foundation\System\Traits\Loggable;
 
 class SetupLinkInjector
 {
+    use Loggable;
+
     public static function inject(): void
     {
+        static::injectFavicon();
+
         $flagPath = storage_path('app/iquesters_ui_installed.flag');
         $marker = '<!-- IQUESTERS-SETUP-LINK -->';
-        // Log::info('[UserInterface] SetupLinkInjector::inject() called.');
 
         if (file_exists($flagPath)) {
-            // Log::info('[UserInterface] Injection already done — skipping.');
             return;
         }
 
         $viewName = static::detectRootView();
         $viewPath = resource_path("views/{$viewName}.blade.php");
 
-        if (!file_exists($viewPath)) {
-            Log::warning("[UserInterface] View {$viewName}.blade.php not found. Creating one...");
+        if (! file_exists($viewPath)) {
+            static::logWarning("[UserInterface] View {$viewName}.blade.php not found. Creating one...");
             static::createDefaultWelcomeView($viewPath);
             static::createDefaultRoute();
         }
@@ -30,7 +33,8 @@ class SetupLinkInjector
         $content = file_get_contents($viewPath);
 
         if (strpos($content, $marker) !== false) {
-            Log::info('[UserInterface] Marker already exists — skipping injection.');
+            static::logInfo('[UserInterface] Marker already exists — skipping injection.');
+
             return;
         }
 
@@ -47,13 +51,58 @@ class SetupLinkInjector
         if (preg_match('/<body[^>]*>/i', $content)) {
             $newContent = preg_replace('/(<body[^>]*>)/i', "$1\n$insert", $content, 1);
         } else {
-            $newContent = $insert . $content;
+            $newContent = $insert.$content;
         }
 
         file_put_contents($viewPath, $newContent);
         file_put_contents($flagPath, 'done');
 
-        Log::info("[UserInterface] Setup link successfully injected into {$viewName}.blade.php");
+        static::logInfo("[UserInterface] Setup link successfully injected into {$viewName}.blade.php");
+    }
+
+    /**
+     * Point the host app's home page favicon at the module's favicon (once).
+     * Separate marker + flag, so installs that already got the setup link get it too.
+     */
+    protected static function injectFavicon(): void
+    {
+        $flagPath = storage_path('app/iquesters_ui_favicon.flag');
+        $marker = '<!-- IQUESTERS-FAVICON -->';
+
+        if (file_exists($flagPath)) {
+            return;
+        }
+
+        $viewPath = resource_path('views/'.static::detectRootView().'.blade.php');
+
+        if (! file_exists($viewPath)) {
+            return; // created by inject() below; picked up on the next request
+        }
+
+        $content = file_get_contents($viewPath);
+
+        if (str_contains($content, $marker)) {
+            file_put_contents($flagPath, 'done');
+
+            return;
+        }
+
+        if (! preg_match('/<head[^>]*>/i', $content)) {
+            return;
+        }
+
+        $link = <<<'BLADE'
+        <!-- IQUESTERS-FAVICON -->
+        @if (class_exists(\Iquesters\UserInterface\UserInterfaceServiceProvider::class))
+            <link rel="icon" type="image/png" href="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('img/favicon.png') }}">
+        @endif
+        <!-- IQUESTERS-FAVICON -->
+        BLADE;
+
+        file_put_contents($viewPath, preg_replace('/(<head[^>]*>)/i', '$1'."\n".$link, $content, 1));
+        file_put_contents($flagPath, 'done');
+
+        static::logInfo('[UserInterface] Favicon link injected into the home page.');
     }
 
     protected static function detectRootView(): string
@@ -64,12 +113,12 @@ class SetupLinkInjector
                     $action = $route->getAction('uses');
                     if (is_callable($action)) {
                         $response = call_user_func($action);
-                        if ($response instanceof \Illuminate\View\View) {
+                        if ($response instanceof View) {
                             return $response->getName();
                         }
                     }
                 } catch (\Throwable $e) {
-                    Log::warning('[UserInterface] Failed to detect root view: ' . $e->getMessage());
+                    static::logWarning('[UserInterface] Failed to detect root view: '.$e->getMessage());
                 }
             }
         }
@@ -83,14 +132,14 @@ class SetupLinkInjector
         $content = file_exists($webPath) ? file_get_contents($webPath) : '';
 
         if (strpos($content, "Route::get('/',") === false) {
-            file_put_contents($webPath, $content . "\nRoute::get('/', fn() => view('welcome'));\n");
-            Log::info('[UserInterface] Default "/" route created.');
+            file_put_contents($webPath, $content."\nRoute::get('/', fn() => view('welcome'));\n");
+            static::logInfo('[UserInterface] Default "/" route created.');
         }
     }
 
     protected static function createDefaultWelcomeView(string $path): void
     {
-        $html = <<<HTML
+        $html = <<<'HTML'
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -105,6 +154,6 @@ class SetupLinkInjector
 
         @mkdir(dirname($path), 0755, true);
         file_put_contents($path, $html);
-        Log::info('[UserInterface] Default welcome view created.');
+        static::logInfo('[UserInterface] Default welcome view created.');
     }
 }

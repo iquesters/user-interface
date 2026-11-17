@@ -30,12 +30,12 @@
 //             const wsScheme = this.config.scheme === 'https' ? 'wss' : 'ws';
 //             const url = `${wsScheme}://${this.config.host}:${this.config.port}/app/${this.config.appKey}`;
             
-//             console.log('🔌 Connecting to Reverb:', url);
+//             window.uiDebug?.('🔌 Connecting to Reverb:', url);
             
 //             this.socket = new WebSocket(url);
             
 //             this.socket.onopen = () => {
-//                 console.log('✅ Connected to Reverb server');
+//                 window.uiDebug?.('✅ Connected to Reverb server');
 //                 this.connected = true;
 //                 this.reconnectAttempts = 0;
                 
@@ -53,7 +53,7 @@
 //             };
             
 //             this.socket.onclose = (event) => {
-//                 console.log('🔌 Disconnected from Reverb:', event.code, event.reason);
+//                 window.uiDebug?.('🔌 Disconnected from Reverb:', event.code, event.reason);
 //                 this.connected = false;
 //                 this.emit('disconnected', { code: event.code, reason: event.reason });
 //                 this.attemptReconnect();
@@ -90,17 +90,17 @@
 //     handleMessage(rawData) {
 //         try {
 //             const data = JSON.parse(rawData);
-//             console.log('📨 Reverb message:', data);
+//             window.uiDebug?.('📨 Reverb message:', data);
             
 //             // Handle connection established
 //             if (data.event === 'pusher:connection_established') {
-//                 console.log('🔐 Reverb connection established');
+//                 window.uiDebug?.('🔐 Reverb connection established');
 //                 return;
 //             }
             
 //             // Handle subscription success
 //             if (data.event === 'pusher_internal:subscription_succeeded') {
-//                 console.log(`✅ Subscribed to channel: ${data.channel}`);
+//                 window.uiDebug?.(`✅ Subscribed to channel: ${data.channel}`);
 //                 return;
 //             }
             
@@ -122,7 +122,7 @@
     
 //     subscribe(channel) {
 //         if (!this.connected) {
-//             console.log('⚠️ Not connected, queueing subscription to:', channel);
+//             window.uiDebug?.('⚠️ Not connected, queueing subscription to:', channel);
 //             this.pendingSubscriptions.add(channel);
 //             return false;
 //         }
@@ -135,7 +135,7 @@
 //             }
 //         };
         
-//         console.log('📡 Subscribing to channel:', channel);
+//         window.uiDebug?.('📡 Subscribing to channel:', channel);
 //         this.socket.send(JSON.stringify(message));
 //         this.subscriptions.set(channel, {});
 //         return true;
@@ -160,7 +160,7 @@
         
 //         this.socket.send(JSON.stringify(message));
 //         this.subscriptions.delete(channel);
-//         console.log('📡 Unsubscribed from:', channel);
+//         window.uiDebug?.('📡 Unsubscribed from:', channel);
 //     }
     
 //     on(event, handler) {
@@ -201,10 +201,10 @@
 //         this.reconnectAttempts++;
 //         const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 30000);
         
-//         console.log(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnect})`);
+//         window.uiDebug?.(`🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnect})`);
         
 //         setTimeout(() => {
-//             console.log('🔄 Attempting reconnect...');
+//             window.uiDebug?.('🔄 Attempting reconnect...');
 //             this.connect();
 //         }, delay);
 //     }
@@ -217,7 +217,7 @@
 //         this.connected = false;
 //         this.subscriptions.clear();
 //         this.pendingSubscriptions.clear();
-//         console.log('🔌 Disconnected from Reverb');
+//         window.uiDebug?.('🔌 Disconnected from Reverb');
 //     }
 // }
 

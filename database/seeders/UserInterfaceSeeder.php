@@ -2,148 +2,150 @@
 
 namespace Iquesters\UserInterface\Database\Seeders;
 
-use Iquesters\Foundation\Database\Seeders\BaseSeeder;
 use Illuminate\Support\Facades\DB;
+use Iquesters\Foundation\Database\Seeders\BaseSeeder;
 
 class UserInterfaceSeeder extends BaseSeeder
 {
     protected string $moduleName = 'user-interface';
-    protected string $description = 'user-interface module';
-    protected array $metas = [
-    'module_icon' => 'fas fa-puzzle-piece',
-    'module_sidebar_menu' => [
 
-        /*
+    protected string $description = 'user-interface module';
+
+    protected array $metas = [
+        'module_icon' => 'fas fa-puzzle-piece',
+        'module_sidebar_menu' => [
+
+            /*
         |-------------------------------------------------
         | Forms
         |-------------------------------------------------
         */
-        [
-            "icon" => "fas fa-list-check",
-            "label" => "Forms",
-            "route" => "ui.list",
-            "table_schema" => [
-                "slug" => "form-schema-table",
-                "name" => "Form Schemas",
-                "description" => "Datatable schema for form schemas",
-                "schema" => [
-                    "entity" => "form_schemas",
-                    "dt-options" => [
-                        "columns" => [
-                            ["data" => "id", "title" => "ID", "visible" => true],
-                            [
-                                "data" => "name",
-                                "title" => "Form Name",
-                                "visible" => true,
-                                "link" => true,
-                                "form-schema-uid" => "form-schema-details"
+            [
+                'icon' => 'fas fa-list-check',
+                'label' => 'Forms',
+                'route' => 'ui.list',
+                'table_schema' => [
+                    'slug' => 'form-schema-table',
+                    'name' => 'Form Schemas',
+                    'description' => 'Datatable schema for form schemas',
+                    'schema' => [
+                        'entity' => 'form_schemas',
+                        'dt-options' => [
+                            'columns' => [
+                                ['data' => 'id', 'title' => 'ID', 'visible' => true],
+                                [
+                                    'data' => 'name',
+                                    'title' => 'Form Name',
+                                    'visible' => true,
+                                    'link' => true,
+                                    'form-schema-uid' => 'form-schema-details',
+                                ],
+                                ['data' => 'slug', 'title' => 'Slug', 'visible' => true],
+                                ['data' => 'description', 'title' => 'Description', 'visible' => true],
                             ],
-                            ["data" => "slug", "title" => "Slug", "visible" => true],
-                            ["data" => "description", "title" => "Description", "visible" => true],
+                            'options' => [
+                                'pageLength' => 10,
+                                'order' => [[0, 'desc']],
+                                'responsive' => true,
+                            ],
                         ],
-                        "options" => [
-                            "pageLength" => 10,
-                            "order" => [[0, "desc"]],
-                            "responsive" => true
-                        ]
+                        'default_view_mode' => 'inbox',
                     ],
-                    "default_view_mode" => "inbox"
-                ]
-            ]
-        ],
+                ],
+            ],
 
-        /*
+            /*
         |-------------------------------------------------
         | Tables
         |-------------------------------------------------
         */
-        [
-            "icon" => "fas fa-table",
-            "label" => "Tables",
-            "route" => "ui.list",
-            "table_schema" => [
-                "slug" => "table-schema-table",
-                "name" => "Table Schemas",
-                "description" => "Datatable schema for table schemas",
-                "schema" => [
-                    "entity" => "table_schemas",
-                    "dt-options" => [
-                        "columns" => [
-                            ["data" => "id", "title" => "ID", "visible" => true],
-                            [
-                                "data" => "name",
-                                "title" => "Table Name",
-                                "visible" => true,
-                                "link" => true,
-                                "form-schema-uid" => "table-schema-details"
+            [
+                'icon' => 'fas fa-table',
+                'label' => 'Tables',
+                'route' => 'ui.list',
+                'table_schema' => [
+                    'slug' => 'table-schema-table',
+                    'name' => 'Table Schemas',
+                    'description' => 'Datatable schema for table schemas',
+                    'schema' => [
+                        'entity' => 'table_schemas',
+                        'dt-options' => [
+                            'columns' => [
+                                ['data' => 'id', 'title' => 'ID', 'visible' => true],
+                                [
+                                    'data' => 'name',
+                                    'title' => 'Table Name',
+                                    'visible' => true,
+                                    'link' => true,
+                                    'form-schema-uid' => 'table-schema-details',
+                                ],
+                                ['data' => 'slug', 'title' => 'Slug', 'visible' => true],
+                                ['data' => 'description', 'title' => 'Description', 'visible' => true],
                             ],
-                            ["data" => "slug", "title" => "Slug", "visible" => true],
-                            ["data" => "description", "title" => "Description", "visible" => true],
+                            'options' => [
+                                'pageLength' => 10,
+                                'order' => [[0, 'desc']],
+                                'responsive' => true,
+                            ],
                         ],
-                        "options" => [
-                            "pageLength" => 10,
-                            "order" => [[0, "desc"]],
-                            "responsive" => true
-                        ]
+                        'default_view_mode' => 'inbox',
                     ],
-                    "default_view_mode" => "inbox"
-                ]
-            ]
-        ],
+                ],
+            ],
 
-        /*
+            /*
         |-------------------------------------------------
         | Navigation
         |-------------------------------------------------
         */
-        [
-            "icon" => "fas fa-bars-staggered",
-            "label" => "Navigation",
-            "route" => "ui.list",
-            "table_schema" => [
-                "slug" => "navigation-table",
-                "name" => "Navigations",
-                "description" => "Datatable schema for navigations",
-                "schema" => [
-                    "entity" => "navigations",
-                    "dt-options" => [
-                        "columns" => [
-                            ["data" => "id", "title" => "ID", "visible" => true],
-                            [
-                                "data" => "name",
-                                "title" => "Navigation Name",
-                                "visible" => true,
-                                "link" => true,
-                                "form-schema-uid" => "navigation-details"
+            [
+                'icon' => 'fas fa-bars-staggered',
+                'label' => 'Navigation',
+                'route' => 'ui.list',
+                'table_schema' => [
+                    'slug' => 'navigation-table',
+                    'name' => 'Navigations',
+                    'description' => 'Datatable schema for navigations',
+                    'schema' => [
+                        'entity' => 'navigations',
+                        'dt-options' => [
+                            'columns' => [
+                                ['data' => 'id', 'title' => 'ID', 'visible' => true],
+                                [
+                                    'data' => 'name',
+                                    'title' => 'Navigation Name',
+                                    'visible' => true,
+                                    'link' => true,
+                                    'form-schema-uid' => 'navigation-details',
+                                ],
+                                [
+                                    'data' => 'meta.navigation_order',
+                                    'title' => 'Order',
+                                    'visible' => true,
+                                ],
                             ],
-                            [
-                                "data" => "meta.navigation_order",
-                                "title" => "Order",
-                                "visible" => true
+                            'options' => [
+                                'pageLength' => 10,
+                                'order' => [[0, 'desc']],
+                                'responsive' => true,
                             ],
                         ],
-                        "options" => [
-                            "pageLength" => 10,
-                            "order" => [[0, "desc"]],
-                            "responsive" => true
-                        ]
+                        'default_view_mode' => 'inbox',
                     ],
-                    "default_view_mode" => "inbox"
-                ]
-            ]
-        ],
-        /*
+                ],
+            ],
+            /*
         |-------------------------------------------------
         | Others (no table schema)
         |-------------------------------------------------
         */
-        [
-            "icon" => "fas fa-building-columns",
-            "label" => "All Organisations",
-            "route" => "organisations.index",
+            [
+                'icon' => 'fas fa-building-columns',
+                'label' => 'All Organisations',
+                'route' => 'organisations.index',
+            ],
         ],
-    ],
-];
+    ];
 
     protected array $permissions = [
         'view-master_data',
@@ -153,19 +155,20 @@ class UserInterfaceSeeder extends BaseSeeder
         'view-organisations',
         'create-organisations',
         'edit-organisations',
-        'delete-organisations'
+        'delete-organisations',
     ];
-    
+
     protected array $entities = [
         'table_schemas' => [
             'fields' => [],
-            'meta_fields' =>[]
+            'meta_fields' => [],
         ],
         'form_schemas' => [
             'fields' => [],
-            'meta_fields' =>[]
-        ]
+            'meta_fields' => [],
+        ],
     ];
+
     /**
      * Implement abstract method from BaseSeeder
      */
@@ -178,8 +181,8 @@ class UserInterfaceSeeder extends BaseSeeder
                 'value' => 'Theme Configuration',
                 'parent_id' => 0,
                 'status' => 'active',
-                'created_by' => 0,
-                'updated_by' => 0,
+                'created_by' => null,
+                'updated_by' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]
@@ -218,9 +221,8 @@ class UserInterfaceSeeder extends BaseSeeder
             'united',
             'vapor',
             'yeti',
-            'zephyr'
+            'zephyr',
         ];
-
 
         // Insert each theme under parent "theme"
         foreach ($themes as $theme) {
@@ -229,8 +231,8 @@ class UserInterfaceSeeder extends BaseSeeder
                 [
                     'value' => ucfirst($theme),
                     'status' => 'active',
-                    'created_by' => 0,
-                    'updated_by' => 0,
+                    'created_by' => null,
+                    'updated_by' => null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]
@@ -243,8 +245,8 @@ class UserInterfaceSeeder extends BaseSeeder
             [
                 'value' => 'default',
                 'status' => 'active',
-                'created_by' => 0,
-                'updated_by' => 0,
+                'created_by' => null,
+                'updated_by' => null,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]

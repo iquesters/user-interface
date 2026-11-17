@@ -194,13 +194,104 @@ function buildFormRoute(formId, entityUid, mode = 'view') {
     return `/${mode}/${formId}/${entityUid}`;
 }
 
-function getInlineLoaderHtml() {
-    return `
-        <div class="d-flex justify-content-center align-items-center gap-2 text-muted py-4">
-            <div class="spinner-border spinner-border-sm" role="status"></div>
-            <span>Loading...</span>
-        </div>
-    `;
+/**
+ * Loading placeholder shaped like the form setupForm() will render, so the
+ * swap to the real form doesn't jump: same card padding, header (title, plus
+ * the Edit/Delete links in view mode), field grid (same column classes via
+ * resolveFieldSizeConfig/addFieldSize), label height, value box / input /
+ * textarea heights, and footer buttons only when the form will have them.
+ *
+ * @param {object|null} schema   form schema if known (cached); null → generic shape
+ * @param {string}      formMode 'view' | 'edit' | 'create' | 'delete'
+ * @returns {HTMLElement} element with class "form-skeleton"
+ */
+function buildFormSkeletonElement(schema = null, formMode = 'edit') {
+    const meta = schema ? applyModeOverrides({ ...schema, formMode }) : { formMode };
+    const readOnly = formMode === 'view';
+    const bar = (classes, style) => `<div class="bg-info-subtle rounded ${classes}" style="${style}"></div>`;
+
+    const skeleton = document.createElement(HTML_TAG.DIV);
+    skeleton.className = 'form-skeleton placeholder-wave w-100 p-1';
+    skeleton.dataset.shaped = schema ? '1' : '0';
+    skeleton.setAttribute('aria-busy', 'true');
+
+    // Header: title bar; view mode also shows the Edit / Delete links.
+    const hasHeader = schema ? Boolean(resolveFormHeaderConfig(meta).text) : true;
+    if (hasHeader) {
+        const header = document.createElement(HTML_TAG.DIV);
+        header.className = 'd-flex align-items-center justify-content-between gap-2 mb-2';
+        header.style.minHeight = '31px';
+        header.innerHTML = bar('', 'width: 40%; height: 1.1rem;')
+            + (readOnly ? `<div class="d-flex gap-3">${bar('', 'width: 2.5rem; height: 0.9rem;')}${bar('', 'width: 3rem; height: 0.9rem;')}</div>` : '');
+        skeleton.appendChild(header);
+    }
+
+    // Fields: real column classes; label line + control at its real height.
+    const fields = schema && Array.isArray(schema.fields)
+        ? schema.fields.filter((field) => field && field.type !== 'hidden')
+        : [{}, {}, {}, {}];
+    const row = document.createElement(HTML_TAG.DIV);
+    row.className = 'row g-2';
+
+    fields.forEach((field) => {
+        const col = document.createElement(HTML_TAG.DIV);
+        const isSpacer = typeof isSpacerField === 'function' && isSpacerField(field);
+        const sizeConfig = isSpacer ? resolveSpacerSizeConfig(field) : resolveFieldSizeConfig(field, meta);
+        addFieldSize({ _resolvedSize: sizeConfig }, col);
+
+        if (!isSpacer) {
+            const rows = Math.max(1, parseInt(field.rows, 10) || 2);
+            const controlHeight = readOnly
+                ? 'calc(1.5rem + 0.5rem + 2px)'                    // plaintext box: p-1 + border
+                : (field.type === 'textarea'
+                    ? `calc(${rows} * 1.5rem + 0.75rem + 2px)`     // textarea rows
+                    : 'calc(1.5rem + 0.75rem + 2px)');             // .form-control
+            const hasLabel = !schema || Boolean(field.label);
+
+            col.innerHTML = (hasLabel
+                ? `<div class="d-flex align-items-center mb-2" style="height: 1.5rem;">${bar('col-5', 'height: 1rem;')}</div>`
+                : '')
+                + bar('col-12', `height: ${controlHeight};`);
+        }
+
+        row.appendChild(col);
+    });
+    skeleton.appendChild(row);
+
+    // Footer: none in view mode; otherwise the action/submit/cancel buttons.
+    if (!readOnly) {
+        const actions = Array.isArray(meta.actions) ? meta.actions : [];
+        const buttonCount = actions.length > 0
+            ? actions.length + (meta.allowCancel && !actions.some((a) => a?.type === 'cancel') ? 1 : 0)
+            : (meta.allowCancel ? 1 : 0) + ((meta.submitButtonLabel || meta.allowSubmit) ? 1 : 0);
+        const align = { start: 'justify-content-start', center: 'justify-content-center', end: 'justify-content-end' }[
+            actions.map((a) => a?.align).find(Boolean)
+        ] || 'justify-content-end';
+
+        if (buttonCount > 0) {
+            const footer = document.createElement(HTML_TAG.DIV);
+            footer.className = `d-flex align-items-center ${align} gap-2 mt-2`;
+            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 80px; height: 31px;')).join('');
+            skeleton.appendChild(footer);
+        }
+    }
+
+    return skeleton;
+}
+
+/**
+ * Show a form-shaped skeleton in a container while a form loads.
+ */
+function showFormSkeleton(container, schema = null, formMode = 'edit') {
+    container.innerHTML = '';
+    container.appendChild(buildFormSkeletonElement(schema, formMode));
+}
+
+/**
+ * Cached schema for a form id, if already fetched (no request).
+ */
+function getCachedFormSchema(formId) {
+    return formId && typeof formSchemaCache !== 'undefined' ? formSchemaCache.get(formId) || null : null;
 }
 
 function resolveInboxDetailContext(formElement) {
@@ -267,7 +358,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     }
 
     if (detailContext?.componentBackedEdit && nextMode === 'view') {
-        console.log('🔁 Returning inbox detail to component view from form mode.', {
+        window.uiDebug?.('🔁 Returning inbox detail to component view from form mode.', {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
             nextMode,
@@ -281,7 +372,7 @@ async function switchFormMode(formElement, nextMode, formMeta) {
         return;
     }
 
-    detailContainer.innerHTML = getInlineLoaderHtml();
+    showFormSkeleton(detailContainer, getCachedFormSchema(formMeta.id), nextMode);
 
     const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.lab-form');
 
@@ -378,7 +469,7 @@ async function handleFormCancelAction(formElement, formMeta) {
     const detailContext = resolveInboxDetailContext(formElement);
 
     if (detailContext?.componentBackedEdit && formMeta.formMode === 'edit') {
-        console.log('↩️ Canceling inbox detail edit and restoring component view.', {
+        window.uiDebug?.('↩️ Canceling inbox detail edit and restoring component view.', {
             entity: detailContext.schema?.entity,
             uid: detailContext.data?.uid || detailContext.data?.id || null,
         });
@@ -472,8 +563,17 @@ function appendViewModeActions(container, formMeta, formElement) {
 }
 
 async function setupForm(formElement) {
-    console.log("setuping lab-form...")
-    console.log("formId = " + formElement.id)
+    window.uiDebug?.("setuping lab-form...")
+    window.uiDebug?.("formId = " + formElement.id)
+
+    // The server renders a generic skeleton when it can't resolve the schema
+    // (e.g. reusable form templates in the table split view). If the schema
+    // is already cached, swap in the exact shape before the first paint.
+    const serverSkeleton = formElement.querySelector('.form-skeleton');
+    const cachedSchema = getCachedFormSchema(formElement.id);
+    if (serverSkeleton && serverSkeleton.dataset.shaped !== '1' && cachedSchema) {
+        serverSkeleton.replaceWith(buildFormSkeletonElement(cachedSchema, formElement.dataset.formMode || 'edit'));
+    }
 
     let schemaMeta = formElement.dataset.formMeta
     if (schemaMeta) {
@@ -496,7 +596,7 @@ async function setupForm(formElement) {
         getUserFormPersonalization(formElement.id)
     );
 
-    console.log("formMeta>>>>>>>>>>>", formMeta)
+    window.uiDebug?.("formMeta>>>>>>>>>>>", formMeta)
 
 
     //Skeleton remove
@@ -570,7 +670,7 @@ async function setupForm(formElement) {
 
         // Submit button
         if (formMeta.submitButtonLabel || formMeta.allowSubmit) {
-            console.log("Adding submit button with label:", formMeta.submitButtonLabel);
+            window.uiDebug?.("Adding submit button with label:", formMeta.submitButtonLabel);
             const submitBtn = document.createElement(HTML_TAG.BUTTON);
             submitBtn.type = "submit";
             submitBtn.textContent = formMeta.submitButtonLabel || "Submit";
@@ -587,7 +687,7 @@ async function setupForm(formElement) {
     }
 
     if (formMeta.cardElevation) {
-        console.log("Applying Bootstrap card elevation styles");
+        window.uiDebug?.("Applying Bootstrap card elevation styles");
 
         formElement.classList.add(
             STYLE_CLASS.SHADOW,
@@ -607,7 +707,7 @@ async function setupForm(formElement) {
 
     // Skeleton screen rendering
     // if (formMeta.skeletonRender) {
-    //     // console.log("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
+    //     // window.uiDebug?.("Applying Bootstrap skeleton render styles", formMeta.skeletonRender);
 
     //     // ✅ Create skeleton container
     //     const skeletonWrapper = document.createElement(HTML_TAG.DIV);
@@ -683,7 +783,7 @@ async function setupForm(formElement) {
     //     setTimeout(() => {
     //         skeletonWrapper.remove();
     //         formElement.classList.remove("d-none");
-    //         // console.log("Skeleton render complete, real form displayed");
+    //         // window.uiDebug?.("Skeleton render complete, real form displayed");
     //     }, formMeta.skeletonRenderDelay || 25000);
     // }
 
@@ -994,15 +1094,29 @@ function appendDynamicFormFieldError(form, field, message) {
     return setFieldMessage(fieldDomId, message, fieldContainer);
 }
 
+/**
+ * Show a form-level error (one not tied to a field) as an error toast.
+ * Falls back to the inline banner at the top of the form only when toasts
+ * aren't available or the schema opted out (disableSnackbar).
+ */
 function appendDynamicFormSubmitSummary(form, message, generalErrors = []) {
+    const lines = [message, ...generalErrors.filter((item) => item && item !== message)].filter(Boolean);
+    const formMeta = form?.__formMeta || null;
+
+    if (typeof window.showSnackbar === 'function' && !formMeta?.disableSnackbar) {
+        window.showSnackbar(lines.join(' '), 'error');
+        return;
+    }
+
     const summary = document.createElement('div');
     summary.classList.add(STYLE_CLASS.ALERT, STYLE_CLASS.ALERT_DANGER, STYLE_CLASS.MB_3);
     summary.dataset.serverError = 'true';
 
-    const lines = [message, ...generalErrors.filter((item) => item && item !== message)];
-    summary.innerHTML = lines
-        .map((line) => `<div>${line}</div>`)
-        .join('');
+    lines.forEach((line) => {
+        const row = document.createElement('div');
+        row.textContent = line;
+        summary.appendChild(row);
+    });
 
     form.prepend(summary);
 }
@@ -1138,7 +1252,10 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 applyDynamicFormSubmitErrors(form, formMeta, errors, errorMessage, payload);
             } else {
                 const errorMessage = resolveDynamicFormMessage(result, 'Unable to submit the form. Please try again.');
-                appendDynamicFormSubmitSummary(form, errorMessage, []);
+                // `error` is only sent by the server in debug mode (APP_DEBUG).
+                const detail = result?.detail || (typeof result?.error === 'string' ? result.error : null);
+                const debugDetail = detail ? [`Details: ${detail}`] : [];
+                appendDynamicFormSubmitSummary(form, errorMessage, debugDetail);
             }
 
             dispatchDynamicFormEvent('lab-form:submit-failed', {
@@ -1183,7 +1300,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 result
             );
 
-            console.log('✅ Form submitted from inbox detail; restoring component-backed detail view.', {
+            window.uiDebug?.('✅ Form submitted from inbox detail; restoring component-backed detail view.', {
                 entity: detailContext.schema?.entity,
                 uid: nextDetailData?.uid || detailContext.data?.uid || null,
                 method,
@@ -1291,6 +1408,11 @@ async function submitDynamicFormRequest(endpoint, method, payload, form) {
         ? { headers: { 'X-CSRF-TOKEN': csrfToken } }
         : {};
 
+    // JSON can't carry files; use multipart when the form has file fields.
+    if (method !== 'DELETE' && payloadHasFiles(payload)) {
+        return submitMultipartFormRequest(endpoint, method, payload, csrfToken);
+    }
+
     if (typeof apiClient !== 'undefined' && apiClient) {
         switch (method) {
             case 'PUT':
@@ -1340,14 +1462,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return `/api/entity/update/${formMeta.entity}/${entityUid}`;
+        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return `/api/entity/delete/${formMeta.entity}/${entityUid}`;
+        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
     }
 
-    return `/api/entity/store/${formMeta.entity}`;
+    return uiApiUrl(`entity/store/${formMeta.entity}`);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
@@ -1392,7 +1514,88 @@ function getSerializedFieldValue(form, field) {
     }
 
     const input = form.querySelector(`[name="${escapedName}"]`);
+
+    // File inputs: send the File objects (multipart), not the fake "C:\fakepath\..." value.
+    if (input && input.type === 'file') {
+        const files = Array.from(input.files || []);
+        return input.multiple ? files : (files[0] || null);
+    }
+
     return input ? input.value : null;
+}
+
+function payloadHasFiles(value) {
+    if (typeof File !== 'undefined' && value instanceof File) {
+        return true;
+    }
+
+    if (Array.isArray(value)) {
+        return value.some(payloadHasFiles);
+    }
+
+    if (value && typeof value === 'object') {
+        return Object.values(value).some(payloadHasFiles);
+    }
+
+    return false;
+}
+
+// Flattens a payload into FormData using PHP's bracket notation (meta[key], tags[]).
+function appendToFormData(formData, key, value) {
+    if (value === null || value === undefined) {
+        formData.append(key, '');
+    } else if (typeof File !== 'undefined' && value instanceof File) {
+        formData.append(key, value, value.name);
+    } else if (Array.isArray(value)) {
+        value.forEach(item => appendToFormData(formData, `${key}[]`, item));
+    } else if (typeof value === 'object') {
+        Object.entries(value).forEach(([subKey, subValue]) => appendToFormData(formData, `${key}[${subKey}]`, subValue));
+    } else if (typeof value === 'boolean') {
+        formData.append(key, value ? '1' : '0');
+    } else {
+        formData.append(key, value);
+    }
+}
+
+/**
+ * Submit a payload that contains files as multipart/form-data. PUT/PATCH are
+ * sent as POST with _method, because PHP only parses multipart bodies on POST.
+ */
+async function submitMultipartFormRequest(endpoint, method, payload, csrfToken) {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => appendToFormData(formData, key, value));
+
+    if (method !== 'POST') {
+        formData.append('_method', method);
+    }
+
+    const headers = {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+    if (csrfToken) {
+        headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+    const apiToken = document.querySelector('meta[name="sanctum-token"]')?.content;
+    if (apiToken) {
+        headers['Authorization'] = `Bearer ${apiToken}`;
+    }
+
+    // No Content-Type header: the browser sets the multipart boundary.
+    const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+        body: formData,
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    return {
+        ...result,
+        success: result?.success ?? response.ok,
+        status: result?.status ?? response.status,
+    };
 }
 
 
@@ -1441,7 +1644,7 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
 
         // ✅ On click handler
         editIcon.addEventListener('click', function () {
-            console.log('Edit icon clicked');
+            window.uiDebug?.('Edit icon clicked');
         });
         headingDiv.appendChild(editIcon);
     }
@@ -1547,11 +1750,20 @@ function setupFormFooter(cardFooter, formMeta, formElement) {
             const rowActions = rows.get(rowKey);
             // A lone action in a row has nothing to space between, so it
             // reads better centered than pinned to the left.
-            const rowJustify = rowActions.length === 1 ? 'justify-content-center' : 'justify-content-between';
+            // An action may set align: 'start' | 'center' | 'end' to override this.
+            const ALIGN_CLASSES = { start: 'justify-content-start', center: 'justify-content-center', end: 'justify-content-end' };
+            const requestedAlign = rowActions.map(a => a.align).find(a => ALIGN_CLASSES[a]);
+            const rowJustify = requestedAlign
+                ? ALIGN_CLASSES[requestedAlign]
+                : (rowActions.length === 1 ? 'justify-content-center' : 'justify-content-between');
 
             const rowFragment = document.createElement('div');
             rowFragment.id = `${cardFooter.id}-item-row-${rowKey}`;
             rowFragment.classList.add(...[STYLE_CLASS.D_FLEX, STYLE_CLASS.ALIGN_ITEMS_CENTER, rowJustify, STYLE_CLASS.GAP_2, 'mb-3']);
+            // Keep the first action row from touching the last field.
+            if (rowKey === sortedRowKeys[0]) {
+                rowFragment.classList.add('mt-2');
+            }
             cardFooter.appendChild(rowFragment);
 
             rowActions.forEach((action) => {
@@ -1645,7 +1857,7 @@ function addAction(action, addTo) {
 
 
         //     // actionElement.addEventListener("click", (e) => {
-        //     //     console.log("Submit button clicked for form:");
+        //     //     window.uiDebug?.("Submit button clicked for form:");
         //     // });
 
 
@@ -1803,7 +2015,7 @@ function addFieldFeedback(feedback, addTo) {
 
 
 function setupCoreFormElement() {
-    console.log("setuping lab-form-elements ...")
+    window.uiDebug?.("setuping lab-form-elements ...")
     $('.shoz-form-element').each(function (e) {
         setupOneCoreFormElement(this)
     })
@@ -1820,13 +2032,23 @@ function setupOneCoreFormElement(element) {
         element.addClass("form-control") // add form-control class
 
         // checking if label is provided in the data-label attr
+        // Attribute values are set as text/attributes, never parsed as HTML.
         if (element.attr('data-label')) {
-            element.parent().append("<label class=\"" + STYLE_CLASS.FORM_LABEL + "\" for=\"" + element.attr('id') + "\" title=\"" + element.attr('data-label') + "\">" + element.attr('data-label') + "</label>")
+            element.parent().append(
+                $('<label>')
+                    .addClass(STYLE_CLASS.FORM_LABEL)
+                    .attr({ for: element.attr('id'), title: element.attr('data-label') })
+                    .text(element.attr('data-label'))
+            )
         }
 
         // checking if additional info is provided in the data-help-info attr
         if (element.attr('data-help-info')) {
-            element.parent().append("<p class=\"shoz-help-text " + STYLE_CLASS.SMALL + " " + STYLE_CLASS.TEXT_MUTED + "\">" + element.attr('data-help-info') + "</p>")
+            element.parent().append(
+                $('<p>')
+                    .addClass('shoz-help-text ' + STYLE_CLASS.SMALL + ' ' + STYLE_CLASS.TEXT_MUTED)
+                    .text(element.attr('data-help-info'))
+            )
         }
 
         // check if select option or not
@@ -1837,19 +2059,22 @@ function setupOneCoreFormElement(element) {
             } else {
                 defaultOption = "-- select an option --"
             }
-            //console.log("Selected Option: "element.val())
+            //window.uiDebug?.("Selected Option: "element.val())
             // create new option element
 
             let selectedFlag = "selected"
             if (element.children('option[selected]').length > 0) selectedFlag = ""
 
-            element.prepend("<option value='selectone' " + selectedFlag + " disabled>" + defaultOption + "</option>")
+            element.prepend(
+                $('<option>', { value: 'selectone', disabled: true, selected: selectedFlag === 'selected' })
+                    .text(defaultOption)
+            )
         }
 
         // checking if type is given
         if (element.attr('type')) {
             let type = element.attr('type') // get the given type of the input element
-            console.log("type::" + type)
+            window.uiDebug?.("type::" + type)
 
             //password type
             if (type == INPUT_TYPE.TYPE_PASSWORD) {
@@ -1865,7 +2090,7 @@ function setupOneCoreFormElement(element) {
             let dataType = element.attr('data-type') // get the given
             // overruled data-type
             // of shoz-form-element
-            console.log("dataType::" + dataType)
+            window.uiDebug?.("dataType::" + dataType)
 
             if (dataType == INPUT_TYPE.DATA_TYPE_DATETIME) {
                 //TODO: Send datetime field value format along with it's value in the hidden input field
@@ -1882,10 +2107,10 @@ function setupOneCoreFormElement(element) {
                 /* if value is there then set it to date time picker */
                 let dateValue
                 if (element.val()) {
-                    console.log("value = " + element.val())
+                    window.uiDebug?.("value = " + element.val())
                     let value = element.val()
                     if ($.isNumeric(value)) {
-                        console.log("value isNumeric - and in milliseconds")
+                        window.uiDebug?.("value isNumeric - and in milliseconds")
                         dateValue = new Date()
                         dateValue.setTime(value)
                     } //TODO else if other formats 
@@ -1920,8 +2145,8 @@ function setupOneCoreFormElement(element) {
                     dtpOption = { format: INPUT_TYPE.DTP_FORMAT_DATE_TIME }
                 }
 
-                console.log("dtpOption:: " + JSON.stringify(dtpOption))
-                console.log("parent: " + element.parent().attr('class'))
+                window.uiDebug?.("dtpOption:: " + JSON.stringify(dtpOption))
+                window.uiDebug?.("parent: " + element.parent().attr('class'))
                 let dateTimePickerId = element.attr('id') + "-datetimepicker"
                 $('#' + dateTimePickerId).datetimepicker(dtpOption).on('dp.change', function () {
                     //TODO
@@ -2008,11 +2233,11 @@ function checkFormAccess(formMeta, formElement) {
 (() => {
     'use strict'
     document.addEventListener('readystatechange', () => {
-        console.log("document.readyState>>>>>>>>>>>>>>", document.readyState);
+        window.uiDebug?.("document.readyState>>>>>>>>>>>>>>", document.readyState);
         if (document.readyState === "complete") {
             // Fetch all the forms marked as lab-form
             const forms = document.querySelectorAll('.lab-form, .shoz-form')
-            // console.log("forms>>>>>>>>>>>>>>>>>>>>>",forms);
+            // window.uiDebug?.("forms>>>>>>>>>>>>>>>>>>>>>",forms);
             // Loop over them and set them up
             Array.from(forms).forEach(form => {
                 setupForm(form)

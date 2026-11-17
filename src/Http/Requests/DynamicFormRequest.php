@@ -3,8 +3,8 @@
 namespace Iquesters\UserInterface\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Iquesters\UserInterface\Support\FormSchema;
 use Illuminate\Support\Facades\DB;
+use Iquesters\UserInterface\Support\FormSchema;
 
 abstract class DynamicFormRequest extends FormRequest
 {
@@ -19,7 +19,7 @@ abstract class DynamicFormRequest extends FormRequest
             ->where('uid', $this->uid())
             ->first();
 
-        if (!$schema) {
+        if (! $schema) {
             return [];
         }
 
@@ -29,12 +29,14 @@ abstract class DynamicFormRequest extends FormRequest
     public function rules(): array
     {
         $schema = $this->schema();
+
         return $schema ? FormSchema::toRules($schema) : [];
     }
 
     public function messages(): array
     {
         $schema = $this->schema();
+
         return $schema ? FormSchema::toMessages($schema) : [];
     }
 }

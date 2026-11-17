@@ -2,17 +2,21 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Api\Meta;
 
-use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Routing\Controller;
-use Iquesters\UserInterface\Models\FormSchema;
-use Illuminate\Support\Facades\Log;
 use Iquesters\Foundation\System\Http\ApiResponse;
+use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Models\FormSchema;
 use Symfony\Component\HttpFoundation\Response;
 
 class FormController extends Controller
 {
+    use Loggable;
+
     private function buildSchemaErrorResponse(\Throwable $e)
     {
+        static::logWarning('Form schema request failed: '.$e->getMessage());
+
         return ApiResponse::error(
             $e->getMessage(),
             Response::HTTP_OK,
@@ -34,7 +38,7 @@ class FormController extends Controller
      */
     public function getNoAuthFormSchema($slug)
     {
-        Log::info("No Auth: Fetching form schema for slug: " . $slug);
+        static::logDebug("Public form schema requested: {$slug}");
         // As application is not ready so we decided not to use uid
         // return $this->getFormSchema($slug);
 
@@ -56,16 +60,16 @@ class FormController extends Controller
     public function getFormSchemaBySlug($slug)
     {
         try {
-            Log::info("Fetching form schema for slug: " . $slug);
+            static::logDebug("Fetching form schema by slug: {$slug}");
 
-            if (!$slug) {
+            if (! $slug) {
                 throw new \Exception('Form schema slug not found');
             }
 
             $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
-            Log::info("Form schema result: " . json_encode($form));
+            static::logDebug($form ? "Form schema found: {$slug}" : "Form schema not found: {$slug}", $form ? ['uid' => $form->uid] : []);
 
-            if (!$form) {
+            if (! $form) {
                 throw new \Exception('Form schema not found');
             }
 
@@ -84,15 +88,15 @@ class FormController extends Controller
     public function getFormSchema($uid)
     {
         try {
-            Log::info("Fetching form schema for uid: " . $uid);
+            static::logDebug("Fetching form schema by uid: {$uid}");
 
-            if (!$uid) {
+            if (! $uid) {
                 throw new \Exception('Form schema ID not found');
             }
 
             $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
 
-            if (!$form) {
+            if (! $form) {
                 throw new \Exception('Form schema not found');
             }
 
@@ -104,5 +108,4 @@ class FormController extends Controller
             return $this->buildSchemaErrorResponse($e);
         }
     }
-
 }

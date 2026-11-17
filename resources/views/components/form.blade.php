@@ -53,7 +53,16 @@
                         $size = $size['lg'] ?? $size['md'] ?? $size['xs'] ?? 6;
                     }
 
-                    return is_numeric($size) ? max(1, min(12, (int) $size)) : 6;
+                    // Real control height: a textarea grows with its rows
+                    // (browser default 2), everything else is one .form-control line.
+                    $height = ($field['type'] ?? null) === 'textarea'
+                        ? 'calc(' . max(1, (int) ($field['rows'] ?? 2)) . ' * 1.5rem + 0.75rem + 2px)'
+                        : 'calc(1.5rem + 0.75rem + 2px)';
+
+                    return [
+                        'width' => is_numeric($size) ? max(1, min(12, (int) $size)) : 6,
+                        'height' => $height,
+                    ];
                 })
                 ->values()
                 ->all();
@@ -94,19 +103,41 @@
                 // as plain text (addAction() gives it no button chrome), so
                 // a boxy button-shaped placeholder for it looked wrong next
                 // to the real thing.
+                $alignClasses = ['start' => 'justify-content-start', 'center' => 'justify-content-center', 'end' => 'justify-content-end'];
+
                 $skeletonActionRows = collect($schemaActions)
                     ->groupBy(fn ($action) => $action['row'] ?? 0)
                     ->sortKeys()
-                    ->map(function ($rowActions) {
-                        return collect($rowActions)
-                            ->map(function ($action) {
-                                $isLink = ($action['element']['type'] ?? null) === 'a'
-                                    || ($action['element']['variant'] ?? null) === 'link';
+                    ->map(function ($rowActions) use ($alignClasses) {
+                        $rowActions = collect($rowActions);
+                        // Same rule as setupFormFooter(): an explicit align wins,
+                        // else a lone action is centred and a group is spread out.
+                        $align = $rowActions->pluck('align')->first(fn ($a) => isset($alignClasses[$a]));
 
-                                return $isLink ? 'link' : 'button';
-                            })
-                            ->values()
-                            ->all();
+                        return [
+                            'justify' => $align
+                                ? $alignClasses[$align]
+                                : ($rowActions->count() === 1 ? 'justify-content-center' : 'justify-content-between'),
+                            'items' => $rowActions
+                                ->map(function ($action) {
+                                    $isLink = ($action['element']['type'] ?? null) === 'a'
+                                        || ($action['element']['variant'] ?? null) === 'link';
+
+                                    if ($isLink) {
+                                        return ['shape' => 'link'];
+                                    }
+
+                                    $size = $action['element']['size'] ?? 'sm';
+
+                                    return ['shape' => 'button', 'height' => match ($size) {
+                                        'lg' => '48px',
+                                        'sm' => '31px',
+                                        default => '38px',
+                                    }];
+                                })
+                                ->values()
+                                ->all(),
+                        ];
                     })
                     ->values()
                     ->all();
@@ -129,7 +160,8 @@
       @if($recaptchaAction) data-recaptcha-action="{{ $recaptchaAction }}" @endif>
     @csrf
 
-  <div class="form-skeleton">
+  {{-- data-shaped: 1 when built from the real schema; form.js replaces a generic one when it has the schema cached --}}
+  <div class="form-skeleton" data-shaped="{{ $rawSchema ?? null ? '1' : '0' }}">
     @if ($skeletonHasHeader)
     <!-- Header Section -->
     <div class="mb-4">
@@ -139,17 +171,18 @@
     </div>
     @endif
     <!-- Body Section -->
-    <div class="mb-4 placeholder-wave">
+    <div class="{{ count($skeletonFieldWidths) > 0 ? '' : 'mb-4' }} placeholder-wave">
       @if (count($skeletonFieldWidths) > 0)
-        <div class="row mb-3 g-2">
-          @foreach ($skeletonFieldWidths as $fieldWidth)
-            <div class="col-{{ $fieldWidth }}">
-                {{-- Explicit heights matching a real .form-label (~24px) and
-                     .form-control (~38px) — the old p-2/p-4 padding-based
-                     sizing didn't map to those, so the skeleton was
-                     noticeably taller than the real field it stands in for. --}}
-                <div class="bg-info-subtle rounded col-5 mb-2" style="height: 1.2rem;"></div>
-                <div class="bg-info-subtle rounded col-12" style="height: 38px;"></div>
+        <div class="row g-2">
+          @foreach ($skeletonFieldWidths as $skeletonField)
+            <div class="col-{{ $skeletonField['width'] }}">
+                {{-- Label slot is a .form-label line (1.5rem + mb-2); the bar
+                     inside is thinner, like text. Control height mirrors the
+                     real input/textarea (see height above). --}}
+                <div class="d-flex align-items-center mb-2" style="height: 1.5rem;">
+                    <div class="bg-info-subtle rounded col-5" style="height: 1rem;"></div>
+                </div>
+                <div class="bg-info-subtle rounded col-12" style="height: {{ $skeletonField['height'] }};"></div>
             </div>
           @endforeach
         </div>
@@ -181,15 +214,15 @@
     </div>
     @if (count($skeletonActionRows) > 0)
     <!-- Footer Section (row-grouped, matches setupFormFooter()'s multi-row layout) -->
-    @foreach ($skeletonActionRows as $rowShapes)
-      <div class="d-flex align-items-center {{ count($rowShapes) === 1 ? 'justify-content-center' : 'justify-content-between' }} gap-2 placeholder-wave mb-3">
-        @foreach ($rowShapes as $shape)
-          @if ($shape === 'link')
+    @foreach ($skeletonActionRows as $rowIndex => $actionRow)
+      <div class="d-flex align-items-center {{ $actionRow['justify'] }} gap-2 placeholder-wave mb-3 {{ $rowIndex === 0 ? 'mt-2' : '' }}">
+        @foreach ($actionRow['items'] as $item)
+          @if ($item['shape'] === 'link')
             {{-- Plain-text link (addAction() gives it no button chrome) — a short, thin bar, not a box --}}
             <div class="bg-info-subtle rounded" style="width: 130px; height: 0.9rem;"></div>
           @else
-            {{-- Real .btn.btn-sm sized placeholder --}}
-            <div class="bg-info-subtle rounded" style="width: 80px; height: 30px;"></div>
+            {{-- Button placeholder at the real .btn height for its size --}}
+            <div class="bg-info-subtle rounded" style="width: 90px; height: {{ $item['height'] }};"></div>
           @endif
         @endforeach
       </div>

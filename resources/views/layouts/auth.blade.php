@@ -8,33 +8,14 @@
     <main>
         <div class="w-100 d-flex align-items-center justify-content-center px-4" style="min-height: 100vh;">
             <div class="row justify-content-md-center w-100">
-                {{-- <div class="col-md-7 col-lg-4 d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4"> --}}
-                <div class="col-md-8 d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4">
+                {{-- Pages showing a single form narrow this via @section('auth-card-class') --}}
+                <div class="@yield('auth-card-class', 'col-md-8') d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4">
                     
                     <!-- Logo (now responsive) -->
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" 
                          class="img-fluid mb-4" 
                          alt="Logo" 
                          style="max-width: 200px; width: 100%;">
-
-                    <!-- Session Status -->
-                    @if (session('status'))
-                        <div class="alert alert-info m-0 m-2 p-2 w-100" role="alert">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
-                    @if(session('success'))
-                        <div class="alert alert-success m-2 p-2 w-100" role="alert">
-                            {{ session('success') }}
-                        </div>
-                    @endif
-
-                    @if (session('error'))
-                        <div class="alert alert-danger m-2 p-2 w-100" role="alert">
-                            {{ session('error') }}
-                        </div>
-                    @endif
 
                     @yield('content')
                 </div>
@@ -43,6 +24,28 @@
     </main>
 
     @include('userinterface::layouts.common.snackbar')
-    @include('userinterface::layouts.common.js')
+    @include('userinterface::layouts.common.js', ['isAuth' => true])
+
+    {{-- Flashed messages from a plain redirect (e.g. Google login error, setup done)
+         show as a toast, same as form submissions. --}}
+    @php
+        $flashToasts = array_filter([
+            'info' => session('status'),
+            'success' => session('success'),
+            'error' => session('error'),
+        ]);
+    @endphp
+    @if ($flashToasts)
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (typeof window.showSnackbar !== 'function') {
+                return;
+            }
+            @foreach ($flashToasts as $type => $message)
+            window.showSnackbar(@json(__($message)), @json($type));
+            @endforeach
+        });
+    </script>
+    @endif
 </body>
 </html>

@@ -176,7 +176,8 @@
         const conf = getConfig()
         const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
         const position = normalizePosition(options.position || conf.position)
-        const delay = options.duration || conf.duration
+        // Errors stay up longer: they usually need reading, not just noticing.
+        const delay = options.duration || (type === 'error' ? Math.max(Number(conf.duration) || 0, 8000) : conf.duration)
         const stackMode = options.stackMode || conf.stackMode
         const maxVisible = Number(options.maxVisible || conf.maxVisible || 4)
         const allowDismiss = typeof options.allowDismiss === 'boolean' ? options.allowDismiss : conf.allowDismiss
@@ -203,10 +204,12 @@
 
         toastEl.innerHTML = `
             <div class="d-flex">
-                <div class="toast-body ${classes.bodyClass}">${text}</div>
+                <div class="toast-body ${classes.bodyClass}"></div>
                 ${allowDismiss ? `<button type="button" class="btn-close ${classes.closeButtonClass} me-2 m-auto" aria-label="Close"></button>` : ''}
             </div>
         `
+        // Messages often come from the server: insert as text, never as HTML.
+        toastEl.querySelector('.toast-body').textContent = text
 
         container.appendChild(toastEl)
 

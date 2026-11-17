@@ -2,8 +2,8 @@
 
 namespace Iquesters\UserInterface\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
 class FormSchema extends Model
 {
@@ -18,7 +18,7 @@ class FormSchema extends Model
         'extra_info',
         'status',
         'created_by',
-        'updated_by'
+        'updated_by',
     ];
 
     protected $casts = [
@@ -26,13 +26,14 @@ class FormSchema extends Model
         'extra_info' => 'array',
         'status' => 'string',
     ];
-    
+
     protected $table = 'form_schemas';
 
     public function refCreatedBy()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
     public function refUpdatedBy()
     {
         return $this->belongsTo(User::class, 'updated_by');

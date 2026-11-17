@@ -1,9 +1,9 @@
 <?php
 
-use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Iquesters\UserInterface\Constants\EntityStatus;
 
 return new class extends Migration
 {

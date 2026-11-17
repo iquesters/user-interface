@@ -1,28 +1,26 @@
 @php
     use Iquesters\Foundation\Support\ConfProvider;
     use Iquesters\Foundation\Enums\Module;
-    use Iquesters\UserManagement\Config\UserManagementKeys;
     $layout=ConfProvider::from(Module::USER_INFE)->app_layout;
-@endphp 
+@endphp
 
 @extends($layout)
 
 @section('title', 'Create New Master Data'.(isset($data->parent_id) && $data->parent_id > 0 ? ' for ' . $data->parent->key : ''))
 
 @section('content')
-<!-- <form id="{{$data->parent->uid}}" class="lab-form"></form> -->
- <!-- action="{{ route('form.submitAndSave', ['uid' => $data->parent->uid ?? '']) }}" -->
-<form id="{{$data->parent->uid}}" class="lab-form" 
-       
-      method="POST" 
+@if (session('success'))
+    <div class="alert alert-success">{{ session('success') }}</div>
+@endif
+
+{{-- Form preview: submitting only validates against the form schema (nothing is saved). --}}
+<form id="{{$data->parent->uid}}" class="lab-form"
+      action="{{ route('form.formsubmit', ['uid' => $data->parent->uid ?? '']) }}"
+      method="POST"
       enctype="multipart/form-data"
       data-form-meta=""
       data-form-data=''>
     @csrf
-
-   
-    
-    
 </form>
 <!-- APP ENV Message container -->
 <div id="form-error-message"></div>
@@ -37,40 +35,22 @@
     }
     window.formErrors = @json($errors->toArray());
 
-    $('#{{$data->parent->uid}}').on('submit', function(e) {
-        e.preventDefault();
-        console.log('Form submitted');
-        const formData = new FormData(this);
+    // Fields are rendered by form.js after load, so wait for them before
+    // marking the fields that failed server-side validation.
+    (function showServerErrorsWhenReady(attempt) {
+        const errors = window.formErrors || {};
+        const fields = Object.keys(errors);
+        if (fields.length === 0) {
+            return;
+        }
 
-        $('.is-invalid').removeClass('is-invalid');   
-        $('.invalid-feedback').remove(); 
-        
-        $.ajax({
-            url: "http://127.0.0.1:8000/api/form/save-form/{{ $data->parent->uid ?? '' }}", 
-            method: "POST",
-            data: formData,
-            contentType: false,
-            processData: false,
-            success: function(response) {
-                console.log("API Response:", response);
-                alert("Form submitted successfully!");
-                window.location.reload();
-            },
-            error: function(xhr) {
-                console.error("API Error:", xhr.responseText);
-                if (xhr.status === 422) {
-                    const res = xhr.responseJSON;
-                    if (res.errors) {
-                        showValidationErrors(res.errors);
-                    }
-                } else {
-                    alert("Something went wrong!");
-                }
-            
-            }
-        });
-    });
+        if (!fields.some((f) => document.querySelector(`[name="${f}"]`)) && attempt < 30) {
+            setTimeout(() => showServerErrorsWhenReady(attempt + 1), 100);
+            return;
+        }
 
+        showValidationErrors(errors);
+    })(0);
 
 function showValidationErrors(errors) {
     Object.keys(errors).forEach(function(field) {
@@ -81,7 +61,7 @@ function showValidationErrors(errors) {
             const errorDiv = document.createElement("div");
             errorDiv.classList.add("invalid-feedback");
             errorDiv.textContent = errors[field][0];
-            
+
             // Append error message right after the input
             input.parentNode.appendChild(errorDiv);
         }

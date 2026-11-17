@@ -47,103 +47,10 @@
         }
     }
     
-    // Generate menu helper
-    use Iquesters\Foundation\Models\Navigation;
-    use Illuminate\Support\Facades\Route;
-
-    $generateMenu = function ($module) {
-
-        /**
-         * STEP 1: Load raw submenu from module meta
-         */
-        $submenuItems = json_decode(
-            $module->getMeta('module_sidebar_menu') ?? '[]',
-            true
-        );
-
-        if (!is_array($submenuItems) || empty($submenuItems)) {
-            return collect();
-        }
-
-        /**
-         * STEP 2: Normalize submenu items (unique key)
-         */
-        $submenu = collect($submenuItems)
-            ->map(function ($item) {
-                return array_merge($item, [
-                    '_key' => $item['route']
-                        . '::'
-                        . ($item['default-table-schema-uid'] ?? 'none'),
-                ]);
-            });
-
-        /**
-         * STEP 3: Load saved order
-         */
-        $navigation = Navigation::where(
-            'name',
-            $module->name . '_sub_menu'
-        )->first();
-
-        $savedOrder = [];
-
-        if ($navigation) {
-            $savedOrder = json_decode(
-                $navigation->getMeta('navigation_order') ?? '[]',
-                true
-            );
-        }
-
-        $savedOrder = is_array($savedOrder) ? $savedOrder : [];
-
-        /**
-         * STEP 4: Clean invalid keys
-         */
-        $existingKeys = $submenu->pluck('_key')->toArray();
-        $savedOrder   = array_values(array_intersect($savedOrder, $existingKeys));
-
-        /**
-         * STEP 5: Append new submenu items
-         */
-        $newKeys   = array_diff($existingKeys, $savedOrder);
-        $finalKeys = array_merge($savedOrder, $newKeys);
-
-        /**
-         * STEP 6: Build sidebar menu (CORRECT)
-         */
-        return collect($finalKeys)
-            ->map(function ($key) use ($submenu) {
-
-                $item = $submenu->firstWhere('_key', $key);
-                if (!$item) {
-                    return null;
-                }
-
-                $params = $item['params'] ?? [];
-
-                if (!empty($item['default-table-schema-uid'])) {
-                    $params['default_table_schema_uid']
-                        = $item['default-table-schema-uid'];
-                }
-
-                foreach ($params as $k => $v) {
-                    if ($v === null) {
-                        $params[$k] = request()->route($k);
-                    }
-                }
-
-                return [
-                    'icon'  => $item['icon'] ?? null,
-                    'label' => $item['label'] ?? null,
-                    'url'   => Route::has($item['route'])
-                        ? route($item['route'], $params)
-                        : '#',
-                ];
-            })
-            ->filter()
-            ->values();
-
-    };
+    // Menus are built once per request (NavigationMenu), not per include.
+    $navigationMenu = app(\Iquesters\UserInterface\Support\NavigationMenu::class);
+    $generateMenu = fn ($module) => $navigationMenu->menu($module);
+    $activeModuleId = $navigationMenu->active()['module']?->id;
     
     // View mode configurations
     $viewConfigs = [
@@ -192,7 +99,7 @@
             @endphp
 
             <a href="{{ $menu[0]['url'] ?? '#' }}" 
-               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} d-flex flex-column align-items-center justify-content-center text-decoration-none text-primary"
+               class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} {{ $module->id === $activeModuleId ? 'active-module' : '' }} d-flex flex-column align-items-center justify-content-center text-decoration-none text-primary"
                data-view-mode="{{ $viewMode }}"
                data-menu='@json($menu)'
                data-name="{{ ucfirst($module->name) }}"
@@ -229,7 +136,7 @@
                     @foreach($dropdownModules as $idx => $module)
                         @php $menu = $generateMenu($module); @endphp
                         <li>
-                            <a class="dropdown-item d-flex align-items-center text-truncate"
+                            <a class="dropdown-item d-flex align-items-center text-truncate {{ $module->id === $activeModuleId ? 'active' : '' }}"
                                data-view-mode="{{ $viewMode }}"
                                href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($menu[0]['url'] ?? '#') }}"
                                data-menu='@json($menu)'

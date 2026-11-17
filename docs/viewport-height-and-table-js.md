@@ -56,10 +56,10 @@ The main table behavior lives in `public/js/table/table.js`.
 
 ### What it does
 
-- loads table schema from `/api/auth/table/{slug}`
+- loads table schema from `/api/user-interface/v1/auth/table/{slug}`
 - initializes a per-entity cache
 - renders either standard table view or inbox view
-- fetches row data from `/api/entity/list/{entity_name}`
+- fetches row data from `/api/user-interface/v1/entity/list/{entity_name}`
 - supports manual refresh through shared cache clearing
 - supports fallback detail rendering in inbox view when no detail component is configured
 - supports hybrid inbox detail behavior where a custom detail component is the default view and a schema form is used for edit mode

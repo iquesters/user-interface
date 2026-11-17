@@ -1,0 +1,61 @@
+{
+    "_comment": "Third-party libraries the layouts load. Single source for the Blade layouts (Support\\VendorLibraries) and `npm run libs` (scripts/fetch-vendor-libs.mjs), which downloads each file into public/libs/{local} and verifies it against its SRI hash. `scope`: all = every page, app = not on auth pages.",
+    "libraries": [
+        {
+            "name": "jquery",
+            "type": "js",
+            "scope": "all",
+            "cdn": "https://code.jquery.com/jquery-3.7.0.min.js",
+            "integrity": "sha384-NXgwF8Kv9SSAr+jemKKcbvQsz+teULH/a5UNJvZc6kP47hZgl62M1vGnw6gHQhb1",
+            "local": "jquery/3.7.0/jquery.min.js"
+        },
+        {
+            "name": "bootstrap",
+            "type": "js",
+            "scope": "all",
+            "cdn": "https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.0/js/bootstrap.bundle.min.js",
+            "integrity": "sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz",
+            "local": "bootstrap/5.3.0/bootstrap.bundle.min.js"
+        },
+        {
+            "name": "fontawesome",
+            "type": "css",
+            "scope": "all",
+            "cdn": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css",
+            "integrity": "sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==",
+            "local": "fontawesome/6.7.2/css/all.min.css"
+        },
+        {
+            "name": "datatables",
+            "type": "css",
+            "scope": "app",
+            "cdn": "https://cdn.datatables.net/v/bs5/jq-3.7.0/moment-2.29.4/jszip-3.10.1/dt-2.2.2/af-2.7.0/b-3.2.2/b-colvis-3.2.2/b-html5-3.2.2/b-print-3.2.2/cr-2.0.4/date-1.5.5/fc-5.0.4/fh-4.0.1/kt-2.12.1/r-3.0.4/rg-1.5.1/rr-1.5.0/sc-2.4.3/sb-1.8.2/sp-2.3.3/sl-3.0.0/sr-1.4.1/datatables.min.css",
+            "integrity": "sha384-wYf859STWTPggciSnTIDCGMabsgGXnODSCOXsmSXYvBU+qa7uYQjrZCTi9/jyzAD",
+            "local": "datatables/2.2.2/datatables.min.css"
+        },
+        {
+            "name": "datatables",
+            "type": "js",
+            "scope": "app",
+            "cdn": "https://cdn.datatables.net/v/bs5/jq-3.7.0/moment-2.29.4/jszip-3.10.1/dt-2.2.2/af-2.7.0/b-3.2.2/b-colvis-3.2.2/b-html5-3.2.2/b-print-3.2.2/cr-2.0.4/date-1.5.5/fc-5.0.4/fh-4.0.1/kt-2.12.1/r-3.0.4/rg-1.5.1/rr-1.5.0/sc-2.4.3/sb-1.8.2/sp-2.3.3/sl-3.0.0/sr-1.4.1/datatables.min.js",
+            "integrity": "sha384-pdpncyjMFzkxj3N8+5wWQGxGZCFzkWFpInHw4/e5Eg98sIg19W5HYwuEocBQGTtO",
+            "local": "datatables/2.2.2/datatables.min.js"
+        },
+        {
+            "name": "jsoneditor",
+            "type": "css",
+            "scope": "app",
+            "cdn": "https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.css",
+            "integrity": "sha384-cj1rYBc4/dVYAknZMTkVCDRL6Knzugf32igVqsuFW0iRWFHKH8Ci8+ekC8gNsFZ+",
+            "local": "jsoneditor/10.1.0/jsoneditor.min.css"
+        },
+        {
+            "name": "jsoneditor",
+            "type": "js",
+            "scope": "app",
+            "cdn": "https://cdn.jsdelivr.net/npm/jsoneditor@10.1.0/dist/jsoneditor.min.js",
+            "integrity": "sha384-XMmehxwkAgGyArCAd+T/AHykv4Ws/sOgqfB8vMvHBXvmeuQ5LtfMCo0a4TiFjk+7",
+            "local": "jsoneditor/10.1.0/jsoneditor.min.js"
+        }
+    ]
+}

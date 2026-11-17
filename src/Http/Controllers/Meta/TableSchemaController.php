@@ -2,20 +2,21 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
-use Iquesters\UserInterface\Constants\EntityStatus;
-use App\Http\Controllers\Controller;
-use Iquesters\UserInterface\Models\TableSchema;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Models\TableSchema;
 
 class TableSchemaController extends Controller
 {
+    use Loggable;
 
     /**
      * Display a listing of the resource.
-     * 
+     *
      * @return TableSchema[]
      */
     public function list()
@@ -27,8 +28,7 @@ class TableSchemaController extends Controller
 
     /**
      * This is the overview page for a single table
-     * 
-     * @param $id
+     *
      * @return TableSchema
      */
     public function overview($id)
@@ -48,8 +48,6 @@ class TableSchemaController extends Controller
 
     /**
      * Store a newly created table resource in storage.
-     * 
-     * @param $request
      */
     public function store(Request $request)
     {
@@ -67,14 +65,14 @@ class TableSchemaController extends Controller
             return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $slug = $request->input('slug') 
-            ? Str::slug($request->input('slug')) 
-            : Str::slug($request->input('name')) . '-' . Str::random(4);
+        $slug = $request->input('slug')
+            ? Str::slug($request->input('slug'))
+            : Str::slug($request->input('name')).'-'.Str::random(4);
 
         // decode schema and extra_info if JSON
         $schema = json_decode($request->input('schema'), true);
         $extra_info = json_decode($request->input('extra_info'), true);
-        
+
         $userId = auth()->check() ? auth()->id() : 0;
 
         // store
@@ -132,14 +130,14 @@ class TableSchemaController extends Controller
         //     $table_data['slug'] = $request['slug'];
         // }
 
-        Log::info('table id=' . json_encode($id));
+        static::logInfo('table id='.json_encode($id));
         // Log::info('table_data=' . json_encode($table_data));
         // create table
         $result = TableSchema::where(['id' => $id])->update([
             'name' => $request['name'],
             'description' => $request['description'],
             'schema' => $request['schema'],
-            'extra_info' => $request['extra_info']
+            'extra_info' => $request['extra_info'],
         ]);
 
         if ($result) {
@@ -158,5 +156,4 @@ class TableSchemaController extends Controller
     }
 
     public function delete() {}
-    
 }

@@ -5,13 +5,16 @@
     
     $user = Auth::user();
 
-    $profilePath  = $user->getMeta('profile_picture_path');
-    $profileFile  = $user->getMeta('profile_picture');
+    // getMeta() comes from iquesters/user-management's HasUserManagement trait.
+    $userMeta = fn (string $key) => method_exists($user, 'getMeta') ? $user->getMeta($key) : null;
+
+    $profilePath  = $userMeta('profile_picture_path');
+    $profileFile  = $userMeta('profile_picture');
     $userAvatar = $profileFile
         ? $profilePath . $profileFile
         : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
 
-    $lastLoginRaw = $user->getMeta('last_login_at');
+    $lastLoginRaw = $userMeta('last_login_at');
 
     if ($lastLoginRaw) {
         try {
@@ -66,7 +69,7 @@
                             <small class="d-block mb-0">{{ $user->email ?? 'Unknown' }}</small>
                             <small>
                                 <small class="d-block mb-0" title="User Theme">
-                                    Theme: {{ $user->getMeta('theme') ?? 'Application Default' }}
+                                    Theme: {{ $userMeta('theme') ?? 'Application Default' }}
                                 </small>
                                 <small class="d-block mb-0" title="User Role">
                                     Role(s): {{ implode(', ', array_map('ucwords', $user->roles?->pluck('name')->toArray() ?? ['Unknown'])) }}

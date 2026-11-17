@@ -12,6 +12,7 @@ const DEFAULT_DT_CONFIG = {
     processing: false,
     serverSide: true,
     searching: true,
+    searchDelay: 400, // debounce: one request after typing pauses
     ordering: true,
     responsive: true,
     autoWidth: true,
@@ -36,8 +37,10 @@ const DETAIL_RENDER_MODE_COMPONENT = 'component';
 const DETAIL_RENDER_MODE_FORM = 'form';
 
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
-const TABLE_API_ENTITY_LIST_PREFIX = '/api/entity/list/';
-const TABLE_API_COMPONENT_TEMPLATE_PREFIX = '/api/components/templates/';
+// Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
+const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
+const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
+const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
 const TABLE_SELECTOR_LAB_TABLE_SHELL = '.lab-table-shell';
@@ -164,7 +167,6 @@ const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['summary_component', 'summary-compon
 const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';
-const TABLE_MESSAGE_LOADING_DETAILS = 'Loading details...';
 const TABLE_MESSAGE_EMPTY_DETAIL = 'Select an item to view details';
 const TABLE_MESSAGE_RECORD_INFO = 'Record Information';
 const TABLE_MESSAGE_AUTH_REQUIRED = 'Authentication Required';

@@ -29,9 +29,10 @@ class UIController extends Controller
             $table_schema = TableSchema::where('uid', $table_schema_id)->first();
 
             $this->logMethodEnd("table_schema_id={$table_schema_id}");
+
             return view('userinterface::ui.list', compact('table_schema'));
         } catch (\Throwable $th) {
-            $this->logError('List failed: ' . $th->getMessage());
+            $this->logError('List failed: '.$th->getMessage());
             Log::error('Error in list method', [
                 'error' => $th->getMessage(),
             ]);
@@ -51,9 +52,10 @@ class UIController extends Controller
             ]);
 
             $this->logMethodEnd("form_schema_id={$form_schema_id}, entity_uid={$entity_uid}");
+
             return view('userinterface::ui.form.view', compact('form_schema_id', 'entity_uid'));
         } catch (\Throwable $th) {
-            $this->logError('View failed: ' . $th->getMessage());
+            $this->logError('View failed: '.$th->getMessage());
             Log::error('UIController@view failed', [
                 'form_schema_id' => $form_schema_id,
                 'entity_uid' => $entity_uid,
@@ -78,9 +80,10 @@ class UIController extends Controller
             ]);
 
             $this->logMethodEnd("form_schema_id={$form_schema_id}, entity_uid={$entity_uid}");
+
             return view('userinterface::ui.form.edit', compact('form_schema_id', 'entity_uid'));
         } catch (\Throwable $th) {
-            $this->logError('Edit failed: ' . $th->getMessage());
+            $this->logError('Edit failed: '.$th->getMessage());
             Log::error('UIController@edit failed', [
                 'exception' => $th,
             ]);
@@ -99,9 +102,10 @@ class UIController extends Controller
             ]);
 
             $this->logMethodEnd("form_schema_id={$form_schema_id}, entity_uid={$entity_uid}");
+
             return view('userinterface::ui.form.view', compact('form_schema_id', 'entity_uid'));
         } catch (\Throwable $th) {
-            $this->logError('Delete failed: ' . $th->getMessage());
+            $this->logError('Delete failed: '.$th->getMessage());
             Log::error('UIController@delete failed', [
                 'exception' => $th,
             ]);
@@ -121,9 +125,10 @@ class UIController extends Controller
             $themeMasterData = MasterData::where('key', 'current_theme')->first();
 
             $this->logMethodEnd('theme selector loaded');
+
             return view('userinterface::ui.theme-selector', compact('themes', 'themeMasterData'));
         } catch (\Throwable $th) {
-            $this->logError('Set theme failed: ' . $th->getMessage());
+            $this->logError('Set theme failed: '.$th->getMessage());
             throw $th;
         }
     }

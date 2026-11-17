@@ -22,6 +22,19 @@ const API_CONFIG = {
     followRedirects: true, // Auto-follow 3xx redirects
 };
 
+/**
+ * Versioned user-interface API: /api/{module}/{version} (foundation ModuleApi).
+ * Override window.UI_API_BASE before this file loads to point elsewhere.
+ * The unversioned /api/... routes are deprecated aliases.
+ */
+window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
+
+/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+function uiApiUrl(path = '') {
+    return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.uiApiUrl = uiApiUrl;
+
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,
     SWITCHING_PROTOCOLS: 101,
@@ -396,6 +409,8 @@ class ApiClient {
             links: json.response_schema?.links || null,
             ui_context: json.ui_context || {},
             redirect_url: json.redirect_url || json.ui_context?.redirect || null,
+            // Server-side cause, only sent in debug mode (APP_DEBUG).
+            detail: typeof json.error === 'string' ? json.error : null,
         };
 
         // Process UI context
@@ -422,6 +437,8 @@ class ApiClient {
             links: json.links || null,
             ui_context: {},
             redirect_url: json.redirect_url || null,
+            // Server-side cause, only sent in debug mode (APP_DEBUG).
+            detail: typeof json.error === 'string' ? json.error : null,
         };
     }
 
@@ -437,37 +454,37 @@ class ApiClient {
 
         // Handle redirect
         if (uiContext.redirect) {
-            console.log('🔄 UI Context: Redirect to', uiContext.redirect);
+            window.uiDebug?.('🔄 UI Context: Redirect to', uiContext.redirect);
             // Note: Actual redirect should be handled by caller
         }
 
         // Handle toast notification
         if (uiContext.toast) {
-            console.log('📢 UI Context: Toast notification', uiContext.toast);
+            window.uiDebug?.('📢 UI Context: Toast notification', uiContext.toast);
             this._showToast(uiContext.toast);
         }
 
         // Handle modal
         if (uiContext.modal) {
-            console.log('📋 UI Context: Modal', uiContext.modal);
+            window.uiDebug?.('📋 UI Context: Modal', uiContext.modal);
             // Note: Modal handling should be implemented by application
         }
 
         // Handle page refresh
         if (uiContext.refresh) {
-            console.log('🔄 UI Context: Page refresh requested');
+            window.uiDebug?.('🔄 UI Context: Page refresh requested');
             // Note: Actual refresh should be handled by caller
         }
 
         // Handle close action
         if (uiContext.close) {
-            console.log('❌ UI Context: Close requested');
+            window.uiDebug?.('❌ UI Context: Close requested');
             // Note: Close action should be handled by caller
         }
 
         // Handle custom actions
         if (uiContext.custom) {
-            console.log('⚙️ UI Context: Custom action', uiContext.custom);
+            window.uiDebug?.('⚙️ UI Context: Custom action', uiContext.custom);
             // Dispatch custom event
             window.dispatchEvent(new CustomEvent('api-ui-context', {
                 detail: uiContext.custom
@@ -503,7 +520,7 @@ class ApiClient {
                 }
             );
         } else {
-            console.log('Toast:', toastConfig);
+            window.uiDebug?.('Toast:', toastConfig);
         }
     }
 
@@ -584,11 +601,11 @@ class ApiClient {
             return parsedResponse;
         }
 
-        console.log(`🔄 Redirect [${response.status}]: ${redirectUrl}`);
+        window.uiDebug?.(`🔄 Redirect [${response.status}]: ${redirectUrl}`);
 
         // Auto-follow redirects if configured
         if (request.followRedirects !== false && this.config.followRedirects) {
-            console.log('🔄 Following redirect...');
+            window.uiDebug?.('🔄 Following redirect...');
             
             // Preserve method for 307/308, use GET for others
             const newMethod = (
@@ -673,7 +690,7 @@ class ApiClient {
             );
             options.signal = controller.signal;
 
-            console.log(`🚀 API Request [${modifiedRequest.method}]: ${url}`);
+            window.uiDebug?.(`🚀 API Request [${modifiedRequest.method}]: ${url}`);
 
             // Execute fetch
             const response = await fetch(url, options);
@@ -698,7 +715,7 @@ class ApiClient {
             }
 
             const parsed = await this._parseResponse(modifiedResponse, modifiedRequest);
-            console.log(`✅ API Success [${modifiedResponse.status}]:`, parsed);
+            window.uiDebug?.(`✅ API Success [${modifiedResponse.status}]:`, parsed);
 
             return parsed;
 
@@ -707,7 +724,7 @@ class ApiClient {
 
             // Retry logic
             if (attempt < this.config.retryAttempts && !error.name?.includes('Abort')) {
-                console.log(`🔄 Retrying request (attempt ${attempt + 1})...`);
+                window.uiDebug?.(`🔄 Retrying request (attempt ${attempt + 1})...`);
                 await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
                 return this._executeRequest(request, attempt + 1);
             }
