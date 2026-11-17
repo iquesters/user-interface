@@ -39,4 +39,16 @@ class UserInterfaceConf extends BaseConf
         $default_values->vendor_assets = 'local';
     }
 
+    protected function rules(): array
+    {
+        return [
+            'auth_layout' => 'required|string',
+            'app_layout' => 'required|string',
+            'large_screen_nav_style' => 'in:minibar,header',
+            'large_screen_module_tabs' => 'integer|between:1,20',
+            'small_screen_bottom_tabs' => 'integer|between:1,6',
+            'small_screen_featured_position' => 'in:center,left,right',
+            'vendor_assets' => 'in:local,cdn',
+        ];
+    }
 }

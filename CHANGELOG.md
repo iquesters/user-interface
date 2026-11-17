@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased] – 2.0.0
 
+### Settings engine
+- Validation rules for the UI and snackbar settings (`nav style`, tabs, `vendor_assets`, toast position…).
+
 ### Front-end assets
 - **One bundled script:** `public/js` is built into `public/dist/userinterface.js` (`npm run build`, no npm
   dependencies). The layout loads the bundle when `APP_DEBUG` is off (1 request instead of ~37) and the individual
