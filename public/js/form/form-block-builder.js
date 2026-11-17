@@ -844,7 +844,7 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
     for (const [key, value] of Object.entries(entityData)) {
         const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
             ? CSS.escape(key)
-            : key.replace(/"/g, '\\"');
+            : String(key).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
         const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
 
@@ -871,7 +871,7 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         const metaValue = item?.meta_value ?? "";
         const escapedKey = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
             ? CSS.escape(metaKey)
-            : metaKey.replace(/"/g, '\\"');
+            : String(metaKey).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const field = form.querySelector(`#${escapedKey}, [name="${escapedKey}"]`);
         const readOnlyField = form.querySelector(`[data-field-id="${escapedKey}"]`);
 

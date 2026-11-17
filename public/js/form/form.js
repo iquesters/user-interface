@@ -2032,13 +2032,23 @@ function setupOneCoreFormElement(element) {
         element.addClass("form-control") // add form-control class
 
         // checking if label is provided in the data-label attr
+        // Attribute values are set as text/attributes, never parsed as HTML.
         if (element.attr('data-label')) {
-            element.parent().append("<label class=\"" + STYLE_CLASS.FORM_LABEL + "\" for=\"" + element.attr('id') + "\" title=\"" + element.attr('data-label') + "\">" + element.attr('data-label') + "</label>")
+            element.parent().append(
+                $('<label>')
+                    .addClass(STYLE_CLASS.FORM_LABEL)
+                    .attr({ for: element.attr('id'), title: element.attr('data-label') })
+                    .text(element.attr('data-label'))
+            )
         }
 
         // checking if additional info is provided in the data-help-info attr
         if (element.attr('data-help-info')) {
-            element.parent().append("<p class=\"shoz-help-text " + STYLE_CLASS.SMALL + " " + STYLE_CLASS.TEXT_MUTED + "\">" + element.attr('data-help-info') + "</p>")
+            element.parent().append(
+                $('<p>')
+                    .addClass('shoz-help-text ' + STYLE_CLASS.SMALL + ' ' + STYLE_CLASS.TEXT_MUTED)
+                    .text(element.attr('data-help-info'))
+            )
         }
 
         // check if select option or not
@@ -2055,7 +2065,10 @@ function setupOneCoreFormElement(element) {
             let selectedFlag = "selected"
             if (element.children('option[selected]').length > 0) selectedFlag = ""
 
-            element.prepend("<option value='selectone' " + selectedFlag + " disabled>" + defaultOption + "</option>")
+            element.prepend(
+                $('<option>', { value: 'selectone', disabled: true, selected: selectedFlag === 'selected' })
+                    .text(defaultOption)
+            )
         }
 
         // checking if type is given
