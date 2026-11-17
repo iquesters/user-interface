@@ -2,9 +2,7 @@
 
 namespace Iquesters\UserInterface\Tests\Feature;
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Iquesters\UserInterface\Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
@@ -16,14 +14,7 @@ class EntityApiTest extends TestCase
     {
         parent::setUp();
 
-        Schema::create('demo_items', function (Blueprint $table) {
-            $table->id();
-            $table->ulid('uid')->unique();
-            $table->string('name');
-            $table->string('status')->default('active');
-            $table->timestamps();
-        });
-
+        // demo_items comes from tests/database/migrations (DDL here would break the test transaction).
         $entityId = DB::table('entities')->insertGetId([
             'uid' => (string) Str::ulid(),
             'entity_name' => 'Demo Item',
@@ -43,13 +34,6 @@ class EntityApiTest extends TestCase
             $rows[] = ['uid' => (string) Str::ulid(), 'name' => "Item {$i}", 'status' => 'active', 'created_at' => now(), 'updated_at' => now()];
         }
         DB::table('demo_items')->insert($rows);
-    }
-
-    protected function tearDown(): void
-    {
-        Schema::dropIfExists('demo_items');
-
-        parent::tearDown();
     }
 
     private function actingAsAdmin(): void

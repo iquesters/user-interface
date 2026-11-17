@@ -46,8 +46,11 @@ abstract class TestCase extends Orchestra
     {
         $this->loadMigrationsFrom(__DIR__.'/database/migrations');
 
-        $sanctum = dirname((new \ReflectionClass(SanctumServiceProvider::class))->getFileName(), 2);
-        $this->loadMigrationsFrom($sanctum.'/database/migrations');
+        // Sanctum ships its migration unregistered; load it unless a published copy exists.
+        if (! glob(database_path('migrations/*_create_personal_access_tokens_table.php'))) {
+            $sanctum = dirname((new \ReflectionClass(SanctumServiceProvider::class))->getFileName(), 2);
+            $this->loadMigrationsFrom($sanctum.'/database/migrations');
+        }
     }
 
     protected function makeUser(?string $role = null): User
