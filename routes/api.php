@@ -7,11 +7,12 @@
 */
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\Foundation\System\Http\Middleware\RequestMiddleware;
+use Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware;
 use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
 use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
-use Iquesters\UserInterface\Http\Controllers\UIController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,14 +36,14 @@ Route::get('ping', function () {
 Route::prefix('api')
     ->middleware([
         'api',
-        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
-        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+        RequestMiddleware::class,
+        ResponseMiddleware::class,
     ])
     ->group(function () {
         // Public API (No Sanctum)
         Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])
             ->name('noauth.form');
-        
+
         // Protected APIs (Require Sanctum)
         Route::middleware('auth:sanctum')->group(function () {
 
@@ -69,14 +70,13 @@ Route::prefix('api')
             Route::get('entity/show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])
                 ->name('api.entity.show');
         });
-});
-
+    });
 
 Route::prefix('api')
     ->middleware([
         'api',
-        \Iquesters\Foundation\System\Http\Middleware\RequestMiddleware::class,
-        \Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware::class,
+        RequestMiddleware::class,
+        ResponseMiddleware::class,
         'auth:sanctum',
     ])
     ->group(function () {

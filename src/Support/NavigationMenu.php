@@ -57,10 +57,10 @@ class NavigationMenu
     private function loadModules(): Collection
     {
         if (
-            !Auth::check() ||
-            !Schema::hasTable('modules') ||
-            !Schema::hasTable('navigations') ||
-            !Schema::hasTable('navigation_metas')
+            ! Auth::check() ||
+            ! Schema::hasTable('modules') ||
+            ! Schema::hasTable('navigations') ||
+            ! Schema::hasTable('navigation_metas')
         ) {
             return collect();
         }
@@ -96,16 +96,16 @@ class NavigationMenu
     {
         $submenuItems = json_decode($module->getMeta('module_sidebar_menu') ?? '[]', true);
 
-        if (!is_array($submenuItems) || empty($submenuItems)) {
+        if (! is_array($submenuItems) || empty($submenuItems)) {
             return collect();
         }
 
         // Unique key per item: route + default table schema.
         $submenu = collect($submenuItems)->map(fn ($item) => array_merge($item, [
-            '_key' => ($item['route'] ?? '') . '::' . ($item['default-table-schema-uid'] ?? 'none'),
+            '_key' => ($item['route'] ?? '').'::'.($item['default-table-schema-uid'] ?? 'none'),
         ]));
 
-        $navigation = Navigation::with('metas')->where('name', $module->name . '_sub_menu')->first();
+        $navigation = Navigation::with('metas')->where('name', $module->name.'_sub_menu')->first();
         $savedOrder = $navigation ? json_decode($navigation->getMeta('navigation_order') ?? '[]', true) : [];
         $savedOrder = is_array($savedOrder) ? $savedOrder : [];
 
@@ -117,13 +117,13 @@ class NavigationMenu
             ->map(function ($key) use ($submenu) {
                 $item = $submenu->firstWhere('_key', $key);
 
-                if (!$item) {
+                if (! $item) {
                     return null;
                 }
 
                 $params = $item['params'] ?? [];
 
-                if (!empty($item['default-table-schema-uid'])) {
+                if (! empty($item['default-table-schema-uid'])) {
                     $params['default_table_schema_uid'] = $item['default-table-schema-uid'];
                 }
 
@@ -136,7 +136,7 @@ class NavigationMenu
                 return [
                     'icon' => $item['icon'] ?? null,
                     'label' => $item['label'] ?? null,
-                    'url' => !empty($item['route']) && Route::has($item['route']) ? route($item['route'], $params) : '#',
+                    'url' => ! empty($item['route']) && Route::has($item['route']) ? route($item['route'], $params) : '#',
                 ];
             })
             ->filter()
@@ -148,12 +148,12 @@ class NavigationMenu
         $none = ['index' => null, 'module' => null, 'url' => null];
         $request = request();
 
-        if (!$request) {
+        if (! $request) {
             return $none;
         }
 
         $fullUrl = rtrim($request->fullUrl(), '/');
-        $currentPath = '/' . trim($request->path(), '/');
+        $currentPath = '/'.trim($request->path(), '/');
 
         $best = null;
         $bestScore = -1;
@@ -164,13 +164,13 @@ class NavigationMenu
                     continue;
                 }
 
-                $itemPath = '/' . trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
+                $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
 
                 if (rtrim($item['url'], '/') === $fullUrl) {
                     $score = PHP_INT_MAX; // exact, query string included
                 } elseif ($itemPath === $currentPath) {
                     $score = PHP_INT_MAX - 1;
-                } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath . '/')) {
+                } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
                     $score = strlen($itemPath);
                 } else {
                     continue;

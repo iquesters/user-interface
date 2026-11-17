@@ -3,6 +3,7 @@
 namespace Iquesters\UserInterface\Install;
 
 use Iquesters\Foundation\Support\InstallPublisher;
+use Laravel\Sanctum\SanctumServiceProvider;
 
 /**
  * One-time setup run on `package:discover` (composer install/update).
@@ -13,8 +14,8 @@ final class InstallSteps
     public static function run(): void
     {
         // The entity/form APIs authenticate with Sanctum tokens.
-        if (!class_exists(\Laravel\Sanctum\SanctumServiceProvider::class)) {
-            echo '🧩 user-interface: laravel/sanctum is not installed: composer require laravel/sanctum' . PHP_EOL;
+        if (! class_exists(SanctumServiceProvider::class)) {
+            echo '🧩 user-interface: laravel/sanctum is not installed: composer require laravel/sanctum'.PHP_EOL;
 
             return;
         }
@@ -25,7 +26,7 @@ final class InstallSteps
         ];
 
         foreach (array_filter($messages) as $message) {
-            echo "🧩 user-interface: {$message}" . PHP_EOL;
+            echo "🧩 user-interface: {$message}".PHP_EOL;
         }
     }
 }

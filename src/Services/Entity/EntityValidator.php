@@ -110,11 +110,11 @@ class EntityValidator
             $rules[] = 'numeric';
 
             if (isset($definition['min']) && is_numeric($definition['min'])) {
-                $rules[] = 'min:' . $definition['min'];
+                $rules[] = 'min:'.$definition['min'];
             }
 
             if (isset($definition['max']) && is_numeric($definition['max'])) {
-                $rules[] = 'max:' . $definition['max'];
+                $rules[] = 'max:'.$definition['max'];
             }
         }
 

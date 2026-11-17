@@ -36,9 +36,17 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
         $this->app->scoped(NavigationMenu::class);
 
         // Foundation's entity builder stores generated schemas in our models.
-        $this->app->singleton(SchemaModels::class, fn () => new class implements SchemaModels {
-            public function formSchemaModel(): string { return FormSchema::class; }
-            public function tableSchemaModel(): string { return TableSchema::class; }
+        $this->app->singleton(SchemaModels::class, fn () => new class implements SchemaModels
+        {
+            public function formSchemaModel(): string
+            {
+                return FormSchema::class;
+            }
+
+            public function tableSchemaModel(): string
+            {
+                return TableSchema::class;
+            }
         });
     }
 
@@ -47,7 +55,7 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
         parent::boot();
 
         if (class_exists(Breadcrumbs::class)) {
-            require __DIR__ . '/../routes/breadcrumbs.php';
+            require __DIR__.'/../routes/breadcrumbs.php';
         }
 
         Assets::registerRoutes();
@@ -63,7 +71,7 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
 
         // 'laravel-assets' is re-published by the app after every `composer update`.
         $this->publishes([
-            __DIR__ . '/../public' => public_path('vendor/userinterface'),
+            __DIR__.'/../public' => public_path('vendor/userinterface'),
         ], ['laravel-assets', 'user-userinterface-assets']);
 
         // composer install/update: publish Sanctum files.

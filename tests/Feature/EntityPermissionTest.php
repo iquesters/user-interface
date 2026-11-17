@@ -52,7 +52,7 @@ class EntityPermissionTest extends TestCase
 
     private function userWith(array $actions)
     {
-        $role = Role::findOrCreate('notice-reader-' . implode('-', $actions), 'web');
+        $role = Role::findOrCreate('notice-reader-'.implode('-', $actions), 'web');
         $role->syncPermissions(array_map(fn ($a) => EntityPermission::name('notices', $a), $actions));
 
         $user = $this->makeUser('user');

@@ -42,18 +42,18 @@ class FormSubmitTest extends TestCase
 
     public function test_valid_preview_submission_passes_validation(): void
     {
-        $this->from('/form/formCreation/' . $this->formUid)
+        $this->from('/form/formCreation/'.$this->formUid)
             ->post("/form/formsubmit/{$this->formUid}", ['full_name' => 'Asha', 'email' => 'asha@example.test'])
-            ->assertRedirect('/form/formCreation/' . $this->formUid)
+            ->assertRedirect('/form/formCreation/'.$this->formUid)
             ->assertSessionHas('success')
             ->assertSessionHasNoErrors();
     }
 
     public function test_invalid_preview_submission_returns_field_errors(): void
     {
-        $this->from('/form/formCreation/' . $this->formUid)
+        $this->from('/form/formCreation/'.$this->formUid)
             ->post("/form/formsubmit/{$this->formUid}", ['full_name' => str_repeat('x', 30), 'email' => 'nope'])
-            ->assertRedirect('/form/formCreation/' . $this->formUid)
+            ->assertRedirect('/form/formCreation/'.$this->formUid)
             ->assertSessionHasErrors(['full_name', 'email']);
     }
 }

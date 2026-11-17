@@ -10,7 +10,9 @@ use Iquesters\UserInterface\Tests\TestCase;
 class FaviconInjectionTest extends TestCase
 {
     private string $view;
+
     private ?string $original = null;
+
     private string $flag;
 
     protected function setUp(): void

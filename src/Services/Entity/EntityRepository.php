@@ -2,6 +2,7 @@
 
 namespace Iquesters\UserInterface\Services\Entity;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -22,8 +23,7 @@ class EntityRepository
         private readonly EntitySchemaResolver $schema,
         private readonly EntityScope $scope,
         private readonly EntityValueNormalizer $normalizer,
-    ) {
-    }
+    ) {}
 
     /** @return array{0: int, 1: Collection} [total count, page of records with meta] */
     public function paginate(string $table, array $filters, array $sorts, int $offset, int $length, ?string $search = null): array
@@ -131,6 +131,7 @@ class EntityRepository
         if ($ids->isEmpty()) {
             return $records->map(function ($item) {
                 $item->meta = [];
+
                 return $item;
             });
         }
@@ -139,6 +140,7 @@ class EntityRepository
 
         return $records->map(function ($item) use ($grouped) {
             $item->meta = $grouped[$item->id] ?? [];
+
             return $item;
         });
     }
@@ -147,7 +149,7 @@ class EntityRepository
      * Base query that hides soft-deleted rows (status = 'deleted'), so they are
      * not listed and behave as "not found" for show/update/delete.
      */
-    private function visible(string $table): \Illuminate\Database\Query\Builder
+    private function visible(string $table): Builder
     {
         $query = DB::table($table);
 

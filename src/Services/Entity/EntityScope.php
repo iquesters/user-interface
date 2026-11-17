@@ -13,9 +13,7 @@ class EntityScope
 {
     public const SCOPED_COLUMNS = ['organisation_id'];
 
-    public function __construct(private readonly EntitySchemaResolver $schema)
-    {
-    }
+    public function __construct(private readonly EntitySchemaResolver $schema) {}
 
     /** Restrict a query to the scope-column values the current actor may access. */
     public function applyToQuery($query, string $table): void

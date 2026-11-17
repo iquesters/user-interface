@@ -2,15 +2,14 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Meta;
 
-use Iquesters\Foundation\System\Traits\Loggable;
-use Iquesters\UserInterface\Constants\EntityStatus;
-use Illuminate\Routing\Controller;
-use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
-use Iquesters\UserInterface\Models\FormSchema;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Iquesters\UserInterface\Http\Requests\DynamicFormRequest;
+use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Http\Controllers\Utils\StringUtil;
+use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Support\DynamicFormSchema;
 
 class FormController extends Controller
@@ -19,7 +18,7 @@ class FormController extends Controller
 
     /**
      * Display a listing of the resource.
-     * 
+     *
      * @return FormSchema[]
      */
     public function list()
@@ -31,8 +30,7 @@ class FormController extends Controller
 
     /**
      * This is the overview page for a single form
-     * 
-     * @param $id
+     *
      * @return FormSchema
      */
     public function overview($id)
@@ -52,8 +50,6 @@ class FormController extends Controller
 
     /**
      * Store a newly created form resource in storage.
-     * 
-     * @param $request
      */
     public function store(Request $request)
     {
@@ -84,7 +80,7 @@ class FormController extends Controller
             'description' => $request['description'],
             'schema' => $request['schema'],
             'extra_info' => $request['extra_info'],
-            'status' => EntityStatus::ACTIVE
+            'status' => EntityStatus::ACTIVE,
         ]);
 
         if ($result) {
@@ -128,14 +124,14 @@ class FormController extends Controller
         //     $form_data['slug'] = $request['slug'];
         // }
 
-        static::logInfo('form id=' . json_encode($id));
+        static::logInfo('form id='.json_encode($id));
         // Log::info('form_data=' . json_encode($form_data));
         // create form
         $result = FormSchema::where(['id' => $id])->update([
             'name' => $request['name'],
             'description' => $request['description'],
             'schema' => $request['schema'],
-            'extra_info' => $request['extra_info']
+            'extra_info' => $request['extra_info'],
         ]);
 
         if ($result) {
@@ -155,37 +151,41 @@ class FormController extends Controller
 
     public function delete() {}
 
-public function formCreation($id = 0){
+    public function formCreation($id = 0)
+    {
         $parent_id = $id;
 
-        $data = (object)array(
-            'parent_id' => $parent_id
-        );
+        $data = (object) [
+            'parent_id' => $parent_id,
+        ];
 
         if ($parent_id > 0) {
             $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
-        static::logInfo('Form data: ' . json_encode($data));
+        static::logInfo('Form data: '.json_encode($data));
+
         return view('userinterface::form-schemas.formcreation', compact('data'));
     }
 
-public function formCreation_new($id = 0){
+    public function formCreation_new($id = 0)
+    {
         $parent_id = $id;
 
-        $data = (object)array(
-            'parent_id' => $parent_id
-        );
+        $data = (object) [
+            'parent_id' => $parent_id,
+        ];
 
         if ($parent_id > 0) {
             $parent = FormSchema::where('uid', $parent_id)->first();
             $data->parent = $parent;
         }
-        static::logInfo('Form data: ' . json_encode($data));
+        static::logInfo('Form data: '.json_encode($data));
+
         return view('userinterface::form-schemas.formcreation_new', compact('data'));
     }
 
-/**
+    /**
      * Validate a submission against the form schema (no save). Web form post.
      */
     public function formsubmit(Request $request, $uid)
@@ -204,7 +204,7 @@ public function formCreation_new($id = 0){
 
             return back()->with('success', 'Form submitted successfully');
         } catch (\Throwable $e) {
-            static::logError('Form submission error: ' . $e->getMessage());
+            static::logError('Form submission error: '.$e->getMessage());
 
             return back()->withErrors(['form_error' => 'An error occurred while submitting the form.'])->withInput();
         }
@@ -219,7 +219,7 @@ public function formCreation_new($id = 0){
             $schema = json_decode($schema, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new \RuntimeException('Invalid JSON schema: ' . json_last_error_msg());
+                throw new \RuntimeException('Invalid JSON schema: '.json_last_error_msg());
             }
         }
 
@@ -237,8 +237,8 @@ public function formCreation_new($id = 0){
 
     public function getNoAuthFormSchema($slug)
     {
-        static::logInfo("No Auth: Fetching form schema for slug: " . $slug);
+        static::logInfo('No Auth: Fetching form schema for slug: '.$slug);
+
         return $this->getFormSchema($slug);
     }
-
 }

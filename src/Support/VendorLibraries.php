@@ -20,6 +20,7 @@ use Iquesters\Foundation\Support\ConfProvider;
 final class VendorLibraries
 {
     public const SOURCE_LOCAL = 'local';
+
     public const SOURCE_CDN = 'cdn';
 
     private static ?array $libraries = null;
@@ -68,8 +69,8 @@ final class VendorLibraries
     /** @param array{cdn: string, local: string} $lib */
     public static function url(array $lib): string
     {
-        if (self::source() === self::SOURCE_LOCAL && file_exists(Assets::publicPath() . '/libs/' . $lib['local'])) {
-            return Assets::url('libs/' . $lib['local']);
+        if (self::source() === self::SOURCE_LOCAL && file_exists(Assets::publicPath().'/libs/'.$lib['local'])) {
+            return Assets::url('libs/'.$lib['local']);
         }
 
         return $lib['cdn'];
@@ -80,7 +81,7 @@ final class VendorLibraries
     {
         return array_values(array_filter(
             self::all(),
-            fn ($lib) => $lib['type'] === $type && (!$isAuthPage || $lib['scope'] === 'all')
+            fn ($lib) => $lib['type'] === $type && (! $isAuthPage || $lib['scope'] === 'all')
         ));
     }
 
@@ -88,7 +89,7 @@ final class VendorLibraries
     public static function all(): array
     {
         if (self::$libraries === null) {
-            $manifest = json_decode((string) file_get_contents(dirname(__DIR__, 2) . '/resources/vendor-libraries.json'), true);
+            $manifest = json_decode((string) file_get_contents(dirname(__DIR__, 2).'/resources/vendor-libraries.json'), true);
             self::$libraries = $manifest['libraries'] ?? [];
         }
 

@@ -2,24 +2,35 @@
 
 namespace Iquesters\UserInterface\Config;
 
-use Iquesters\Foundation\Support\BaseConf;
 use Iquesters\Foundation\Enums\Module;
+use Iquesters\Foundation\Support\BaseConf;
 
 class UserInterfaceConf extends BaseConf
 {
     protected ?string $identifier = Module::USER_INFE;
 
     protected string $auth_layout;
+
     protected string $app_layout;
+
     protected string $logo;
+
     protected string $app_name;
+
     protected string $app_description;
+
     protected string $large_screen_nav_style;
+
     protected int $large_screen_module_tabs;
+
     protected int $small_screen_bottom_tabs;
+
     protected string $small_screen_featured_tab;
+
     protected string $small_screen_featured_position;
+
     protected SnackbarConf $snackbar_conf;
+
     /** Third-party JS/CSS (jQuery, Bootstrap, Font Awesome, DataTables, JSON Editor): local | cdn */
     protected string $vendor_assets;
 
@@ -35,7 +46,7 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_bottom_tabs = 4;
         $default_values->small_screen_featured_tab = '';
         $default_values->small_screen_featured_position = 'center';
-        $default_values->snackbar_conf = new SnackbarConf();
+        $default_values->snackbar_conf = new SnackbarConf;
         $default_values->vendor_assets = 'local';
     }
 

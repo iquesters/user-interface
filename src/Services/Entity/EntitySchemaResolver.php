@@ -23,7 +23,9 @@ class EntitySchemaResolver
     ];
 
     private array $definitions = [];
+
     private array $columns = [];
+
     private array $metaTables = [];
 
     /**
@@ -148,8 +150,8 @@ class EntitySchemaResolver
         $candidates = [
             "{$table}_metas",
             "{$table}_meta",
-            Str::singular($table) . '_meta',
-            Str::singular($table) . '_metas',
+            Str::singular($table).'_meta',
+            Str::singular($table).'_metas',
         ];
 
         return $this->metaTables[$table] = collect($candidates)->first(fn ($t) => Schema::hasTable($t));

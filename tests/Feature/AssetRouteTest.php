@@ -41,12 +41,12 @@ class AssetRouteTest extends TestCase
 
             // Published and current -> static URL served by the web server.
             File::ensureDirectoryExists("{$publishedDir}/js/form");
-            $source = dirname(__DIR__, 2) . '/public/js/form/form.js';
+            $source = dirname(__DIR__, 2).'/public/js/form/form.js';
             File::copy($source, "{$publishedDir}/js/form/form.js");
             touch("{$publishedDir}/js/form/form.js", filemtime($source) + 10);
 
             $url = UserInterfaceServiceProvider::getJsUrl('js/form/form.js');
-            $this->assertStringContainsString('/vendor/userinterface/js/form/form.js?v=' . filemtime($source), $url);
+            $this->assertStringContainsString('/vendor/userinterface/js/form/form.js?v='.filemtime($source), $url);
 
             // Stale copy (module updated after publishing) -> fallback again.
             touch("{$publishedDir}/js/form/form.js", filemtime($source) - 10);

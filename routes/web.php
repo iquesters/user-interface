@@ -17,7 +17,7 @@ Route::middleware(['web'])->group(function () {
         // which enforces per-entity permissions.
         Route::prefix('')->name('ui')->group(function () {
             Route::get('/list/{default_table_schema_uid}', [UIController::class, 'list'])->name('.list');
-            //Currently, entity_uid is optional for View routes but will be used in the future.
+            // Currently, entity_uid is optional for View routes but will be used in the future.
             Route::get('/view/{form_schema_id}/{entity_uid?}', [UIController::class, 'view'])->name('.view');
             Route::get('/edit/{form_schema_id}/{entity_uid?}', [UIController::class, 'edit'])->name('.edit');
             Route::get('/delete/{form_schema_id}/{entity_uid}', [UIController::class, 'delete'])->name('.delete');
@@ -34,7 +34,7 @@ Route::middleware(['web'])->group(function () {
             Route::post('/{id}/update', [FormController::class, 'update'])->name('.update.schema');
             Route::get('/{id}/delete', [FormController::class, 'delete'])->name('.delete');
 
-Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
+            Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name('.formCreation');
             Route::post('/formsubmit/{uid}', [FormController::class, 'formsubmit'])->name('.formsubmit');
             Route::get('/formCreation_new/{id}', [FormController::class, 'formCreation_new'])->name('.formCreation_new');
         });
@@ -49,7 +49,7 @@ Route::get('/formCreation/{id}', [FormController::class, 'formCreation'])->name(
             Route::get('/{id}/delete', [TableSchemaController::class, 'delete'])->name('.delete');
         });
 
-});
+    });
 });
 
-require __DIR__ . '/api.php';
+require __DIR__.'/api.php';

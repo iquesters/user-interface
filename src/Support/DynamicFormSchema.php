@@ -18,10 +18,10 @@ class DynamicFormSchema
             $fieldRules = [];
 
             // Required or nullable
-            $fieldRules[] = !empty($field['required']) ? FormValidationStatus::REQUIRED : 'nullable';
+            $fieldRules[] = ! empty($field['required']) ? FormValidationStatus::REQUIRED : 'nullable';
 
             // Data type rules
-            if (!empty($field['type'])) {
+            if (! empty($field['type'])) {
                 switch ($field['type']) {
                     case FormValidationStatus::EMAIL:
                         $fieldRules[] = 'email';
@@ -34,32 +34,32 @@ class DynamicFormSchema
                         $fieldRules[] = 'date';
                         break;
                     case FormValidationStatus::FILE:
-                        if (!empty($field['accept'])) {
+                        if (! empty($field['accept'])) {
                             // Convert .jpg,.png to jpg,png
-                            $mimes = implode(',', array_map(fn($ext) => ltrim($ext, '.'), explode(',', $field['accept'])));
-                            $fieldRules[] = 'mimes:' . $mimes;
+                            $mimes = implode(',', array_map(fn ($ext) => ltrim($ext, '.'), explode(',', $field['accept'])));
+                            $fieldRules[] = 'mimes:'.$mimes;
                         }
-                        if (!empty($field['maxSize'])) {
-                            $fieldRules[] = 'max:' . ($field['maxSize'] / 1024); // max in KB
+                        if (! empty($field['maxSize'])) {
+                            $fieldRules[] = 'max:'.($field['maxSize'] / 1024); // max in KB
                         }
                         break;
                 }
             }
 
             // min/max length for text, password, textarea
-            if (!empty($field['minLength'])) {
-                $fieldRules[] = 'min:' . $field['minLength'];
+            if (! empty($field['minLength'])) {
+                $fieldRules[] = 'min:'.$field['minLength'];
             }
-            if (!empty($field['maxLength'])) {
-                $fieldRules[] = 'max:' . $field['maxLength'];
+            if (! empty($field['maxLength'])) {
+                $fieldRules[] = 'max:'.$field['maxLength'];
             }
 
             // min/max for number
-            if (!empty($field['min'])) {
-                $fieldRules[] = 'min:' . $field['min'];
+            if (! empty($field['min'])) {
+                $fieldRules[] = 'min:'.$field['min'];
             }
-            if (!empty($field['max'])) {
-                $fieldRules[] = 'max:' . $field['max'];
+            if (! empty($field['max'])) {
+                $fieldRules[] = 'max:'.$field['max'];
             }
 
             // Regex pattern
@@ -71,22 +71,23 @@ class DynamicFormSchema
             //         return '[' . str_replace('-', '\-', $matches[1]) . ']';
             //     }, $pattern);
 
-if (!empty($field['pattern'])) {
+            if (! empty($field['pattern'])) {
                 $pattern = $field['pattern'];
                 // wrap with # delimiter
-                $wrapped = '#' . $pattern . '#';
+                $wrapped = '#'.$pattern.'#';
                 if (@preg_match($wrapped, '') === false) {
-                    // invalid regex, skip or 
+                    // invalid regex, skip or
                     Log::info("Invalid regex pattern for field {$field['id']}: {$pattern}");
                 } else {
-                    $fieldRules[] = 'regex:' . $wrapped;
+                    $fieldRules[] = 'regex:'.$wrapped;
                 }
             }
 
             $rules[$field['id']] = $fieldRules;
         }
 
-        Log::info('Generated Validation Rules: ' . json_encode($rules));
+        Log::info('Generated Validation Rules: '.json_encode($rules));
+
         return $rules;
     }
 
@@ -97,7 +98,7 @@ if (!empty($field['pattern'])) {
     {
         $messages = [];
 
-//     // Map custom messages only if present
+        //     // Map custom messages only if present
         //     if (!empty($fieldMessages['required'])) {
         //         $messages["{$fieldId}.required"] = $fieldMessages['required'];
         //     }
@@ -123,27 +124,28 @@ if (!empty($field['pattern'])) {
 
         // Map schema keys → Laravel validation rules
         $ruleMessageMap = [
-            FormValidationStatus::REQUIRED   => 'required',
+            FormValidationStatus::REQUIRED => 'required',
             FormValidationStatus::MIN_LENGTH => 'min',
             FormValidationStatus::MAX_LENGTH => 'max',
-            FormValidationStatus::PATTERN    => 'regex',
-            FormValidationStatus::MIN        => 'min',
-            FormValidationStatus::MAX        => 'max',
+            FormValidationStatus::PATTERN => 'regex',
+            FormValidationStatus::MIN => 'min',
+            FormValidationStatus::MAX => 'max',
             FormValidationStatus::INVALIDTYPE => 'mimes', // can move to constants if you want
         ];
 
         foreach ($schema['fields'] as $field) {
-            $fieldId       = $field['id'];
+            $fieldId = $field['id'];
             $fieldMessages = $field['messages'] ?? [];
 
             foreach ($ruleMessageMap as $schemaKey => $laravelRule) {
-                if (!empty($fieldMessages[$schemaKey])) {
+                if (! empty($fieldMessages[$schemaKey])) {
                     $messages["{$fieldId}.{$laravelRule}"] = $fieldMessages[$schemaKey];
                 }
             }
         }
 
-        Log::info('Generated Validation Messages: ' . json_encode($messages));
+        Log::info('Generated Validation Messages: '.json_encode($messages));
+
         return $messages;
     }
 }

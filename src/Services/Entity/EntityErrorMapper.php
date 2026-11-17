@@ -32,7 +32,7 @@ class EntityErrorMapper
         };
 
         if ($mapped === null) {
-            $this->logError('Entity Data API Error: ' . $e->getMessage() . ' ' . json_encode([
+            $this->logError('Entity Data API Error: '.$e->getMessage().' '.json_encode([
                 'entity' => $entity ?? 'unknown',
                 'data_uid' => $reference,
                 'file' => $e->getFile(),
@@ -72,7 +72,7 @@ class EntityErrorMapper
 
             return [
                 HttpStatusCode::HTTP_CONFLICT,
-                $field ? ucfirst($field) . ' already exists.' : 'Duplicate value already exists.',
+                $field ? ucfirst($field).' already exists.' : 'Duplicate value already exists.',
                 $field ? [$field => ["The {$field} has already been taken."]] : null,
             ];
         }
@@ -87,7 +87,7 @@ class EntityErrorMapper
 
             return [
                 HttpStatusCode::HTTP_UNPROCESSABLE_ENTITY,
-                $field ? ucfirst($field) . ' is required.' : 'A required field is missing.',
+                $field ? ucfirst($field).' is required.' : 'A required field is missing.',
                 $field ? [$field => ["The {$field} field is required."]] : null,
             ];
         }

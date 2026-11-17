@@ -18,13 +18,13 @@ class FrontendAssetsTest extends TestCase
     public function test_every_listed_library_is_shipped_locally(): void
     {
         foreach (VendorLibraries::all() as $lib) {
-            $this->assertFileExists(Assets::publicPath() . '/libs/' . $lib['local'], "Run `npm run libs` ({$lib['name']}).");
+            $this->assertFileExists(Assets::publicPath().'/libs/'.$lib['local'], "Run `npm run libs` ({$lib['name']}).");
         }
     }
 
     public function test_libraries_are_self_hosted_by_default(): void
     {
-        $html = VendorLibraries::scripts()->toHtml() . VendorLibraries::styles()->toHtml();
+        $html = VendorLibraries::scripts()->toHtml().VendorLibraries::styles()->toHtml();
 
         $this->assertStringContainsString('/libs/jquery/3.7.0/jquery.min.js', $html);
         $this->assertStringNotContainsString('https://code.jquery.com', $html);
@@ -40,7 +40,7 @@ class FrontendAssetsTest extends TestCase
 
     public function test_auth_pages_skip_table_and_json_editor_libraries(): void
     {
-        $html = VendorLibraries::scripts(isAuthPage: true)->toHtml() . VendorLibraries::styles(isAuthPage: true)->toHtml();
+        $html = VendorLibraries::scripts(isAuthPage: true)->toHtml().VendorLibraries::styles(isAuthPage: true)->toHtml();
 
         $this->assertStringNotContainsString('datatables', $html);
         $this->assertStringNotContainsString('jsoneditor', $html);
@@ -58,7 +58,7 @@ class FrontendAssetsTest extends TestCase
 
     public function test_bundle_contains_every_script_in_load_order(): void
     {
-        $manifest = json_decode(file_get_contents(Assets::publicPath() . '/dist/manifest.json'), true);
+        $manifest = json_decode(file_get_contents(Assets::publicPath().'/dist/manifest.json'), true);
 
         $this->assertSame(
             array_column(Assets::jsAssets(), 'path'),

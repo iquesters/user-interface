@@ -40,8 +40,7 @@ class DynamicEntityController extends Controller
         private readonly EntityScope $scope,
         private readonly EntityPresenter $presenter,
         private readonly EntityErrorMapper $errors,
-    ) {
-    }
+    ) {}
 
     public function list(Request $request, string $entity)
     {
@@ -101,7 +100,7 @@ class DynamicEntityController extends Controller
             [$mainData, $metaData] = $this->validatedData($request, $entity, false);
 
             $record = $this->repository->create($entity, $mainData, $metaData);
-            $this->logDebug("Dynamic entity record created | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+            $this->logDebug("Dynamic entity record created | entity={$entity} | record_id=".($record->id ?? 'null'));
 
             return ApiResponse::created($this->presenter->one($record), 'Record created successfully');
         } catch (Throwable $e) {
@@ -116,7 +115,7 @@ class DynamicEntityController extends Controller
             [$mainData, $metaData] = $this->validatedData($request, $entity, true, $data_uid);
 
             $record = $this->repository->update($entity, $data_uid, $mainData, $metaData);
-            $this->logDebug("Dynamic entity record updated | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+            $this->logDebug("Dynamic entity record updated | entity={$entity} | record_id=".($record->id ?? 'null'));
 
             return ApiResponse::success($this->presenter->one($record), 'Record updated successfully');
         } catch (Throwable $e) {
@@ -131,7 +130,7 @@ class DynamicEntityController extends Controller
             $this->schema->ensureEntityTableExists($entity);
 
             $record = $this->repository->softDelete($entity, $data_uid);
-            $this->logDebug("Dynamic entity record soft deleted | entity={$entity} | record_id=" . ($record->id ?? 'null'));
+            $this->logDebug("Dynamic entity record soft deleted | entity={$entity} | record_id=".($record->id ?? 'null'));
 
             return ApiResponse::success($this->presenter->one($record), 'Record deleted successfully');
         } catch (Throwable $e) {

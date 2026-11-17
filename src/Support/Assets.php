@@ -27,7 +27,7 @@ final class Assets extends ModuleAssets
     /** Logo from the user-interface conf (set by first-run setup); may be a file in the app's public/. */
     public static function logoUrl(): string
     {
-        return static::resolveUrl((string) ConfProvider::from(Module::USER_INFE)->logo);
+        return self::resolveUrl((string) ConfProvider::from(Module::USER_INFE)->logo);
     }
 
     /**
@@ -46,7 +46,7 @@ final class Assets extends ModuleAssets
                     ->where('status', 'active')
                     ->value('meta_value');
 
-                if (!empty($theme)) {
+                if (! empty($theme)) {
                     return $theme;
                 }
             }
@@ -55,7 +55,7 @@ final class Assets extends ModuleAssets
                 ->where('status', EntityStatus::ACTIVE)
                 ->value('value');
         } catch (\Throwable $e) {
-            static::logError('Failed to get user theme', ['error' => $e->getMessage()]);
+            self::logError('Failed to get user theme', ['error' => $e->getMessage()]);
 
             return 'default';
         }
@@ -86,11 +86,11 @@ final class Assets extends ModuleAssets
      */
     public static function jsBundleUrl(): ?string
     {
-        if (config('app.debug') || !file_exists(self::publicPath() . '/dist/userinterface.js')) {
+        if (config('app.debug') || ! file_exists(self::publicPath().'/dist/userinterface.js')) {
             return null;
         }
 
-        return static::url('dist/userinterface.js');
+        return self::url('dist/userinterface.js');
     }
 
     /**
@@ -101,9 +101,9 @@ final class Assets extends ModuleAssets
      */
     private static function discover(string $type, ?string $excludePrefix = null): array
     {
-        $basePath = self::publicPath() . '/' . $type;
+        $basePath = self::publicPath().'/'.$type;
 
-        if (!File::exists($basePath)) {
+        if (! File::exists($basePath)) {
             return [];
         }
 
@@ -120,7 +120,7 @@ final class Assets extends ModuleAssets
 
         return array_map(fn ($file) => [
             'type' => $type,
-            'path' => $type . '/' . $file['relative'],
+            'path' => $type.'/'.$file['relative'],
             'media' => $type === 'css' ? self::cssMedia($file['name']) : null,
         ], $files);
     }

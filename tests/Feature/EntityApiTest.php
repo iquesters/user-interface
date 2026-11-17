@@ -142,7 +142,7 @@ class EntityApiTest extends TestCase
         $this->actingAsAdmin();
         DB::table('demo_items')->insert(['uid' => (string) Str::ulid(), 'name' => '100% done', 'status' => 'active']);
 
-        $this->getJson('/api/entity/list/demo_items?search=' . rawurlencode('%') . '&length=100')
+        $this->getJson('/api/entity/list/demo_items?search='.rawurlencode('%').'&length=100')
             ->assertOk()
             ->assertJsonPath('response_schema.meta.pagination.total', 1);
         $this->getJson('/api/entity/list/demo_items?search=_&length=100')

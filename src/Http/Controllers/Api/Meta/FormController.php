@@ -2,11 +2,11 @@
 
 namespace Iquesters\UserInterface\Http\Controllers\Api\Meta;
 
-use Iquesters\UserInterface\Constants\EntityStatus;
 use Illuminate\Routing\Controller;
-use Iquesters\UserInterface\Models\FormSchema;
-use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\Foundation\System\Http\ApiResponse;
+use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Constants\EntityStatus;
+use Iquesters\UserInterface\Models\FormSchema;
 use Symfony\Component\HttpFoundation\Response;
 
 class FormController extends Controller
@@ -15,7 +15,7 @@ class FormController extends Controller
 
     private function buildSchemaErrorResponse(\Throwable $e)
     {
-        static::logWarning('Form schema request failed: ' . $e->getMessage());
+        static::logWarning('Form schema request failed: '.$e->getMessage());
 
         return ApiResponse::error(
             $e->getMessage(),
@@ -62,14 +62,14 @@ class FormController extends Controller
         try {
             static::logDebug("Fetching form schema by slug: {$slug}");
 
-            if (!$slug) {
+            if (! $slug) {
                 throw new \Exception('Form schema slug not found');
             }
 
             $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
             static::logDebug($form ? "Form schema found: {$slug}" : "Form schema not found: {$slug}", $form ? ['uid' => $form->uid] : []);
 
-            if (!$form) {
+            if (! $form) {
                 throw new \Exception('Form schema not found');
             }
 
@@ -90,13 +90,13 @@ class FormController extends Controller
         try {
             static::logDebug("Fetching form schema by uid: {$uid}");
 
-            if (!$uid) {
+            if (! $uid) {
                 throw new \Exception('Form schema ID not found');
             }
 
             $form = FormSchema::where(['uid' => $uid, 'status' => EntityStatus::ACTIVE])->first();
 
-            if (!$form) {
+            if (! $form) {
                 throw new \Exception('Form schema not found');
             }
 
@@ -108,5 +108,4 @@ class FormController extends Controller
             return $this->buildSchemaErrorResponse($e);
         }
     }
-
 }
