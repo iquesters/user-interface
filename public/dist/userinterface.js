@@ -2387,6 +2387,64 @@ async function getFormSchema(formID) {
 }
 
 /**
+ * GET a same-origin JSON endpoint with the user's session and return its
+ * `data` (plain {success, data} or response_schema.data), or null.
+ */
+async function fetchSessionJsonData(url) {
+    try {
+        const response = await fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            window.uiDebug?.(`fetchSessionJsonData: ${url} answered ${response.status}`);
+            return null;
+        }
+
+        const json = await response.json();
+        return json?.response_schema?.data ?? json?.data ?? null;
+    } catch (err) {
+        window.uiDebug?.(err);
+        return null;
+    }
+}
+
+/**
+ * Fields with "optionsFrom": {"url": "/..."} load their options from that
+ * endpoint (an array of {value, label}). The endpoint's own auth applies, so
+ * options that are not public never travel in the (public) schema.
+ */
+async function loadRemoteFieldOptions(formMeta) {
+    const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
+
+    await Promise.all(fields
+        .filter(field => field?.optionsFrom?.url && !(Array.isArray(field.options) && field.options.length > 0))
+        .map(async field => {
+            const options = await fetchSessionJsonData(field.optionsFrom.url);
+            field.options = Array.isArray(options) ? options : [];
+        }));
+}
+
+/**
+ * Record shown/edited by an entity form. A schema can name its own
+ * "dataEndpoint" (with {uid}) when the generic entity API does not return
+ * everything the form needs (e.g. a role with its permissions).
+ */
+async function fetchFormRecord(formMeta, entityUid) {
+    if (formMeta?.dataEndpoint && entityUid) {
+        return fetchSessionJsonData(formMeta.dataEndpoint.replace('{uid}', encodeURIComponent(entityUid)));
+    }
+
+    if (formMeta?.entity && entityUid) {
+        const response = await getfetchEntityData(formMeta.entity, entityUid);
+        return response?.data || null;
+    }
+
+    return null;
+}
+
+/**
 * This function provide you the table schema based on tableID
 * 
 * @param string tableID
@@ -2446,6 +2504,10 @@ async function setupFormBlock(formCol, formMeta) {
         // no per-field margin (see createFieldFragment) — avoids the two
         // stacking and producing an inconsistent-looking gap.
         form.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, 'g-2', STYLE_CLASS.NEEDS_VALIDATION])
+        // View mode: no divider lines, so give rows more air.
+        if (typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta)) {
+            form.classList.add('gy-3');
+        }
 
         // get form data
         let formData = form.dataset.formData
@@ -2464,18 +2526,22 @@ async function setupFormBlock(formCol, formMeta) {
             entityData = formData;
         }
 
-        if (!entityData && formMeta.entity && entityUId) {
-            const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
-            entityData = getentityResponse?.data || null;
+        if (!entityData && entityUId) {
+            entityData = await fetchFormRecord(formMeta, entityUId);
         }
 
         if (entityData) {
             form.__entityDataCache = entityData;
         }
 
+        await loadRemoteFieldOptions(formMeta);
+
         // add fields to form
         if (formMeta.fields && formMeta.fields.length > 0) {
             formMeta.fields.forEach((field, index) => {
+                if (!isFieldShownInMode(field, formMeta.formMode)) {
+                    return;
+                }
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
@@ -2693,7 +2759,17 @@ async function addField(field, addTo,formMeta) {
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
         input.type = field.type;
         input.value = field.value || "";
+        // "readonly": shown in edit mode but not editable (e.g. the account email).
+        if (field.readonly === true) {
+            input.readOnly = true;
+            input.classList.add('bg-body-tertiary');
+        }
         fragment.appendChild(formContainer);
+
+        // "crop": choose the area of an image before it is uploaded.
+        if (field.type === 'file' && field.crop && typeof attachImageCrop === 'function') {
+            attachImageCrop(input, field, fragment);
+        }
 
         // ✅ Password fields get a show/hide toggle, matching the classic
         // auth forms. The click handling itself is a shared, delegated
@@ -2755,35 +2831,168 @@ function renderFormSpacer(field, addTo) {
     }
 }
 
+/**
+ * View mode: a details grid (small muted label above the value, spacing
+ * instead of divider lines), not a disabled-looking input. The value element keeps the field's DOM id
+ * and data-field-id, which renderEntityDataToForm() fills in later.
+ */
 function renderReadOnlyField(field, addTo) {
     const fragment = createFieldFragment(field, addTo);
     const fieldDomId = getFieldDomId(field);
     const formContainer = document.createElement(HTML_TAG.DIV);
     formContainer.id = `${fieldDomId}${SUFFIX.CONTAINER}`;
+    formContainer.classList.add('lab-view-field', 'py-1');
     fragment.appendChild(formContainer);
 
     if (field.label) {
-        const label = createLabel(field.label, fieldDomId, [STYLE_CLASS.FORM_LABEL]);
+        const label = document.createElement(HTML_TAG.DIV);
         label.id = `${fieldDomId}${SUFFIX.LABEL}`;
+        label.classList.add('lab-view-label', 'small', 'text-body-secondary', 'mb-1');
+        label.textContent = field.label;
         formContainer.appendChild(label);
+    }
+
+    if (field.type === 'image') {
+        renderReadOnlyImage(field, formContainer, fieldDomId);
+        createHelperText(field, fragment);
+        return;
     }
 
     const valueDiv = document.createElement(HTML_TAG.DIV);
     valueDiv.id = fieldDomId;
     valueDiv.dataset.fieldId = field.id;
-    valueDiv.classList.add(
-        STYLE_CLASS.FORM_CONTROL_PLAINTEXT,
-        STYLE_CLASS.BORDER,
-        STYLE_CLASS.ROUNDED,
-        STYLE_CLASS.P_1,
-        STYLE_CLASS.PX_2,
-        STYLE_CLASS.BG_LIGHT_SUBTLE,
-        STYLE_CLASS.W_100
-    );
-    valueDiv.textContent = getReadOnlyFieldDisplayValue(field);
+    valueDiv.classList.add('lab-view-value', 'fw-medium', 'text-break');
+    if (field.display === 'badge' || field.display === 'status') {
+        valueDiv.dataset.display = field.display;
+    }
+    setReadOnlyValue(valueDiv, field, getReadOnlyFieldDisplayValue(field), field.value);
     formContainer.appendChild(valueDiv);
 
+    appendFieldActions(field, formContainer);
     createHelperText(field, fragment);
+}
+
+/**
+ * Write a view-mode value.
+ *   "display": "status" -> the same badge as <x-userinterface::status>:
+ *                          `badge text-bg-{value}` (colours in bootstrap-override.css),
+ *                          labelled with the option label.
+ *   "display": "badge"  -> each value (or list item) as a neutral badge, e.g. roles.
+ */
+function setReadOnlyValue(valueDiv, field, text, rawValue) {
+    const display = valueDiv.dataset.display;
+
+    if (display === 'status' && text !== '—') {
+        // Same class contract as the Blade status/badge components.
+        const variant = String(rawValue ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'secondary';
+        const badge = document.createElement('span');
+        badge.className = `badge text-bg-${variant}`;
+        badge.textContent = text;
+        valueDiv.textContent = '';
+        valueDiv.appendChild(badge);
+        return;
+    }
+
+    if (display !== 'badge' || text === '—') {
+        valueDiv.textContent = text;
+        return;
+    }
+
+    valueDiv.textContent = '';
+    String(text).split(', ').filter(Boolean).forEach(item => {
+        const badge = document.createElement('span');
+        badge.className = 'badge text-bg-light border me-1';
+        badge.textContent = item;
+        valueDiv.appendChild(badge);
+    });
+}
+
+/**
+ * "type": "image" in view mode: the picture (value = URL), square by default.
+ * "actions" on the field (see appendFieldActions) open other forms, e.g.
+ * "Change picture" -> the upload form in a modal.
+ */
+function renderReadOnlyImage(field, container, fieldDomId) {
+    const wrapper = document.createElement(HTML_TAG.DIV);
+    wrapper.className = 'position-relative d-inline-block w-100';
+    wrapper.style.maxWidth = field.maxWidth || '240px';
+
+    const img = document.createElement('img');
+    img.id = fieldDomId;
+    img.dataset.fieldId = field.id;
+    img.alt = field.label || '';
+    img.className = 'img-thumbnail rounded w-100';
+    img.style.aspectRatio = field.aspectRatio || '1 / 1';
+    img.style.objectFit = 'cover';
+    if (field.value) {
+        img.src = field.value;
+    }
+    wrapper.appendChild(img);
+    container.appendChild(wrapper);
+
+    appendFieldActions(field, wrapper, true);
+}
+
+/**
+ * Field-level actions in view mode:
+ *   "actions": [{"label": "Change picture", "icon": "fas fa-camera", "form": "user-profile-picture", "title": "..."}]
+ * Each opens that form schema in a modal (showModal({formId})). On an image
+ * they sit in a camera menu over the picture; otherwise as small links.
+ */
+function appendFieldActions(field, container, overlay = false) {
+    const actions = Array.isArray(field.actions) ? field.actions.filter(a => a?.form) : [];
+    if (actions.length === 0 || typeof showModal !== 'function') {
+        return;
+    }
+
+    const open = action => showModal({
+        formId: action.form,
+        title: action.title || action.label || '',
+        submitLabel: action.submitLabel || 'Save',
+    });
+
+    if (!overlay) {
+        const bar = document.createElement(HTML_TAG.DIV);
+        bar.className = 'd-flex gap-3 mt-1';
+        actions.forEach(action => {
+            const link = document.createElement(HTML_TAG.BUTTON);
+            link.type = 'button';
+            link.className = `btn btn-link btn-sm p-0 text-decoration-none ${action.danger ? 'text-danger' : ''}`;
+            link.innerHTML = `${action.icon ? `<i class="${action.icon} me-1"></i>` : ''}`;
+            link.append(document.createTextNode(action.label || ''));
+            link.addEventListener('click', () => open(action));
+            bar.appendChild(link);
+        });
+        container.appendChild(bar);
+        return;
+    }
+
+    const menu = document.createElement(HTML_TAG.DIV);
+    menu.className = 'dropdown position-absolute bottom-0 end-0 mb-2 me-2';
+
+    const toggle = document.createElement(HTML_TAG.BUTTON);
+    toggle.type = 'button';
+    toggle.className = 'btn btn-secondary btn-sm rounded';
+    toggle.dataset.bsToggle = 'dropdown';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.title = field.actionsLabel || 'Change';
+    toggle.innerHTML = '<i class="fas fa-fw fa-camera"></i>';
+    menu.appendChild(toggle);
+
+    const list = document.createElement(HTML_TAG.DIV);
+    list.className = 'dropdown-menu shadow';
+    actions.forEach(action => {
+        const item = document.createElement(HTML_TAG.BUTTON);
+        item.type = 'button';
+        item.className = `dropdown-item ${action.danger ? 'text-danger' : ''}`;
+        item.dataset.formAction = action.form;
+        item.innerHTML = action.icon ? `<i class="${action.icon} fa-fw me-1"></i>` : '';
+        item.append(document.createTextNode(action.label || ''));
+        item.addEventListener('click', () => open(action));
+        list.appendChild(item);
+    });
+    menu.appendChild(list);
+    container.appendChild(menu);
 }
 
 function getReadOnlyFieldDisplayValue(field) {
@@ -2795,6 +3004,14 @@ function getReadOnlyFieldDisplayValue(field) {
 
     if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
         return value ? 'Yes' : 'No';
+    }
+
+    // Select/radio: show the option's label, not its stored value.
+    if (Array.isArray(field.options) && field.options.length > 0) {
+        const option = field.options.find(opt => String(opt?.value ?? '') === String(value ?? ''));
+        if (option && (option.label || option.text)) {
+            return option.label || option.text;
+        }
     }
 
     if (value === null || value === undefined || value === '') {
@@ -2849,14 +3066,33 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
         return gridSize;
     }
 
-    const formDefaultSize = getUsableSizeConfig(
-        formMeta.defaultFieldSize
+    const formDefault = formMeta.defaultFieldSize
         || formMeta.default_field_size
         || formMeta.fieldDefaultSize
-        || formMeta.field_default_size
-    );
+        || formMeta.field_default_size;
+
+    // "auto": responsive by field type (see autoFieldSize).
+    if (formDefault === 'auto') {
+        return autoFieldSize(field);
+    }
+
+    const formDefaultSize = getUsableSizeConfig(formDefault);
 
     return formDefaultSize || CONSTANT.DEFAULT_FORM_FIELD_SIZE;
+}
+
+/**
+ * "defaultFieldSize": "auto": one column on phones; from md up, short inputs
+ * sit two per row and wide content (textarea, file, image, option groups)
+ * keeps the full width. Mirrors the server-rendered skeleton in
+ * components/form.blade.php.
+ */
+function autoFieldSize(field = {}) {
+    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'].includes(field.type)
+        || (field.type === 'checkbox' && Array.isArray(field.options))
+        || Boolean(field.optionsFrom?.url && field.type === 'checkbox');
+
+    return wide ? { xs: 12 } : { xs: 12, md: 6 };
 }
 
 function resolveSpacerSizeConfig(field = {}) {
@@ -3261,7 +3497,11 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         }
 
         if (readOnlyField) {
-            readOnlyField.textContent = value ?? "—";
+            if (readOnlyField.tagName === 'IMG') {
+                if (value) readOnlyField.src = value;
+            } else {
+                setReadOnlyValue(readOnlyField, null, readOnlyDisplayText(form, key, value), value);
+            }
         }
     }
 
@@ -3284,9 +3524,20 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         }
 
         if (readOnlyField) {
-            readOnlyField.textContent = metaValue || "—";
+            readOnlyField.textContent = readOnlyDisplayText(form, metaKey, metaValue);
         }
     });
+}
+
+/**
+ * View-mode text for a value, using the field's schema when known (so a
+ * select shows its option label and empty values show "—"), the same as
+ * renderReadOnlyField() does on first render.
+ */
+function readOnlyDisplayText(form, fieldId, value) {
+    const fieldDef = (form.__formMeta?.fields || []).find(f => f?.id === fieldId);
+
+    return String(getReadOnlyFieldDisplayValue({ ...(fieldDef || {}), value }));
 }
 
 ;/* ---- js/form/form-constant.js ---- */
@@ -3454,6 +3705,15 @@ function isFormReadOnly(formMeta = {}) {
     return formMeta.formMode === 'view';
 }
 
+/**
+ * A field with "showIn": ["edit", "create"] only appears (and is only
+ * submitted) in those modes, e.g. a "new password" field that has nothing to
+ * show in view mode. Fields without "showIn" appear in every mode.
+ */
+function isFieldShownInMode(field, formMode = 'edit') {
+    return !Array.isArray(field?.showIn) || field.showIn.includes(formMode || 'edit');
+}
+
 function resolveModeConfig(formMeta = {}) {
     const formMode = formMeta.formMode || 'edit';
     const modes = formMeta.modes || {};
@@ -3586,10 +3846,10 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
 
     // Fields: real column classes; label line + control at its real height.
     const fields = schema && Array.isArray(schema.fields)
-        ? schema.fields.filter((field) => field && field.type !== 'hidden')
+        ? schema.fields.filter((field) => field && field.type !== 'hidden' && isFieldShownInMode(field, formMode))
         : [{}, {}, {}, {}];
     const row = document.createElement(HTML_TAG.DIV);
-    row.className = 'row g-2';
+    row.className = readOnly ? 'row g-2 gy-3' : 'row g-2';
 
     fields.forEach((field) => {
         const col = document.createElement(HTML_TAG.DIV);
@@ -3597,11 +3857,16 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
         const sizeConfig = isSpacer ? resolveSpacerSizeConfig(field) : resolveFieldSizeConfig(field, meta);
         addFieldSize({ _resolvedSize: sizeConfig }, col);
 
-        if (!isSpacer) {
+        if (!isSpacer && readOnly && field.type === 'image') {
+            // Picture (renderReadOnlyImage): label line + square.
+            const maxWidth = field.maxWidth || '240px';
+            col.innerHTML = `<div class="py-1">${bar('col-3', 'height: 0.75rem;')}<div class="mt-2 bg-info-subtle rounded" style="max-width: ${maxWidth}; aspect-ratio: ${field.aspectRatio || '1 / 1'};"></div></div>`;
+        } else if (!isSpacer && readOnly) {
+            // Details grid (renderReadOnlyField): small label line, value line, no divider.
+            col.innerHTML = `<div class="py-1">${bar('col-3', 'height: 0.75rem;')}<div class="mt-2">${bar('col-7', 'height: 1.1rem;')}</div></div>`;
+        } else if (!isSpacer) {
             const rows = Math.max(1, parseInt(field.rows, 10) || 2);
-            const controlHeight = readOnly
-                ? 'calc(1.5rem + 0.5rem + 2px)'                    // plaintext box: p-1 + border
-                : (field.type === 'textarea'
+            const controlHeight = (field.type === 'textarea'
                     ? `calc(${rows} * 1.5rem + 0.75rem + 2px)`     // textarea rows
                     : 'calc(1.5rem + 0.75rem + 2px)');             // .form-control
             const hasLabel = !schema || Boolean(field.label);
@@ -3888,6 +4153,21 @@ function appendDefaultCancelButton(container, formElement, formMeta) {
 function appendViewModeActions(container, formMeta, formElement) {
     const entityUid = formElement.dataset.entityUid;
     if (!entityUid) {
+        // Not an entity record: a view mode can still link to its edit page
+        // ("modes.view.editUrl"), e.g. My Profile -> Settings.
+        const editUrl = resolveModeConfig(formMeta).editUrl;
+        if (formMeta.allowEdit && editUrl) {
+            const link = createHeaderIconButton(
+                'fas fa-pencil-alt',
+                'Edit',
+                'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+                (event) => {
+                    event.preventDefault();
+                    window.location.href = editUrl;
+                }
+            );
+            container.appendChild(link);
+        }
         return;
     }
 
@@ -4191,17 +4471,21 @@ async function renderFormForModal(formElement, formMeta) {
         entityData = formData;
     }
 
-    if (!entityData && formMeta.entity && entityUId) {
-        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
-        entityData = getentityResponse?.data || null;
+    if (!entityData && entityUId) {
+        entityData = await fetchFormRecord(formMeta, entityUId);
     }
 
     if (entityData) {
         formElement.__entityDataCache = entityData;
     }
 
+    await loadRemoteFieldOptions(formMeta);
+
     if (Array.isArray(formMeta.fields)) {
         formMeta.fields.forEach((field, index) => {
+            if (!isFieldShownInMode(field, formMeta.formMode)) {
+                return;
+            }
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
             field.value = resolveFieldValue(field.id, formData, entityData);
@@ -4576,6 +4860,9 @@ async function handleDynamicFormSubmit(event, formMeta) {
         return;
     }
 
+    if (typeof waitForImageCrops === 'function') {
+        await waitForImageCrops(form);
+    }
     const payload = serializeDynamicFormPayload(form, formMeta);
 
     const recaptchaAction = form.dataset.recaptchaAction;
@@ -4836,7 +5123,19 @@ function serializeDynamicFormPayload(form, formMeta) {
     const fields = Array.isArray(formMeta.fields) ? formMeta.fields : [];
 
     fields.forEach(field => {
+        // Not shown in this mode ("showIn"), or a layout spacer: not part of the submission.
+        if (!isFieldShownInMode(field, formMeta.formMode)
+            || (typeof isSpacerField === 'function' && isSpacerField(field))) {
+            return;
+        }
+
         const value = getSerializedFieldValue(form, field);
+
+        // "omitIfEmpty": a blank value means "leave unchanged" (e.g. a new password).
+        if (field.omitIfEmpty === true && (value === null || value === '')) {
+            return;
+        }
+
         const target = field.meta === true ? metaPayload : payload;
         target[field.id] = value;
     });
@@ -4875,6 +5174,10 @@ function getSerializedFieldValue(form, field) {
 
     // File inputs: send the File objects (multipart), not the fake "C:\fakepath\..." value.
     if (input && input.type === 'file') {
+        // Cropped image ("crop" fields, image-crop-field.js) replaces the original.
+        if (input.__croppedFile) {
+            return input.multiple ? [input.__croppedFile] : input.__croppedFile;
+        }
         const files = Array.from(input.files || []);
         return input.multiple ? files : (files[0] || null);
     }
@@ -5643,6 +5946,191 @@ function checkFormAccess(formMeta, formElement) {
     })
 })();
 
+;/* ---- js/form/image-crop-field.js ---- */
+/**
+ * Crop for schema file fields: { "type": "file", "crop": { "aspectRatio": 1 } }.
+ *
+ * After an image is chosen, it is shown with a crop box (drag to move, drag
+ * the corner to resize; mouse and touch; ratio kept). The cropped area is
+ * what gets submitted: getSerializedFieldValue() sends input.__croppedFile,
+ * and the submit handler waits for input.__cropPromise first.
+ */
+function attachImageCrop(input, field, container) {
+    const ratio = Number(field?.crop?.aspectRatio) > 0 ? Number(field.crop.aspectRatio) : 1;
+    const maxOutput = Number(field?.crop?.maxSize) > 0 ? Number(field.crop.maxSize) : 1024;
+
+    const stage = document.createElement('div');
+    stage.className = 'lab-crop-stage position-relative d-none mt-2 mx-auto';
+    stage.style.maxWidth = '100%';
+    stage.style.width = 'fit-content';
+    stage.style.touchAction = 'none';
+    stage.style.userSelect = 'none';
+
+    const img = document.createElement('img');
+    img.alt = '';
+    img.draggable = false;
+    img.style.display = 'block';
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '320px';
+    stage.appendChild(img);
+
+    const box = document.createElement('div');
+    box.className = 'lab-crop-box position-absolute';
+    box.style.cssText += 'border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.5);cursor:move;';
+    stage.appendChild(box);
+
+    const handle = document.createElement('div');
+    handle.className = 'lab-crop-handle position-absolute';
+    // Inside the box, so it stays fully visible (and easy to grab) when the box fills the image.
+    handle.style.cssText = 'width:22px;height:22px;right:2px;bottom:2px;background:#fff;border:2px solid #0d6efd;border-radius:50%;cursor:nwse-resize;';
+    box.appendChild(handle);
+
+    const hint = document.createElement('div');
+    hint.className = 'form-text small text-center d-none';
+    hint.textContent = 'Drag the box to choose the area; drag its corner to resize.';
+
+    container.appendChild(stage);
+    container.appendChild(hint);
+    stage.style.overflow = 'hidden';
+
+    // Crop box in displayed pixels.
+    let crop = { x: 0, y: 0, w: 0, h: 0 };
+    let drag = null;
+
+    const display = () => ({ w: img.clientWidth, h: img.clientHeight });
+
+    function layout() {
+        box.style.left = `${crop.x}px`;
+        box.style.top = `${crop.y}px`;
+        box.style.width = `${crop.w}px`;
+        box.style.height = `${crop.h}px`;
+    }
+
+    function resetCrop() {
+        const { w, h } = display();
+        // Largest box of the ratio that fits, centred.
+        let cw = w;
+        let ch = cw / ratio;
+        if (ch > h) {
+            ch = h;
+            cw = ch * ratio;
+        }
+        crop = { x: (w - cw) / 2, y: (h - ch) / 2, w: cw, h: ch };
+        layout();
+        scheduleRender();
+    }
+
+    function clamp() {
+        const { w, h } = display();
+        crop.w = Math.min(crop.w, w);
+        crop.h = crop.w / ratio;
+        if (crop.h > h) {
+            crop.h = h;
+            crop.w = crop.h * ratio;
+        }
+        crop.x = Math.max(0, Math.min(crop.x, w - crop.w));
+        crop.y = Math.max(0, Math.min(crop.y, h - crop.h));
+    }
+
+    function point(event) {
+        const rect = stage.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    }
+
+    box.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        const p = point(event);
+        drag = { mode: event.target === handle ? 'resize' : 'move', start: p, from: { ...crop } };
+        box.setPointerCapture(event.pointerId);
+    });
+
+    box.addEventListener('pointermove', event => {
+        if (!drag) return;
+        const p = point(event);
+        const dx = p.x - drag.start.x;
+        const dy = p.y - drag.start.y;
+
+        if (drag.mode === 'move') {
+            crop.x = drag.from.x + dx;
+            crop.y = drag.from.y + dy;
+        } else {
+            const size = Math.max(40, drag.from.w + Math.max(dx, dy * ratio));
+            crop.w = size;
+            crop.h = size / ratio;
+            crop.x = drag.from.x;
+            crop.y = drag.from.y;
+        }
+
+        clamp();
+        layout();
+    });
+
+    const endDrag = () => {
+        if (!drag) return;
+        drag = null;
+        scheduleRender();
+    };
+    box.addEventListener('pointerup', endDrag);
+    box.addEventListener('pointercancel', endDrag);
+
+    // Produce the cropped File (async); the submit waits for input.__cropPromise.
+    function scheduleRender() {
+        input.__cropPromise = new Promise(resolve => {
+            requestAnimationFrame(() => {
+                const scale = img.naturalWidth / img.clientWidth;
+                const sw = Math.round(crop.w * scale);
+                const sh = Math.round(crop.h * scale);
+                const outW = Math.min(sw, maxOutput);
+                const outH = Math.round(outW / ratio);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = outW;
+                canvas.height = outH;
+                canvas.getContext('2d').drawImage(img, Math.round(crop.x * scale), Math.round(crop.y * scale), sw, sh, 0, 0, outW, outH);
+
+                canvas.toBlob(blob => {
+                    const name = (input.__originalName || 'image').replace(/\.[^.]+$/, '') + '.png';
+                    input.__croppedFile = blob ? new File([blob], name, { type: 'image/png' }) : null;
+                    resolve(input.__croppedFile);
+                }, 'image/png');
+            });
+        });
+    }
+
+    input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        input.__croppedFile = null;
+        input.__cropPromise = null;
+
+        if (!file || !file.type.startsWith('image/')) {
+            stage.classList.add('d-none');
+            hint.classList.add('d-none');
+            return;
+        }
+
+        input.__originalName = file.name;
+        const reader = new FileReader();
+        reader.onload = () => {
+            img.onload = () => {
+                stage.classList.remove('d-none');
+                hint.classList.remove('d-none');
+                requestAnimationFrame(resetCrop);
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+/** Wait until every cropped image in the form is ready (before serializing). */
+async function waitForImageCrops(form) {
+    const pending = Array.from(form.querySelectorAll('input[type="file"]'))
+        .map(input => input.__cropPromise)
+        .filter(Boolean);
+
+    await Promise.all(pending);
+}
+
 ;/* ---- js/form/validation/customValidationMessage.js ---- */
 window.applyValidationMessage = function (type, field, input, messages) {
   // window.uiDebug?.("type received:", type, "input:", input); 
@@ -6121,6 +6609,71 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+;/* ---- js/image-changer.js ---- */
+// Picture changer (resources/views/utils/image-changer.blade.php): "Change image"
+// opens the upload/crop dialog (media.parts.dropbox), "Remove image" confirms
+// and posts to the URL in #imgEdit[data-remove-url]. Does nothing on pages
+// without a picture changer.
+document.addEventListener('DOMContentLoaded', function () {
+    const menu = document.getElementById('imgEdit');
+    if (!menu) {
+        return;
+    }
+
+    // The modal moves the node it is given into itself and clears its body on
+    // close, so keep a reference and hand the same node back each time.
+    const uploadTemplate = document.getElementById('media-dropbox');
+    const removeTemplate = document.getElementById('remove-image-dropbox');
+    const removeUrl = menu.dataset.removeUrl;
+
+    document.getElementById('img-change')?.addEventListener('click', function () {
+        if (!uploadTemplate) {
+            return;
+        }
+
+        showModal({
+            header: { enabled: true, content: '<h5 class="modal-title">Change profile picture</h5>' },
+            body: { enabled: true, content: uploadTemplate },
+            footer: {
+                enabled: true,
+                allowCancel: true,
+                actions: [{ label: 'Save', className: 'btn btn-primary', action: () => saveCroppedImage() }],
+            },
+        });
+    });
+
+    document.getElementById('remove-image')?.addEventListener('click', function () {
+        if (!removeTemplate || !removeUrl) {
+            return;
+        }
+
+        showModal({
+            header: { enabled: true, content: '<h5 class="modal-title">Remove profile picture?</h5>' },
+            body: { enabled: true, content: removeTemplate.innerHTML },
+            footer: {
+                enabled: true,
+                allowCancel: true,
+                actions: [{ label: 'Remove', className: 'btn btn-danger', action: submitRemove }],
+            },
+        });
+    });
+
+    function submitRemove() {
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = removeUrl;
+
+        const token = document.createElement('input');
+        token.type = 'hidden';
+        token.name = '_token';
+        token.value = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        form.appendChild(token);
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+});
+
 ;/* ---- js/modal.js ---- */
 
 const DEFAULT_MODAL_OPTIONS = {}
@@ -6279,6 +6832,13 @@ async function showSchemaFormModal(config = {}) {
     const host = document.createElement('div')
     host.appendChild(form)
 
+    // Skeleton while the schema loads: shaped like this form when its schema
+    // is known (cached), generic otherwise; setupForm() removes it.
+    if (typeof buildFormSkeletonElement === 'function') {
+        const cached = typeof getCachedFormSchema === 'function' ? getCachedFormSchema(formId) : null
+        form.appendChild(buildFormSkeletonElement(cached, 'edit'))
+    }
+
     activeSchemaFormModalState = {
         formId,
         closeOnSuccess,
@@ -6312,6 +6872,16 @@ async function showSchemaFormModal(config = {}) {
     })
 
     await new Promise(resolve => requestAnimationFrame(resolve))
+
+    // Swap the generic skeleton for one shaped like this form once its schema arrives.
+    if (typeof getFormSchema === 'function' && typeof buildFormSkeletonElement === 'function') {
+        const schema = await getFormSchema(formId)
+        const skeleton = form.querySelector('.form-skeleton')
+        if (schema && skeleton) {
+            skeleton.replaceWith(buildFormSkeletonElement(schema, 'edit'))
+        }
+    }
+
     const formMeta = await setupForm(form)
     populateSchemaModalFormValues(form, values)
 

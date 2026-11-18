@@ -49,6 +49,64 @@ async function getFormSchema(formID) {
 }
 
 /**
+ * GET a same-origin JSON endpoint with the user's session and return its
+ * `data` (plain {success, data} or response_schema.data), or null.
+ */
+async function fetchSessionJsonData(url) {
+    try {
+        const response = await fetch(url, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) {
+            window.uiDebug?.(`fetchSessionJsonData: ${url} answered ${response.status}`);
+            return null;
+        }
+
+        const json = await response.json();
+        return json?.response_schema?.data ?? json?.data ?? null;
+    } catch (err) {
+        window.uiDebug?.(err);
+        return null;
+    }
+}
+
+/**
+ * Fields with "optionsFrom": {"url": "/..."} load their options from that
+ * endpoint (an array of {value, label}). The endpoint's own auth applies, so
+ * options that are not public never travel in the (public) schema.
+ */
+async function loadRemoteFieldOptions(formMeta) {
+    const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
+
+    await Promise.all(fields
+        .filter(field => field?.optionsFrom?.url && !(Array.isArray(field.options) && field.options.length > 0))
+        .map(async field => {
+            const options = await fetchSessionJsonData(field.optionsFrom.url);
+            field.options = Array.isArray(options) ? options : [];
+        }));
+}
+
+/**
+ * Record shown/edited by an entity form. A schema can name its own
+ * "dataEndpoint" (with {uid}) when the generic entity API does not return
+ * everything the form needs (e.g. a role with its permissions).
+ */
+async function fetchFormRecord(formMeta, entityUid) {
+    if (formMeta?.dataEndpoint && entityUid) {
+        return fetchSessionJsonData(formMeta.dataEndpoint.replace('{uid}', encodeURIComponent(entityUid)));
+    }
+
+    if (formMeta?.entity && entityUid) {
+        const response = await getfetchEntityData(formMeta.entity, entityUid);
+        return response?.data || null;
+    }
+
+    return null;
+}
+
+/**
 * This function provide you the table schema based on tableID
 * 
 * @param string tableID

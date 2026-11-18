@@ -1,11 +1,17 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\UserInterface\Http\Controllers\InfoPageController;
 use Iquesters\UserInterface\Http\Controllers\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Meta\TableSchemaController;
 use Iquesters\UserInterface\Http\Controllers\UIController;
 
 Route::middleware(['web'])->group(function () {
+    // Public info pages; templates are published to the app (see Support\InfoPages).
+    Route::get('/help', [InfoPageController::class, 'help'])->name('ui.help');
+    Route::get('/privacy-policy', [InfoPageController::class, 'privacy'])->name('ui.privacy');
+    Route::get('/terms-conditions', [InfoPageController::class, 'terms'])->name('ui.terms');
+
     Route::middleware(['auth'])->group(function () {
 
         // domain/list/{table_schema_id}

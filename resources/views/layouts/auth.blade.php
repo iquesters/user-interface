@@ -6,10 +6,10 @@
 <body>
     <!-- Main Content -->
     <main>
-        <div class="w-100 d-flex align-items-center justify-content-center px-4" style="min-height: 100vh;">
+        <div class="w-100 d-flex align-items-center justify-content-center px-2 px-sm-4 py-4" style="min-height: 100vh;">
             <div class="row justify-content-md-center w-100">
                 {{-- Pages showing a single form narrow this via @section('auth-card-class') --}}
-                <div class="@yield('auth-card-class', 'col-md-8') d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-4">
+                <div class="@yield('auth-card-class', 'col-md-8') d-flex flex-column justify-content-center align-items-center card shadow-lg rounded-4 p-3 p-sm-4">
                     
                     <!-- Logo (now responsive) -->
                     <img src="{{ Iquesters\UserInterface\UserInterfaceServiceProvider::getLogoUrl() }}" 

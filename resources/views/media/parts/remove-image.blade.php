@@ -1,39 +1,27 @@
-<?php 
-$currentImageOptions = (object)array(
-    'img' => (object)array(
-        'id' => 'user-logo',
-        'src' => $user_logo,
-        'alt' => $user->name,
-        'width' => '120px',
-        'class' => 'rounded-circle',
-        'container_class' => 'img-thumbnail rounded-circle',
-        'aspect_ratio' => '1/1'
-    ),
-);
-$initial = strtoupper(substr($user->name ?? 'S', 0, 1));
-$newImageOptions = (object)array(
-    'img' => (object)array(
-        'id' => 'user-logo',
-        'src' => "https://placehold.co/400x400/faf3e0/d72638/png?text=".$initial,
-        'alt' => $user->name,
-        'width' => '120px',
-        'class' => 'rounded-circle',
-        'container_class' => 'img-thumbnail rounded-circle',
-        'aspect_ratio' => '1/1'
-    ),
-);
-?>
+@php
+    // Expects $user. avatarUrl() comes from user-management's HasUserManagement trait.
+    $initial = mb_strtoupper(mb_substr(trim((string) ($user->name ?? '')) ?: '?', 0, 1));
+    $imageOptions = fn (string $id, string $src) => (object) [
+        'img' => (object) [
+            'id' => $id,
+            'src' => $src,
+            'alt' => $user->name ?? '',
+            'width' => '96px',
+            'class' => 'rounded-circle',
+            'container_class' => 'img-thumbnail rounded-circle',
+            'aspect_ratio' => '1/1',
+        ],
+    ];
+    $current = method_exists($user, 'avatarUrl') ? $user->avatarUrl() : '';
+@endphp
 
 <div id="remove-image-dropbox" class="d-none">
-    <div class="text-center p-3 d-flex flex-column align-items-center gap-2">
-        <h3>Remove profile picture?</h3>
+    <div class="text-center p-2 d-flex flex-column align-items-center gap-2">
         <div class="d-flex align-items-center">
-            @include('userinterface::utils.image', ['options' => $currentImageOptions])
-        
-            <i class="fa-solid fa-arrow-right p-3"></i>
-
-            @include('userinterface::utils.image', ['options' => $newImageOptions])
+            @include('userinterface::utils.image', ['options' => $imageOptions('remove-image-current', $current)])
+            <i class="fa-solid fa-arrow-right p-3 text-muted"></i>
+            @include('userinterface::utils.image', ['options' => $imageOptions('remove-image-default', 'https://placehold.co/400x400/faf3e0/d72638/png?text='.rawurlencode($initial))])
         </div>
-        <p class="mt-3">Your previous picture will be saved in your past profile pictures album, and this image will be used instead.</p>
+        <p class="small text-muted mb-0">Your uploaded picture will be removed and the default picture shown instead.</p>
     </div>
 </div>

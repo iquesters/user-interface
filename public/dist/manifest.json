@@ -1,6 +1,6 @@
 {
     "file": "dist/userinterface.js",
-    "hash": "77b6a2daed8d",
+    "hash": "15962a90ab73",
     "sources": [
         "js/00-ui-shared-constants.js",
         "js/api-client.js",
@@ -19,12 +19,14 @@
         "js/form/form-block-builder.js",
         "js/form/form-constant.js",
         "js/form/form.js",
+        "js/form/image-crop-field.js",
         "js/form/validation/customValidationMessage.js",
         "js/form/validation/datalist-validation.js",
         "js/form/validation/input-field-validation.js",
         "js/form/validation/select-validation.js",
         "js/form/validation/textarea-validation.js",
         "js/grouped-collection-filter.js",
+        "js/image-changer.js",
         "js/modal.js",
         "js/production-performance.js",
         "js/recaptcha.js",

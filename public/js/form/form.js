@@ -96,6 +96,15 @@ function isFormReadOnly(formMeta = {}) {
     return formMeta.formMode === 'view';
 }
 
+/**
+ * A field with "showIn": ["edit", "create"] only appears (and is only
+ * submitted) in those modes, e.g. a "new password" field that has nothing to
+ * show in view mode. Fields without "showIn" appear in every mode.
+ */
+function isFieldShownInMode(field, formMode = 'edit') {
+    return !Array.isArray(field?.showIn) || field.showIn.includes(formMode || 'edit');
+}
+
 function resolveModeConfig(formMeta = {}) {
     const formMode = formMeta.formMode || 'edit';
     const modes = formMeta.modes || {};
@@ -228,10 +237,10 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
 
     // Fields: real column classes; label line + control at its real height.
     const fields = schema && Array.isArray(schema.fields)
-        ? schema.fields.filter((field) => field && field.type !== 'hidden')
+        ? schema.fields.filter((field) => field && field.type !== 'hidden' && isFieldShownInMode(field, formMode))
         : [{}, {}, {}, {}];
     const row = document.createElement(HTML_TAG.DIV);
-    row.className = 'row g-2';
+    row.className = readOnly ? 'row g-2 gy-3' : 'row g-2';
 
     fields.forEach((field) => {
         const col = document.createElement(HTML_TAG.DIV);
@@ -239,11 +248,16 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
         const sizeConfig = isSpacer ? resolveSpacerSizeConfig(field) : resolveFieldSizeConfig(field, meta);
         addFieldSize({ _resolvedSize: sizeConfig }, col);
 
-        if (!isSpacer) {
+        if (!isSpacer && readOnly && field.type === 'image') {
+            // Picture (renderReadOnlyImage): label line + square.
+            const maxWidth = field.maxWidth || '240px';
+            col.innerHTML = `<div class="py-1">${bar('col-3', 'height: 0.75rem;')}<div class="mt-2 bg-info-subtle rounded" style="max-width: ${maxWidth}; aspect-ratio: ${field.aspectRatio || '1 / 1'};"></div></div>`;
+        } else if (!isSpacer && readOnly) {
+            // Details grid (renderReadOnlyField): small label line, value line, no divider.
+            col.innerHTML = `<div class="py-1">${bar('col-3', 'height: 0.75rem;')}<div class="mt-2">${bar('col-7', 'height: 1.1rem;')}</div></div>`;
+        } else if (!isSpacer) {
             const rows = Math.max(1, parseInt(field.rows, 10) || 2);
-            const controlHeight = readOnly
-                ? 'calc(1.5rem + 0.5rem + 2px)'                    // plaintext box: p-1 + border
-                : (field.type === 'textarea'
+            const controlHeight = (field.type === 'textarea'
                     ? `calc(${rows} * 1.5rem + 0.75rem + 2px)`     // textarea rows
                     : 'calc(1.5rem + 0.75rem + 2px)');             // .form-control
             const hasLabel = !schema || Boolean(field.label);
@@ -530,6 +544,21 @@ function appendDefaultCancelButton(container, formElement, formMeta) {
 function appendViewModeActions(container, formMeta, formElement) {
     const entityUid = formElement.dataset.entityUid;
     if (!entityUid) {
+        // Not an entity record: a view mode can still link to its edit page
+        // ("modes.view.editUrl"), e.g. My Profile -> Settings.
+        const editUrl = resolveModeConfig(formMeta).editUrl;
+        if (formMeta.allowEdit && editUrl) {
+            const link = createHeaderIconButton(
+                'fas fa-pencil-alt',
+                'Edit',
+                'btn btn-sm btn-link text-dark text-decoration-none d-inline-flex align-items-center gap-1 px-0',
+                (event) => {
+                    event.preventDefault();
+                    window.location.href = editUrl;
+                }
+            );
+            container.appendChild(link);
+        }
         return;
     }
 
@@ -833,17 +862,21 @@ async function renderFormForModal(formElement, formMeta) {
         entityData = formData;
     }
 
-    if (!entityData && formMeta.entity && entityUId) {
-        const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
-        entityData = getentityResponse?.data || null;
+    if (!entityData && entityUId) {
+        entityData = await fetchFormRecord(formMeta, entityUId);
     }
 
     if (entityData) {
         formElement.__entityDataCache = entityData;
     }
 
+    await loadRemoteFieldOptions(formMeta);
+
     if (Array.isArray(formMeta.fields)) {
         formMeta.fields.forEach((field, index) => {
+            if (!isFieldShownInMode(field, formMeta.formMode)) {
+                return;
+            }
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
             field.value = resolveFieldValue(field.id, formData, entityData);
@@ -1218,6 +1251,9 @@ async function handleDynamicFormSubmit(event, formMeta) {
         return;
     }
 
+    if (typeof waitForImageCrops === 'function') {
+        await waitForImageCrops(form);
+    }
     const payload = serializeDynamicFormPayload(form, formMeta);
 
     const recaptchaAction = form.dataset.recaptchaAction;
@@ -1478,7 +1514,19 @@ function serializeDynamicFormPayload(form, formMeta) {
     const fields = Array.isArray(formMeta.fields) ? formMeta.fields : [];
 
     fields.forEach(field => {
+        // Not shown in this mode ("showIn"), or a layout spacer: not part of the submission.
+        if (!isFieldShownInMode(field, formMeta.formMode)
+            || (typeof isSpacerField === 'function' && isSpacerField(field))) {
+            return;
+        }
+
         const value = getSerializedFieldValue(form, field);
+
+        // "omitIfEmpty": a blank value means "leave unchanged" (e.g. a new password).
+        if (field.omitIfEmpty === true && (value === null || value === '')) {
+            return;
+        }
+
         const target = field.meta === true ? metaPayload : payload;
         target[field.id] = value;
     });
@@ -1517,6 +1565,10 @@ function getSerializedFieldValue(form, field) {
 
     // File inputs: send the File objects (multipart), not the fake "C:\fakepath\..." value.
     if (input && input.type === 'file') {
+        // Cropped image ("crop" fields, image-crop-field.js) replaces the original.
+        if (input.__croppedFile) {
+            return input.multiple ? [input.__croppedFile] : input.__croppedFile;
+        }
         const files = Array.from(input.files || []);
         return input.multiple ? files : (files[0] || null);
     }

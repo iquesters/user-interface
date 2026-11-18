@@ -155,6 +155,13 @@ async function showSchemaFormModal(config = {}) {
     const host = document.createElement('div')
     host.appendChild(form)
 
+    // Skeleton while the schema loads: shaped like this form when its schema
+    // is known (cached), generic otherwise; setupForm() removes it.
+    if (typeof buildFormSkeletonElement === 'function') {
+        const cached = typeof getCachedFormSchema === 'function' ? getCachedFormSchema(formId) : null
+        form.appendChild(buildFormSkeletonElement(cached, 'edit'))
+    }
+
     activeSchemaFormModalState = {
         formId,
         closeOnSuccess,
@@ -188,6 +195,16 @@ async function showSchemaFormModal(config = {}) {
     })
 
     await new Promise(resolve => requestAnimationFrame(resolve))
+
+    // Swap the generic skeleton for one shaped like this form once its schema arrives.
+    if (typeof getFormSchema === 'function' && typeof buildFormSkeletonElement === 'function') {
+        const schema = await getFormSchema(formId)
+        const skeleton = form.querySelector('.form-skeleton')
+        if (schema && skeleton) {
+            skeleton.replaceWith(buildFormSkeletonElement(schema, 'edit'))
+        }
+    }
+
     const formMeta = await setupForm(form)
     populateSchemaModalFormValues(form, values)
 

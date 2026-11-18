@@ -101,7 +101,7 @@ $optionsCrop = (object)array(
     </div>
 
     <div id="uploadMediaSection" class="col-md-6 col-lg-6 media-dropbox-container d-flex justify-content-center align-items-center w-100">
-        <div class="img-thumbnail h-100 d-flex align-items-center row" style="width: 70%">
+        <div class="img-thumbnail h-100 d-flex align-items-center row w-100 mx-0" style="max-width: 640px;">
             <div class="col-md-6">
                 <form class="dropbox h-100 w-100 d-flex align-items-center justify-contents-center"
                     {{-- method="post" --}}
@@ -114,7 +114,7 @@ $optionsCrop = (object)array(
                         <label for="modal-media-upload">
                             <a class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-fw fa-arrow-up-from-bracket"></i>
-                                <span class="d-none d-md-inline-block">Upload new Media</span>
+                                <span>Upload a picture</span>
                             </a>
                         </label>
                         <span class="dropbox__dragndrop d-none d-md-block">or drop files here</span>
@@ -146,7 +146,7 @@ $optionsCrop = (object)array(
                     <label for="cameraInput">
                         <a class="btn btn-sm btn-outline-secondary">
                             <i class="fas fa-camera fa-arrow-up-from-bracket"></i>
-                            <span class="d-none d-md-inline-block">Take a picture</span> 
+                            <span>Take a picture</span> 
                         </a>
                     </label>
                 </form>
@@ -316,8 +316,10 @@ function prepareCropUI() {
 }
 
 function resetCropBox() {
-    cropWidth = Math.max(100, image.width / 3);
-    cropHeight = Math.max(100, image.height / 3);
+    // Largest centred square: profile pictures are shown in a square frame.
+    const side = Math.max(50, Math.min(image.width, image.height));
+    cropWidth = side;
+    cropHeight = side;
 
     cropX = (image.width - cropWidth) / 2;
     cropY = (image.height - cropHeight) / 2;
@@ -470,6 +472,29 @@ function showCropResult() {
 
 // Save Cropped Image
 function saveCroppedImage() {
+    // Nothing chosen yet: the canvas would upload a blank image.
+    if (!image.getAttribute('src')) {
+        if (typeof window.showSnackbar === 'function') {
+            window.showSnackbar('Choose or take a picture first.', 'warning');
+        }
+        return;
+    }
+
+    // Saved without pressing Crop: crop the current selection first.
+    if (canvas.style.display !== 'block') {
+        const img = new Image();
+        img.onload = () => {
+            drawCroppedImage(img);
+            uploadCanvas();
+        };
+        img.src = image.src;
+        return;
+    }
+
+    uploadCanvas();
+}
+
+function uploadCanvas() {
     canvas.toBlob(function (blob) {
         const form = buildUploadForm(blob);
         document.body.appendChild(form);

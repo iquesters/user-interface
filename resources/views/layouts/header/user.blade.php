@@ -2,16 +2,16 @@
     use Iquesters\Foundation\Support\ConfProvider;
     use Iquesters\Foundation\Enums\Module;
     use Carbon\Carbon;
-    
+    use Iquesters\UserInterface\Support\InfoPages;
+
     $user = Auth::user();
 
     // getMeta() comes from iquesters/user-management's HasUserManagement trait.
     $userMeta = fn (string $key) => method_exists($user, 'getMeta') ? $user->getMeta($key) : null;
 
-    $profilePath  = $userMeta('profile_picture_path');
-    $profileFile  = $userMeta('profile_picture');
-    $userAvatar = $profileFile
-        ? $profilePath . $profileFile
+    // avatarUrl() (user-management's HasUserManagement) gives an absolute URL that works on every page.
+    $userAvatar = method_exists($user, 'avatarUrl')
+        ? $user->avatarUrl()
         : "https://placehold.co/400x400/faf3e0/d72638/png?text=" . urlencode($user->name[0] ?? '?');
 
     $lastLoginRaw = $userMeta('last_login_at');
@@ -98,7 +98,7 @@
                 </li>
                 @endif
                 <li>
-                    <a class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary" href="#">
+                    <a class="dropdown-item d-flex align-items-center gap-2 py-1 text-primary" href="{{ InfoPages::url('help') }}" @if (InfoPages::isExternal('help')) target="_blank" rel="noopener" @endif>
                         <i class="fas fa-fw fa-question-circle"></i> Help
                     </a>
                 </li>
@@ -117,9 +117,9 @@
                 @endif
 
                 <small class="d-flex align-items-center justify-content-center mt-2">
-                    <a class="small me-1" href="#">Privacy</a>
+                    <a class="small me-1" href="{{ InfoPages::url('privacy') }}" @if (InfoPages::isExternal('privacy')) target="_blank" rel="noopener" @endif>Privacy</a>
                     <small>|</small>
-                    <a class="small ms-1" href="#">Terms & Conditions</a>
+                    <a class="small ms-1" href="{{ InfoPages::url('terms') }}" @if (InfoPages::isExternal('terms')) target="_blank" rel="noopener" @endif>Terms &amp; Conditions</a>
                 </small>
             </ul>
         </li>

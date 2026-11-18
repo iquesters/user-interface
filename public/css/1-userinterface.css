@@ -29,6 +29,16 @@
   .main-content {
     margin-left: 0 !important;
   }
+
+  /* The module tab bar is fixed to the bottom (70px, module-tabs mobile view):
+     keep the end of the page and toasts above it. */
+  .ui-content {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .toast-container {
+    margin-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 .profile-dropdown {
