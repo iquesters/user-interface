@@ -1,6 +1,6 @@
 {
     "file": "dist/userinterface.js",
-    "hash": "15962a90ab73",
+    "hash": "e3dfcf239bc1",
     "sources": [
         "js/00-ui-shared-constants.js",
         "js/api-client.js",
@@ -34,6 +34,7 @@
         "js/snackbar.js",
         "js/table/table-cache.js",
         "js/table/table-constants.js",
+        "js/table/table-create.js",
         "js/table/table-inbox-view.js",
         "js/table/table-init.js",
         "js/table/table-providers.js",

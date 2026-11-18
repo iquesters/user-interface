@@ -139,6 +139,8 @@ async function showSchemaFormModal(config = {}) {
         submitLabel = 'Submit',
         closeOnSuccess = true,
         preferSchemaTitle = false,
+        // 'create' | 'edit' | ... : which of the schema's modes to render (default: edit).
+        formMode = null,
     } = config
 
     if (!formId) {
@@ -152,6 +154,9 @@ async function showSchemaFormModal(config = {}) {
     }
 
     const form = buildSchemaModalForm(formId, values)
+    if (formMode) {
+        form.dataset.formMode = formMode
+    }
     const host = document.createElement('div')
     host.appendChild(form)
 
@@ -159,7 +164,7 @@ async function showSchemaFormModal(config = {}) {
     // is known (cached), generic otherwise; setupForm() removes it.
     if (typeof buildFormSkeletonElement === 'function') {
         const cached = typeof getCachedFormSchema === 'function' ? getCachedFormSchema(formId) : null
-        form.appendChild(buildFormSkeletonElement(cached, 'edit'))
+        form.appendChild(buildFormSkeletonElement(cached, formMode || 'edit'))
     }
 
     activeSchemaFormModalState = {
@@ -201,7 +206,7 @@ async function showSchemaFormModal(config = {}) {
         const schema = await getFormSchema(formId)
         const skeleton = form.querySelector('.form-skeleton')
         if (schema && skeleton) {
-            skeleton.replaceWith(buildFormSkeletonElement(schema, 'edit'))
+            skeleton.replaceWith(buildFormSkeletonElement(schema, formMode || 'edit'))
         }
     }
 

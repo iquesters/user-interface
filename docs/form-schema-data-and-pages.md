@@ -60,6 +60,11 @@ Set on the schema to size fields by type: one column on phones; from `md` up, sh
 
 For forms that are not entity records, `modes.view.editUrl` shows the Edit icon and links it there (My Profile uses `/settings`).
 
+## Tables: split view and Create button
+
+- In table view, clicking a row opens split view with that record's details; the details' close button goes back to table view.
+- Add a Create button to a list page with the table schema key `"create": {"form": "user-details", "label": "Create user"}`. The form schema needs a `create` mode (`method` + `endpoint`; for entity forms `POST /api/user-interface/v1/entity/store/{table}`). Use `"requiredIn": ["create"]` for fields required only when creating (e.g. a password).
+
 ## Read-only fields
 
 `"readonly": true` shows the value as a disabled-looking input in edit mode (it is still sent; validate on the server). In view mode every field is read-only anyway.

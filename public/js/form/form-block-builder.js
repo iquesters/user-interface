@@ -80,6 +80,7 @@ async function setupFormBlock(formCol, formMeta) {
                 if (!isFieldShownInMode(field, formMeta.formMode)) {
                     return;
                 }
+                applyModeRequired(field, formMeta.formMode);
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);

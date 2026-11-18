@@ -498,3 +498,8 @@ ol.breadcrumb {
     min-width: 40px;
     max-width: 40px;
 }
+
+/* Table view: a row click opens the record in split view (table-runtime.js). */
+.lab-table tbody tr {
+  cursor: pointer;
+}

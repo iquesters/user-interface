@@ -2542,6 +2542,7 @@ async function setupFormBlock(formCol, formMeta) {
                 if (!isFieldShownInMode(field, formMeta.formMode)) {
                     return;
                 }
+                applyModeRequired(field, formMeta.formMode);
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
@@ -3714,6 +3715,16 @@ function isFieldShownInMode(field, formMode = 'edit') {
     return !Array.isArray(field?.showIn) || field.showIn.includes(formMode || 'edit');
 }
 
+/**
+ * "requiredIn": ["create"] makes a field required only in those modes, e.g. a
+ * password that must be set when creating a user but can stay blank on edit.
+ */
+function applyModeRequired(field, formMode = 'edit') {
+    if (Array.isArray(field?.requiredIn)) {
+        field.required = field.requiredIn.includes(formMode || 'edit');
+    }
+}
+
 function resolveModeConfig(formMeta = {}) {
     const formMode = formMeta.formMode || 'edit';
     const modes = formMeta.modes || {};
@@ -4486,6 +4497,9 @@ async function renderFormForModal(formElement, formMeta) {
             if (!isFieldShownInMode(field, formMeta.formMode)) {
                 return;
             }
+            applyModeRequired(field, formMeta.formMode);
+            // Same responsive widths as page forms (e.g. defaultFieldSize "auto").
+            field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
             field.value = resolveFieldValue(field.id, formData, entityData);
@@ -6816,6 +6830,8 @@ async function showSchemaFormModal(config = {}) {
         submitLabel = 'Submit',
         closeOnSuccess = true,
         preferSchemaTitle = false,
+        // 'create' | 'edit' | ... : which of the schema's modes to render (default: edit).
+        formMode = null,
     } = config
 
     if (!formId) {
@@ -6829,6 +6845,9 @@ async function showSchemaFormModal(config = {}) {
     }
 
     const form = buildSchemaModalForm(formId, values)
+    if (formMode) {
+        form.dataset.formMode = formMode
+    }
     const host = document.createElement('div')
     host.appendChild(form)
 
@@ -6836,7 +6855,7 @@ async function showSchemaFormModal(config = {}) {
     // is known (cached), generic otherwise; setupForm() removes it.
     if (typeof buildFormSkeletonElement === 'function') {
         const cached = typeof getCachedFormSchema === 'function' ? getCachedFormSchema(formId) : null
-        form.appendChild(buildFormSkeletonElement(cached, 'edit'))
+        form.appendChild(buildFormSkeletonElement(cached, formMode || 'edit'))
     }
 
     activeSchemaFormModalState = {
@@ -6878,7 +6897,7 @@ async function showSchemaFormModal(config = {}) {
         const schema = await getFormSchema(formId)
         const skeleton = form.querySelector('.form-skeleton')
         if (schema && skeleton) {
-            skeleton.replaceWith(buildFormSkeletonElement(schema, 'edit'))
+            skeleton.replaceWith(buildFormSkeletonElement(schema, formMode || 'edit'))
         }
     }
 
@@ -7930,6 +7949,39 @@ const TABLE_STYLE_TOP_ZERO = '0';
 const TABLE_STYLE_ZINDEX_STICKY = '10';
 const TABLE_STYLE_BACKGROUND_INHERIT = 'inherit';
 
+;/* ---- js/table/table-create.js ---- */
+/**
+ * List page "Create" button (table schema "create": {"form", "label"}):
+ * opens that form schema in create mode in a modal; after a successful save
+ * the modal closes and the table reloads so the new record shows up.
+ */
+document.addEventListener('DOMContentLoaded', function () {
+    const button = document.getElementById('createRecordBtn');
+    if (!button || typeof showModal !== 'function') {
+        return;
+    }
+
+    const formId = button.dataset.form;
+
+    button.addEventListener('click', function () {
+        showModal({
+            formId,
+            formMode: 'create',
+            title: button.dataset.label || 'Create',
+            submitLabel: 'Create',
+        });
+    });
+
+    window.addEventListener('lab-form:submitted', function (event) {
+        if (event.detail?.formId !== formId) {
+            return;
+        }
+
+        // Same as the Refresh button: clear the cache and reload.
+        document.getElementById('refreshTableBtn')?.click();
+    });
+});
+
 ;/* ---- js/table/table-inbox-view.js ---- */
 function clearInboxRowSelection(tableElement) {
     if (!tableElement) {
@@ -8014,6 +8066,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     container.appendChild(leftPanel);
     container.appendChild(resizer);
     container.appendChild(rightPanelEle);
+    // Kept as references: loadDetailComponent() strips the panel's inbox-* classes.
+    container.__rightPanel = rightPanelEle;
     
     window.uiDebug?.(TABLE_LOG_ASSEMBLED_INBOX_CONTAINER);
     
@@ -8047,6 +8101,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Create DataTable
     const listTable = document.createElement('table');
     listTable.__sourceTable = tableElement;
+    container.__listTable = listTable;
     listTable.className = `table table-bordered table-hover ${TABLE_SELECTOR_INBOX_LIST.slice(1)}`;
     listTable.style.cssText = TABLE_STYLE_LIST_TABLE;
     
@@ -8440,36 +8495,69 @@ class ViewModeManager {
     }
     
     async toggleViewMode() {
-        // Toggle the view mode
-        const newMode = this.currentViewMode === VIEW_MODE_TABLE 
-            ? VIEW_MODE_INBOX 
-            : VIEW_MODE_TABLE;
-        
-        window.uiDebug?.(`${TABLE_LOG_SWITCHING_VIEW_MODE} ${this.currentViewMode} → ${newMode}`);
-        
-        // Store in localStorage
+        await this.setViewMode(this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE);
+    }
+
+    /** Switch to a view mode (stored per table) and re-render. No-op if already in it. */
+    async setViewMode(newMode) {
+        if (newMode === this.currentViewMode) {
+            return;
+        }
+
+        const oldMode = this.currentViewMode;
+        window.uiDebug?.(`${TABLE_LOG_SWITCHING_VIEW_MODE} ${oldMode} → ${newMode}`);
+
         this.storeViewMode(newMode);
-        
-        // Update current mode
         this.currentViewMode = newMode;
-        
-        // Update button UI
+
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (toggleBtn) this.updateToggleButton(toggleBtn);
-        
-        // Dispatch view mode changed event
-        const event = new CustomEvent(TABLE_EVENT_VIEW_MODE_CHANGED, {
-            detail: { 
-                entity: this.entity,
-                oldMode: this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE,
-                newMode: this.currentViewMode
-            },
+
+        document.dispatchEvent(new CustomEvent(TABLE_EVENT_VIEW_MODE_CHANGED, {
+            detail: { entity: this.entity, oldMode, newMode },
             bubbles: true
-        });
-        document.dispatchEvent(event);
-        
-        // Re-render the table with new view mode
+        }));
+
         await this.reRenderView();
+    }
+
+    /** The split view's container for this table (null in table mode). */
+    inboxContainer() {
+        const parent = this.tableElement.parentNode || this.originalParent;
+        return parent?.querySelector(TABLE_SELECTOR_INBOX_VIEW_CONTAINER) || null;
+    }
+
+    /**
+     * Table mode row click: switch to split view, show that record on the
+     * right and highlight its row (when it is on the visible page).
+     */
+    async openRowInSplit(rowData) {
+        await this.setViewMode(VIEW_MODE_INBOX);
+
+        const container = this.inboxContainer();
+        const rightPanel = container?.__rightPanel;
+        const listTable = container?.__listTable;
+        if (!rightPanel) {
+            return;
+        }
+
+        await loadDetailComponent(rightPanel, this.schema, rowData);
+
+        const uid = String(rowData?.uid || rowData?.id || '');
+        const highlight = () => {
+            const checkbox = listTable?.querySelector(`${TABLE_SELECTOR_ROW_CHECKBOX}[data-uid="${CSS.escape(uid)}"]`);
+            const row = checkbox?.closest('tr');
+            if (row) {
+                setInboxRowSelection(row);
+                row.scrollIntoView({ block: 'nearest' });
+            }
+            return Boolean(row);
+        };
+
+        // The list may still be loading its first page.
+        if (!highlight() && listTable && typeof $ !== 'undefined') {
+            $(listTable).one('draw.dt', () => setTimeout(highlight, 0));
+        }
     }
 
     async reRenderView() {
@@ -9727,9 +9815,16 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     closeButton.setAttribute('aria-label', TABLE_MESSAGE_CLOSE);
     closeButton.onclick = (e) => {
         e.stopPropagation();
-        
-        // Clear the right panel content but PRESERVE WIDTH
+
+        // Closing the details returns to the full table view.
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
+        if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
+            viewManager.setViewMode(VIEW_MODE_TABLE);
+            return;
+        }
+
+        // No view manager (detail shown elsewhere): just clear the panel.
         const currentWidth = rightPanelEle.style.width;
         const currentFlex = rightPanelEle.style.flex;
         
@@ -10152,6 +10247,27 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
 
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
+
+    // Row click: open the record in split view (table on the left, details on
+    // the right). Checkboxes and controls keep their own behaviour, and
+    // Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
+    $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
+        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
+            return;
+        }
+        if (event.target.closest('a') && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+            return;
+        }
+
+        const data = $(tableElement).DataTable().row(this).data();
+        const manager = tableElement.__viewManager;
+        if (!data || !manager) {
+            return;
+        }
+
+        event.preventDefault();
+        manager.openRowInSplit(data);
+    });
 
     window.uiDebug?.(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
 }

@@ -105,6 +105,16 @@ function isFieldShownInMode(field, formMode = 'edit') {
     return !Array.isArray(field?.showIn) || field.showIn.includes(formMode || 'edit');
 }
 
+/**
+ * "requiredIn": ["create"] makes a field required only in those modes, e.g. a
+ * password that must be set when creating a user but can stay blank on edit.
+ */
+function applyModeRequired(field, formMode = 'edit') {
+    if (Array.isArray(field?.requiredIn)) {
+        field.required = field.requiredIn.includes(formMode || 'edit');
+    }
+}
+
 function resolveModeConfig(formMeta = {}) {
     const formMode = formMeta.formMode || 'edit';
     const modes = formMeta.modes || {};
@@ -877,6 +887,9 @@ async function renderFormForModal(formElement, formMeta) {
             if (!isFieldShownInMode(field, formMeta.formMode)) {
                 return;
             }
+            applyModeRequired(field, formMeta.formMode);
+            // Same responsive widths as page forms (e.g. defaultFieldSize "auto").
+            field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
             field.value = resolveFieldValue(field.id, formData, entityData);

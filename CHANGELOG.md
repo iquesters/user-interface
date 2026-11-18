@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **Tables:** in table view, clicking a row switches to split view with that record's details on the right and the row selected; the details' close button returns to table view (Ctrl/Cmd/Shift-click on the name link still opens it in a new tab).
+- **Tables:** table schema `"create": {"form": "<form schema>", "label": "Create user"}` adds a Create button to the list page's action row; it opens that form in create mode in a modal and reloads the table after saving. `showModal({formId, formMode: 'create'})` renders a schema's create mode.
+- Form fields: `"requiredIn": ["create"]` (required only in those modes). Modal forms use the same responsive field widths as page forms.
 - **Help, Privacy policy and Terms pages** (`/help`, `/privacy-policy`, `/terms-conditions`, public). Editable templates are published to the app (`resources/views/vendor/userinterface/pages`) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until `$isTemplate = false`. Settings `help_url`, `privacy_url`, `terms_url` link external pages instead. The user menu links point here (they were `#`).
 esources/views/vendor/userinterface/pages) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until ` = false`. Settings help_url, privacy_url, 	erms_url link external pages instead. The user menu links point here (they were #).
 - Form schema: a field can load its options with `"optionsFrom": {"master_data": "theme", "exclude": [...], "empty": "..."}` (filled in when the schema is served) or `"optionsFrom": {"url": "/..."}` (fetched by the browser with the user's session).

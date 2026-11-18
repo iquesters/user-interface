@@ -81,6 +81,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     container.appendChild(leftPanel);
     container.appendChild(resizer);
     container.appendChild(rightPanelEle);
+    // Kept as references: loadDetailComponent() strips the panel's inbox-* classes.
+    container.__rightPanel = rightPanelEle;
     
     window.uiDebug?.(TABLE_LOG_ASSEMBLED_INBOX_CONTAINER);
     
@@ -114,6 +116,7 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     // Create DataTable
     const listTable = document.createElement('table');
     listTable.__sourceTable = tableElement;
+    container.__listTable = listTable;
     listTable.className = `table table-bordered table-hover ${TABLE_SELECTOR_INBOX_LIST.slice(1)}`;
     listTable.style.cssText = TABLE_STYLE_LIST_TABLE;
     
