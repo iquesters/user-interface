@@ -831,9 +831,16 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     closeButton.setAttribute('aria-label', TABLE_MESSAGE_CLOSE);
     closeButton.onclick = (e) => {
         e.stopPropagation();
-        
-        // Clear the right panel content but PRESERVE WIDTH
+
+        // Closing the details returns to the full table view.
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
+        if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
+            viewManager.setViewMode(VIEW_MODE_TABLE);
+            return;
+        }
+
+        // No view manager (detail shown elsewhere): just clear the panel.
         const currentWidth = rightPanelEle.style.width;
         const currentFlex = rightPanelEle.style.flex;
         

@@ -165,6 +165,27 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
 
+    // Row click: open the record in split view (table on the left, details on
+    // the right). Checkboxes and controls keep their own behaviour, and
+    // Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
+    $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
+        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
+            return;
+        }
+        if (event.target.closest('a') && (event.ctrlKey || event.metaKey || event.shiftKey)) {
+            return;
+        }
+
+        const data = $(tableElement).DataTable().row(this).data();
+        const manager = tableElement.__viewManager;
+        if (!data || !manager) {
+            return;
+        }
+
+        event.preventDefault();
+        manager.openRowInSplit(data);
+    });
+
     window.uiDebug?.(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
 }
 

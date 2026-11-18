@@ -44,13 +44,34 @@
                 || ! empty($decodedSchema['heading'])
                 || ! empty($decodedSchema['info']['innerHTML']);
 
+            $skeletonMode = $form_mode ?: 'edit';
             $skeletonFieldWidths = collect($decodedSchema['fields'] ?? [])
                 ->filter(fn ($field) => ($field['type'] ?? null) !== 'hidden')
+                // "showIn": the field only exists in those modes (see isFieldShownInMode in form.js).
+                ->filter(fn ($field) => ! is_array($field['showIn'] ?? null) || in_array($skeletonMode, $field['showIn'], true))
                 ->map(function ($field) use ($defaultFieldSize) {
                     $size = $field['size'] ?? $field['gridSize'] ?? $defaultFieldSize;
 
-                    if (is_array($size)) {
-                        $size = $size['lg'] ?? $size['md'] ?? $size['xs'] ?? 6;
+                    // "auto": same rule as autoFieldSize() in form-block-builder.js.
+                    if ($size === 'auto') {
+                        $type = $field['type'] ?? null;
+                        $wide = in_array($type, ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'], true)
+                            || ($type === 'checkbox' && (! empty($field['options']) || ! empty($field['optionsFrom']['url'])));
+                        $size = $wide ? ['xs' => 12] : ['xs' => 12, 'md' => 6];
+                    }
+
+                    // Responsive column classes, same as addFieldSize() in form-block-builder.js.
+                    $cols = 'col-6';
+                    if (is_numeric($size)) {
+                        $cols = 'col-'.max(1, min(12, (int) $size));
+                    } elseif (is_array($size) && $size) {
+                        $cols = collect($size)
+                            ->filter(fn ($value) => is_numeric($value) && $value >= 1 && $value <= 12)
+                            ->map(fn ($value, $breakpoint) => $breakpoint === 'xs' ? "col-{$value}" : "col-{$breakpoint}-{$value}")
+                            ->implode(' ') ?: 'col-12';
+                    } elseif ($size === null) {
+                        // Engine default (CONSTANT.DEFAULT_FORM_FIELD_SIZE).
+                        $cols = 'col-12 col-lg-6 col-xxl-4';
                     }
 
                     // Real control height: a textarea grows with its rows
@@ -60,8 +81,10 @@
                         : 'calc(1.5rem + 0.75rem + 2px)';
 
                     return [
-                        'width' => is_numeric($size) ? max(1, min(12, (int) $size)) : 6,
+                        'cols' => $cols,
                         'height' => $height,
+                        // View-mode picture: a square placeholder, like renderReadOnlyImage().
+                        'image' => ($field['type'] ?? null) === 'image' ? ($field['maxWidth'] ?? '240px') : null,
                     ];
                 })
                 ->values()
@@ -173,9 +196,23 @@
     <!-- Body Section -->
     <div class="{{ count($skeletonFieldWidths) > 0 ? '' : 'mb-4' }} placeholder-wave">
       @if (count($skeletonFieldWidths) > 0)
-        <div class="row g-2">
+        <div class="row g-2 {{ ($form_mode ?: 'edit') === 'view' ? 'gy-3' : '' }}">
           @foreach ($skeletonFieldWidths as $skeletonField)
-            <div class="col-{{ $skeletonField['width'] }}">
+            @if (($form_mode ?: 'edit') === 'view')
+            {{-- View mode is a details list (renderReadOnlyField): label line, value line, divider. --}}
+            <div class="{{ $skeletonField['cols'] }}">
+                <div class="py-1">
+                    <div class="bg-info-subtle rounded col-3" style="height: 0.75rem;"></div>
+                    @if ($skeletonField['image'] ?? null)
+                        <div class="bg-info-subtle rounded mt-2" style="max-width: {{ $skeletonField['image'] }}; aspect-ratio: 1 / 1;"></div>
+                    @else
+                        <div class="bg-info-subtle rounded col-7 mt-2" style="height: 1.1rem;"></div>
+                    @endif
+                </div>
+            </div>
+            @continue
+            @endif
+            <div class="{{ $skeletonField['cols'] }}">
                 {{-- Label slot is a .form-label line (1.5rem + mb-2); the bar
                      inside is thinner, like text. Control height mirrors the
                      real input/textarea (see height above). --}}

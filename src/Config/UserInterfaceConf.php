@@ -34,6 +34,18 @@ class UserInterfaceConf extends BaseConf
     /** Third-party JS/CSS (jQuery, Bootstrap, Font Awesome, DataTables, JSON Editor): local | cdn */
     protected string $vendor_assets;
 
+    /**
+     * Help / Privacy / Terms links in the user menu and page footers. Empty: the
+     * module's own pages (/help, /privacy-policy, /terms-conditions), whose
+     * templates are published to resources/views/vendor/userinterface/pages.
+     * Set a URL to link an external page instead.
+     */
+    protected string $help_url;
+
+    protected string $privacy_url;
+
+    protected string $terms_url;
+
     protected function prepareDefault(BaseConf $default_values)
     {
         $default_values->auth_layout = 'userinterface::layouts.auth';
@@ -48,6 +60,9 @@ class UserInterfaceConf extends BaseConf
         $default_values->small_screen_featured_position = 'center';
         $default_values->snackbar_conf = new SnackbarConf;
         $default_values->vendor_assets = 'local';
+        $default_values->help_url = '';
+        $default_values->privacy_url = '';
+        $default_values->terms_url = '';
     }
 
     protected function rules(): array
@@ -60,6 +75,9 @@ class UserInterfaceConf extends BaseConf
             'small_screen_bottom_tabs' => 'integer|between:1,6',
             'small_screen_featured_position' => 'in:center,left,right',
             'vendor_assets' => 'in:local,cdn',
+            'help_url' => 'nullable|url:http,https|max:2048',
+            'privacy_url' => 'nullable|url:http,https|max:2048',
+            'terms_url' => 'nullable|url:http,https|max:2048',
         ];
     }
 }

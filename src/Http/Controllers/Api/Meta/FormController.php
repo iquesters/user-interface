@@ -7,6 +7,7 @@ use Iquesters\Foundation\System\Http\ApiResponse;
 use Iquesters\Foundation\System\Traits\Loggable;
 use Iquesters\UserInterface\Constants\EntityStatus;
 use Iquesters\UserInterface\Models\FormSchema;
+use Iquesters\UserInterface\Support\FormSchemaOptions;
 use Symfony\Component\HttpFoundation\Response;
 
 class FormController extends Controller
@@ -26,11 +27,13 @@ class FormController extends Controller
 
     private function normalizeSchema(mixed $schema): mixed
     {
+        // Decoded as objects so empty {} stay objects in the response.
         if (is_string($schema)) {
-            return json_decode($schema);
+            $schema = json_decode($schema);
         }
 
-        return $schema;
+        // Options a field loads from data ("optionsFrom") are filled in per request.
+        return FormSchemaOptions::expand($schema);
     }
 
     /**

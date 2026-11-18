@@ -3,7 +3,35 @@
 All notable changes to this package are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
-## [Unreleased] – 2.0.0
+## [Unreleased]
+
+### Added
+- **Tables:** in table view, clicking a row switches to split view with that record's details on the right and the row selected; the details' close button returns to table view (Ctrl/Cmd/Shift-click on the name link still opens it in a new tab).
+- **Tables:** table schema `"create": {"form": "<form schema>", "label": "Create user"}` adds a Create button to the list page's action row; it opens that form in create mode in a modal and reloads the table after saving. `showModal({formId, formMode: 'create'})` renders a schema's create mode.
+- Form fields: `"requiredIn": ["create"]` (required only in those modes). Modal forms use the same responsive field widths as page forms.
+- **Help, Privacy policy and Terms pages** (`/help`, `/privacy-policy`, `/terms-conditions`, public). Editable templates are published to the app (`resources/views/vendor/userinterface/pages`) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until `$isTemplate = false`. Settings `help_url`, `privacy_url`, `terms_url` link external pages instead. The user menu links point here (they were `#`).
+esources/views/vendor/userinterface/pages) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until ` = false`. Settings help_url, privacy_url, 	erms_url link external pages instead. The user menu links point here (they were #).
+- Form schema: a field can load its options with `"optionsFrom": {"master_data": "theme", "exclude": [...], "empty": "..."}` (filled in when the schema is served) or `"optionsFrom": {"url": "/..."}` (fetched by the browser with the user's session).
+- Form schema: `"dataEndpoint"` (with `{uid}`) loads the record from the schema's own endpoint instead of the generic entity API.
+- Form fields: `"readonly": true` shows a value in edit mode without letting it change.
+- Form fields: `"showIn": ["edit"]` (only shown and submitted in those modes), `"omitIfEmpty": true` (a blank value is not sent, e.g. "new password"), `"display": "status"` (view mode: the same `badge text-bg-{status}` as the status component) and `"display": "badge"` (neutral badges), `"type": "image"` (view mode picture) and field `"actions"` that open another form schema in a modal.
+- Form fields: `"type": "file"` with `"crop": {"aspectRatio": 1, "maxSize": 1024}` lets the user choose the area of an image before upload (drag / resize, mouse and touch; `public/js/form/image-crop-field.js`); the cropped image is what is submitted. Modal forms show a skeleton shaped like the form while loading.
+- Form schema: `modes.view.editUrl` shows the Edit icon for forms that are not entity records (e.g. My Profile -> Settings).
+
+### Changed (form layout)
+- View mode is a details grid (small muted label above a medium-weight value, spacing instead of divider lines) instead of disabled-looking input boxes; the loading skeletons match.
+- `"defaultFieldSize": "auto"`: one column on phones; from tablet width, short inputs sit two per row and wide content (textarea, file, image, option groups) keeps the full width. Used by the profile, settings and admin forms. The server-rendered skeleton now uses the same responsive column classes as the form (it used one fixed width).
+
+### Changed
+- Flash messages in the app layout show as toasts (same as the auth pages), once.
+- View mode shows a select's option label instead of its stored value; empty values show "—".
+- Picture changer: script moved to `public/js/image-changer.js`; "Remove image" only when there is an uploaded picture; Save without pressing Crop crops the current selection (it uploaded a blank image); the default crop is the largest centred square.
+- Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
+
+### Fixed
+- The user menu avatar used a relative path that broke on nested URLs.
+
+## [2.0.0] – 2026-11-17
 
 ### Settings engine
 - Validation rules for the UI and snackbar settings (`nav style`, tabs, `vendor_assets`, toast position…).

@@ -42,6 +42,10 @@ async function setupFormBlock(formCol, formMeta) {
         // no per-field margin (see createFieldFragment) — avoids the two
         // stacking and producing an inconsistent-looking gap.
         form.classList.add(...[STYLE_CLASS.ROW, STYLE_CLASS.ROW_COLS_1, 'g-2', STYLE_CLASS.NEEDS_VALIDATION])
+        // View mode: no divider lines, so give rows more air.
+        if (typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta)) {
+            form.classList.add('gy-3');
+        }
 
         // get form data
         let formData = form.dataset.formData
@@ -60,18 +64,23 @@ async function setupFormBlock(formCol, formMeta) {
             entityData = formData;
         }
 
-        if (!entityData && formMeta.entity && entityUId) {
-            const getentityResponse = await getfetchEntityData(formMeta.entity, entityUId);
-            entityData = getentityResponse?.data || null;
+        if (!entityData && entityUId) {
+            entityData = await fetchFormRecord(formMeta, entityUId);
         }
 
         if (entityData) {
             form.__entityDataCache = entityData;
         }
 
+        await loadRemoteFieldOptions(formMeta);
+
         // add fields to form
         if (formMeta.fields && formMeta.fields.length > 0) {
             formMeta.fields.forEach((field, index) => {
+                if (!isFieldShownInMode(field, formMeta.formMode)) {
+                    return;
+                }
+                applyModeRequired(field, formMeta.formMode);
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
@@ -289,7 +298,17 @@ async function addField(field, addTo,formMeta) {
         const { formContainer, inputElement: input } = createFormFieldContainer(field, useFloatingLabel);
         input.type = field.type;
         input.value = field.value || "";
+        // "readonly": shown in edit mode but not editable (e.g. the account email).
+        if (field.readonly === true) {
+            input.readOnly = true;
+            input.classList.add('bg-body-tertiary');
+        }
         fragment.appendChild(formContainer);
+
+        // "crop": choose the area of an image before it is uploaded.
+        if (field.type === 'file' && field.crop && typeof attachImageCrop === 'function') {
+            attachImageCrop(input, field, fragment);
+        }
 
         // ✅ Password fields get a show/hide toggle, matching the classic
         // auth forms. The click handling itself is a shared, delegated
@@ -351,35 +370,168 @@ function renderFormSpacer(field, addTo) {
     }
 }
 
+/**
+ * View mode: a details grid (small muted label above the value, spacing
+ * instead of divider lines), not a disabled-looking input. The value element keeps the field's DOM id
+ * and data-field-id, which renderEntityDataToForm() fills in later.
+ */
 function renderReadOnlyField(field, addTo) {
     const fragment = createFieldFragment(field, addTo);
     const fieldDomId = getFieldDomId(field);
     const formContainer = document.createElement(HTML_TAG.DIV);
     formContainer.id = `${fieldDomId}${SUFFIX.CONTAINER}`;
+    formContainer.classList.add('lab-view-field', 'py-1');
     fragment.appendChild(formContainer);
 
     if (field.label) {
-        const label = createLabel(field.label, fieldDomId, [STYLE_CLASS.FORM_LABEL]);
+        const label = document.createElement(HTML_TAG.DIV);
         label.id = `${fieldDomId}${SUFFIX.LABEL}`;
+        label.classList.add('lab-view-label', 'small', 'text-body-secondary', 'mb-1');
+        label.textContent = field.label;
         formContainer.appendChild(label);
+    }
+
+    if (field.type === 'image') {
+        renderReadOnlyImage(field, formContainer, fieldDomId);
+        createHelperText(field, fragment);
+        return;
     }
 
     const valueDiv = document.createElement(HTML_TAG.DIV);
     valueDiv.id = fieldDomId;
     valueDiv.dataset.fieldId = field.id;
-    valueDiv.classList.add(
-        STYLE_CLASS.FORM_CONTROL_PLAINTEXT,
-        STYLE_CLASS.BORDER,
-        STYLE_CLASS.ROUNDED,
-        STYLE_CLASS.P_1,
-        STYLE_CLASS.PX_2,
-        STYLE_CLASS.BG_LIGHT_SUBTLE,
-        STYLE_CLASS.W_100
-    );
-    valueDiv.textContent = getReadOnlyFieldDisplayValue(field);
+    valueDiv.classList.add('lab-view-value', 'fw-medium', 'text-break');
+    if (field.display === 'badge' || field.display === 'status') {
+        valueDiv.dataset.display = field.display;
+    }
+    setReadOnlyValue(valueDiv, field, getReadOnlyFieldDisplayValue(field), field.value);
     formContainer.appendChild(valueDiv);
 
+    appendFieldActions(field, formContainer);
     createHelperText(field, fragment);
+}
+
+/**
+ * Write a view-mode value.
+ *   "display": "status" -> the same badge as <x-userinterface::status>:
+ *                          `badge text-bg-{value}` (colours in bootstrap-override.css),
+ *                          labelled with the option label.
+ *   "display": "badge"  -> each value (or list item) as a neutral badge, e.g. roles.
+ */
+function setReadOnlyValue(valueDiv, field, text, rawValue) {
+    const display = valueDiv.dataset.display;
+
+    if (display === 'status' && text !== '—') {
+        // Same class contract as the Blade status/badge components.
+        const variant = String(rawValue ?? '').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'secondary';
+        const badge = document.createElement('span');
+        badge.className = `badge text-bg-${variant}`;
+        badge.textContent = text;
+        valueDiv.textContent = '';
+        valueDiv.appendChild(badge);
+        return;
+    }
+
+    if (display !== 'badge' || text === '—') {
+        valueDiv.textContent = text;
+        return;
+    }
+
+    valueDiv.textContent = '';
+    String(text).split(', ').filter(Boolean).forEach(item => {
+        const badge = document.createElement('span');
+        badge.className = 'badge text-bg-light border me-1';
+        badge.textContent = item;
+        valueDiv.appendChild(badge);
+    });
+}
+
+/**
+ * "type": "image" in view mode: the picture (value = URL), square by default.
+ * "actions" on the field (see appendFieldActions) open other forms, e.g.
+ * "Change picture" -> the upload form in a modal.
+ */
+function renderReadOnlyImage(field, container, fieldDomId) {
+    const wrapper = document.createElement(HTML_TAG.DIV);
+    wrapper.className = 'position-relative d-inline-block w-100';
+    wrapper.style.maxWidth = field.maxWidth || '240px';
+
+    const img = document.createElement('img');
+    img.id = fieldDomId;
+    img.dataset.fieldId = field.id;
+    img.alt = field.label || '';
+    img.className = 'img-thumbnail rounded w-100';
+    img.style.aspectRatio = field.aspectRatio || '1 / 1';
+    img.style.objectFit = 'cover';
+    if (field.value) {
+        img.src = field.value;
+    }
+    wrapper.appendChild(img);
+    container.appendChild(wrapper);
+
+    appendFieldActions(field, wrapper, true);
+}
+
+/**
+ * Field-level actions in view mode:
+ *   "actions": [{"label": "Change picture", "icon": "fas fa-camera", "form": "user-profile-picture", "title": "..."}]
+ * Each opens that form schema in a modal (showModal({formId})). On an image
+ * they sit in a camera menu over the picture; otherwise as small links.
+ */
+function appendFieldActions(field, container, overlay = false) {
+    const actions = Array.isArray(field.actions) ? field.actions.filter(a => a?.form) : [];
+    if (actions.length === 0 || typeof showModal !== 'function') {
+        return;
+    }
+
+    const open = action => showModal({
+        formId: action.form,
+        title: action.title || action.label || '',
+        submitLabel: action.submitLabel || 'Save',
+    });
+
+    if (!overlay) {
+        const bar = document.createElement(HTML_TAG.DIV);
+        bar.className = 'd-flex gap-3 mt-1';
+        actions.forEach(action => {
+            const link = document.createElement(HTML_TAG.BUTTON);
+            link.type = 'button';
+            link.className = `btn btn-link btn-sm p-0 text-decoration-none ${action.danger ? 'text-danger' : ''}`;
+            link.innerHTML = `${action.icon ? `<i class="${action.icon} me-1"></i>` : ''}`;
+            link.append(document.createTextNode(action.label || ''));
+            link.addEventListener('click', () => open(action));
+            bar.appendChild(link);
+        });
+        container.appendChild(bar);
+        return;
+    }
+
+    const menu = document.createElement(HTML_TAG.DIV);
+    menu.className = 'dropdown position-absolute bottom-0 end-0 mb-2 me-2';
+
+    const toggle = document.createElement(HTML_TAG.BUTTON);
+    toggle.type = 'button';
+    toggle.className = 'btn btn-secondary btn-sm rounded';
+    toggle.dataset.bsToggle = 'dropdown';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.title = field.actionsLabel || 'Change';
+    toggle.innerHTML = '<i class="fas fa-fw fa-camera"></i>';
+    menu.appendChild(toggle);
+
+    const list = document.createElement(HTML_TAG.DIV);
+    list.className = 'dropdown-menu shadow';
+    actions.forEach(action => {
+        const item = document.createElement(HTML_TAG.BUTTON);
+        item.type = 'button';
+        item.className = `dropdown-item ${action.danger ? 'text-danger' : ''}`;
+        item.dataset.formAction = action.form;
+        item.innerHTML = action.icon ? `<i class="${action.icon} fa-fw me-1"></i>` : '';
+        item.append(document.createTextNode(action.label || ''));
+        item.addEventListener('click', () => open(action));
+        list.appendChild(item);
+    });
+    menu.appendChild(list);
+    container.appendChild(menu);
 }
 
 function getReadOnlyFieldDisplayValue(field) {
@@ -391,6 +543,14 @@ function getReadOnlyFieldDisplayValue(field) {
 
     if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
         return value ? 'Yes' : 'No';
+    }
+
+    // Select/radio: show the option's label, not its stored value.
+    if (Array.isArray(field.options) && field.options.length > 0) {
+        const option = field.options.find(opt => String(opt?.value ?? '') === String(value ?? ''));
+        if (option && (option.label || option.text)) {
+            return option.label || option.text;
+        }
     }
 
     if (value === null || value === undefined || value === '') {
@@ -445,14 +605,33 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
         return gridSize;
     }
 
-    const formDefaultSize = getUsableSizeConfig(
-        formMeta.defaultFieldSize
+    const formDefault = formMeta.defaultFieldSize
         || formMeta.default_field_size
         || formMeta.fieldDefaultSize
-        || formMeta.field_default_size
-    );
+        || formMeta.field_default_size;
+
+    // "auto": responsive by field type (see autoFieldSize).
+    if (formDefault === 'auto') {
+        return autoFieldSize(field);
+    }
+
+    const formDefaultSize = getUsableSizeConfig(formDefault);
 
     return formDefaultSize || CONSTANT.DEFAULT_FORM_FIELD_SIZE;
+}
+
+/**
+ * "defaultFieldSize": "auto": one column on phones; from md up, short inputs
+ * sit two per row and wide content (textarea, file, image, option groups)
+ * keeps the full width. Mirrors the server-rendered skeleton in
+ * components/form.blade.php.
+ */
+function autoFieldSize(field = {}) {
+    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'].includes(field.type)
+        || (field.type === 'checkbox' && Array.isArray(field.options))
+        || Boolean(field.optionsFrom?.url && field.type === 'checkbox');
+
+    return wide ? { xs: 12 } : { xs: 12, md: 6 };
 }
 
 function resolveSpacerSizeConfig(field = {}) {
@@ -857,7 +1036,11 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         }
 
         if (readOnlyField) {
-            readOnlyField.textContent = value ?? "—";
+            if (readOnlyField.tagName === 'IMG') {
+                if (value) readOnlyField.src = value;
+            } else {
+                setReadOnlyValue(readOnlyField, null, readOnlyDisplayText(form, key, value), value);
+            }
         }
     }
 
@@ -880,7 +1063,18 @@ async function renderEntityDataToForm(formSelector, entityResponse) {
         }
 
         if (readOnlyField) {
-            readOnlyField.textContent = metaValue || "—";
+            readOnlyField.textContent = readOnlyDisplayText(form, metaKey, metaValue);
         }
     });
+}
+
+/**
+ * View-mode text for a value, using the field's schema when known (so a
+ * select shows its option label and empty values show "—"), the same as
+ * renderReadOnlyField() does on first render.
+ */
+function readOnlyDisplayText(form, fieldId, value) {
+    const fieldDef = (form.__formMeta?.fields || []).find(f => f?.id === fieldId);
+
+    return String(getReadOnlyFieldDisplayValue({ ...(fieldDef || {}), value }));
 }

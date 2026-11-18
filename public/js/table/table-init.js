@@ -69,36 +69,69 @@ class ViewModeManager {
     }
     
     async toggleViewMode() {
-        // Toggle the view mode
-        const newMode = this.currentViewMode === VIEW_MODE_TABLE 
-            ? VIEW_MODE_INBOX 
-            : VIEW_MODE_TABLE;
-        
-        window.uiDebug?.(`${TABLE_LOG_SWITCHING_VIEW_MODE} ${this.currentViewMode} → ${newMode}`);
-        
-        // Store in localStorage
+        await this.setViewMode(this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE);
+    }
+
+    /** Switch to a view mode (stored per table) and re-render. No-op if already in it. */
+    async setViewMode(newMode) {
+        if (newMode === this.currentViewMode) {
+            return;
+        }
+
+        const oldMode = this.currentViewMode;
+        window.uiDebug?.(`${TABLE_LOG_SWITCHING_VIEW_MODE} ${oldMode} → ${newMode}`);
+
         this.storeViewMode(newMode);
-        
-        // Update current mode
         this.currentViewMode = newMode;
-        
-        // Update button UI
+
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (toggleBtn) this.updateToggleButton(toggleBtn);
-        
-        // Dispatch view mode changed event
-        const event = new CustomEvent(TABLE_EVENT_VIEW_MODE_CHANGED, {
-            detail: { 
-                entity: this.entity,
-                oldMode: this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE,
-                newMode: this.currentViewMode
-            },
+
+        document.dispatchEvent(new CustomEvent(TABLE_EVENT_VIEW_MODE_CHANGED, {
+            detail: { entity: this.entity, oldMode, newMode },
             bubbles: true
-        });
-        document.dispatchEvent(event);
-        
-        // Re-render the table with new view mode
+        }));
+
         await this.reRenderView();
+    }
+
+    /** The split view's container for this table (null in table mode). */
+    inboxContainer() {
+        const parent = this.tableElement.parentNode || this.originalParent;
+        return parent?.querySelector(TABLE_SELECTOR_INBOX_VIEW_CONTAINER) || null;
+    }
+
+    /**
+     * Table mode row click: switch to split view, show that record on the
+     * right and highlight its row (when it is on the visible page).
+     */
+    async openRowInSplit(rowData) {
+        await this.setViewMode(VIEW_MODE_INBOX);
+
+        const container = this.inboxContainer();
+        const rightPanel = container?.__rightPanel;
+        const listTable = container?.__listTable;
+        if (!rightPanel) {
+            return;
+        }
+
+        await loadDetailComponent(rightPanel, this.schema, rowData);
+
+        const uid = String(rowData?.uid || rowData?.id || '');
+        const highlight = () => {
+            const checkbox = listTable?.querySelector(`${TABLE_SELECTOR_ROW_CHECKBOX}[data-uid="${CSS.escape(uid)}"]`);
+            const row = checkbox?.closest('tr');
+            if (row) {
+                setInboxRowSelection(row);
+                row.scrollIntoView({ block: 'nearest' });
+            }
+            return Boolean(row);
+        };
+
+        // The list may still be loading its first page.
+        if (!highlight() && listTable && typeof $ !== 'undefined') {
+            $(listTable).one('draw.dt', () => setTimeout(highlight, 0));
+        }
     }
 
     async reRenderView() {

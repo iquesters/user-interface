@@ -13,6 +13,7 @@ use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Models\TableSchema;
 use Iquesters\UserInterface\Services\Entity\EntitySchemaResolver;
 use Iquesters\UserInterface\Support\Assets;
+use Iquesters\UserInterface\Support\InfoPages;
 use Iquesters\UserInterface\Support\NavigationMenu;
 use Iquesters\UserInterface\Support\SetupLinkInjector;
 
@@ -74,7 +75,12 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
             __DIR__.'/../public' => public_path('vendor/userinterface'),
         ], ['laravel-assets', 'user-userinterface-assets']);
 
-        // composer install/update: publish Sanctum files.
+        // Help / Privacy / Terms templates, edited in the app (see Support\InfoPages).
+        $this->publishes([
+            __DIR__.'/../resources/views/pages' => resource_path('views/vendor/userinterface/pages'),
+        ], InfoPages::PUBLISH_TAG);
+
+        // composer install/update: publish Sanctum files and the page templates.
         $this->onPackageDiscover(fn () => InstallSteps::run());
     }
 

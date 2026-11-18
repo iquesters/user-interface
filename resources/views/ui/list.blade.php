@@ -4,6 +4,12 @@
     $entity = ucwords(str_replace('_', ' ', $table_schema->schema['entity']));
     $defaultView = $table_schema->schema['default_view_mode'] ?? 'table';
 
+    // Table schema "create": {"form": "<form schema>", "label": "Create user"}
+    // adds a Create button that opens that form in create mode (modal).
+    $create = is_array($table_schema->schema['create'] ?? null) && ! empty($table_schema->schema['create']['form'])
+        ? $table_schema->schema['create']
+        : null;
+
     $tabs = [
         [
             'route' => request()->route()->getName(),
@@ -31,8 +37,20 @@
 
     {{-- Actions Bar with Refresh, Bulk Actions, Select Hint, and View Toggle --}}
     <div class="d-flex justify-content-between align-items-center">
-        {{-- Left side: Refresh and Select Hint/Bulk Actions --}}
+        {{-- Left side: Create, Refresh and Select Hint/Bulk Actions --}}
         <div class="d-flex align-items-center gap-2">
+            @if ($create)
+                {{-- Create (table schema "create"); behaviour in public/js/table/table-create.js --}}
+                <button type="button"
+                        class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
+                        id="createRecordBtn"
+                        data-form="{{ $create['form'] }}"
+                        data-label="{{ $create['label'] ?? 'Create' }}">
+                    <i class="fas fa-plus"></i>
+                    <span class="d-none d-sm-inline">{{ $create['label'] ?? 'Create' }}</span>
+                </button>
+            @endif
+
             {{-- Refresh Button (Always visible) --}}
             <button type="button"
                     class="btn btn-sm btn-outline-secondary text-muted border-0"
