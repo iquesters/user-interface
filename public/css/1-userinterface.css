@@ -19,6 +19,13 @@
     left: 0 !important;
     z-index: 1051;
     transform: translateX(-310px);
+    /* Right under the header (app.js sets --ui-sidebar-top), down to the
+       bottom of the screen, scrolling its own menu: no page showing through. */
+    top: var(--ui-sidebar-top, 56px);
+    height: calc(100dvh - var(--ui-sidebar-top, 56px));
+    overflow-y: auto;
+    /* The module tab bar is fixed to the bottom: the last items stay reachable. */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
 
   .sidebar.active {

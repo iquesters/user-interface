@@ -868,6 +868,12 @@ async function renderFormForModal(formElement, formMeta) {
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
 
+    // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+    if (isTableRowForOwnRecord(formElement, formMeta)) {
+        formData = null;
+        entityData = null;
+    }
+
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
     }

@@ -60,6 +60,12 @@ async function setupFormBlock(formCol, formMeta) {
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;
 
+        // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+        if (isTableRowForOwnRecord(form, formMeta)) {
+            formData = null;
+            entityData = null;
+        }
+
         if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
             entityData = formData;
         }

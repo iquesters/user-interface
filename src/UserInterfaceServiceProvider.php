@@ -14,6 +14,7 @@ use Iquesters\UserInterface\Models\TableSchema;
 use Iquesters\UserInterface\Support\Assets;
 use Iquesters\UserInterface\Support\InfoPages;
 use Iquesters\UserInterface\Support\NavigationMenu;
+use Iquesters\UserInterface\Support\RecordComponents;
 use Iquesters\UserInterface\Support\SetupLinkInjector;
 
 /**
@@ -30,6 +31,9 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
 
         // Module navigation is built once per request.
         $this->app->scoped(NavigationMenu::class);
+
+        // Record components (table list / right panel), registered by key by the modules that own them.
+        $this->app->singleton(RecordComponents::class);
 
         // Foundation's entity builder stores generated schemas in our models.
         $this->app->singleton(SchemaModels::class, fn () => new class implements SchemaModels

@@ -8,6 +8,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ### Added
 - **Business entities in tables and forms:** a schema `"entity": "business-entity/{slug}"` lists, loads, saves and deletes its records through foundation's business entity API.
 - JS: `entityApiUrl(path)` and `entityRecordUrl(action, entity, uid)` in `api-client.js` build entity and business entity API URLs (base `window.ENTITY_API_BASE`, default `/api/foundation/v1`).
+- **Record components by key** (`Support\RecordComponents`, `docs/record-components.md`):
+  - table schemas name their list and right-panel components by key, e.g. `"details_component": "user.details"`;
+  - modules keep them in `resources/views/records/{type}/` and register them in their provider;
+  - `Contracts\RecordComponentSource` (tag `record-component-sources`) lets stored components override files later.
+- **Right panel components read the full record:** the row merged with the record from `details_source` or, by default, the table's form's `dataEndpoint`.
+- New binding type `badges`, e.g. a user's roles from `labels.roles`.
+- Bindings: `"prefix"` puts a path before a bare stored file name, e.g. a profile picture's `/profile-picture/`. Full URLs are left as they are.
+- **The right panel shows a record-shaped skeleton** (picture, title, rows) while a component loads. It used to show the form's skeleton.
 - **Form fields: `"type": "repeater"`**, a repeatable group of rows with the same `fields` (`public/js/form/repeater-field.js`):
   - the value is the whole list `[{uid?, field, meta: {}}]`;
   - edit mode shows a card per row with remove and add buttons; view mode shows a small table.
@@ -32,6 +40,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - **The entity data API moved to iquesters/foundation**: the controller, `Services\Entity\*`, `DynamicEntityListQuery`, `EntityListParams` and `EntityScopeResolver`. This module now keeps presentation only. Requires iquesters/foundation `^2.1`.
   - The JS uses `/api/foundation/v1/entity/...` (see foundation `docs/developer/entity-api.md`).
   - **Deprecated, removed in 3.0:**
+    - component names given as view paths (`userinterface::components.lab-user-*`): use registered keys. The `lab-user-*` views moved to user-management (`user.summary`, `user.details`);
     - `/api/user-interface/v1/entity/...` and `/api/entity/...` (now served by foundation's controller);
     - the old `Iquesters\UserInterface\Services\Entity\*`, `Http\Controllers\DynamicEntityController`, `Http\Query\DynamicEntityListQuery`, `Constants\EntityListParams` and `Contracts\EntityScopeResolver` class names, which resolve to foundation's classes (`src/deprecated-aliases.php`).
 - Flash messages in the app layout show as toasts (same as the auth pages), once.
@@ -40,6 +49,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
 
 ### Fixed
+- **Table split view with a form that has its own `dataEndpoint`** (e.g. Users with roles): the panel showed "—" for most fields.
+  - **Cause:** the table passed its list row to the form, and the form used that row as its record, but its fields have other keys (`user__name`).
+  - **Fix:** such a form now loads its record from `dataEndpoint`; switching between view and edit reuses that record.
+  - Forms without `dataEndpoint`, and the right panel's order (component → form in view mode → default row component), are unchanged.
+- **Phones and tablets:** after scrolling, page content (breadcrumb, headings) showed through a gap at the top of the open sidebar.
+  - The sidebar now starts at the header's bottom edge, kept in place on scroll and resize (`--ui-sidebar-top`, `public/js/app.js`).
+  - It fills the rest of the screen and scrolls its own menu; its last items stay above the bottom module bar.
 - The user menu avatar used a relative path that broke on nested URLs.
 
 ## [2.0.0] – 2026-11-17

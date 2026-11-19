@@ -93,6 +93,22 @@ async function loadRemoteFieldOptions(formMeta) {
 }
 
 /**
+ * Tables hand the clicked row to the detail form (data-record-source="table-row").
+ * That row is the form's record only when both read the same data: a form
+ * with its own "dataEndpoint" (e.g. a business entity, keys "user__name")
+ * loads its record instead. Once loaded, view/edit switches reuse it.
+ */
+function isTableRowForOwnRecord(form, formMeta) {
+    const fromRow = form?.dataset?.recordSource === 'table-row';
+
+    if (fromRow) {
+        delete form.dataset.recordSource;
+    }
+
+    return fromRow && Boolean(formMeta?.dataEndpoint) && Boolean(form?.dataset?.entityUid);
+}
+
+/**
  * Record shown/edited by an entity form. A schema can name its own
  * "dataEndpoint" (with {uid}) when the generic entity API does not return
  * everything the form needs (e.g. a role with its permissions).

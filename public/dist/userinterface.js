@@ -1173,10 +1173,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* ----------------------------
+       Mobile: keep the sidebar right under the header
+    ----------------------------
+       The sidebar is fixed; without a top it stays where it was first laid
+       out, so once the page scrolls (the admin bar goes, the sticky header
+       stays) the page showed through a gap above it. Its top follows the
+       header's bottom edge instead (CSS --ui-sidebar-top). */
+    const header = document.querySelector('header.sticky-top');
+    let placeQueued = false;
+
+    function placeSidebar() {
+        placeQueued = false;
+        const top = isMobile() && header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : null;
+
+        if (top === null) {
+            document.documentElement.style.removeProperty('--ui-sidebar-top');
+        } else {
+            document.documentElement.style.setProperty('--ui-sidebar-top', `${top}px`);
+        }
+    }
+
+    function queuePlaceSidebar() {
+        if (!placeQueued) {
+            placeQueued = true;
+            window.requestAnimationFrame(placeSidebar);
+        }
+    }
+
+    placeSidebar();
+    window.addEventListener('scroll', queuePlaceSidebar, { passive: true });
+    window.addEventListener('resize', queuePlaceSidebar);
+
+    /* ----------------------------
        Toggle sidebar
     ---------------------------- */
     function toggleSidebar() {
         if (isMobile()) {
+            placeSidebar();
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
 
@@ -2459,6 +2492,22 @@ async function loadRemoteFieldOptions(formMeta) {
 }
 
 /**
+ * Tables hand the clicked row to the detail form (data-record-source="table-row").
+ * That row is the form's record only when both read the same data: a form
+ * with its own "dataEndpoint" (e.g. a business entity, keys "user__name")
+ * loads its record instead. Once loaded, view/edit switches reuse it.
+ */
+function isTableRowForOwnRecord(form, formMeta) {
+    const fromRow = form?.dataset?.recordSource === 'table-row';
+
+    if (fromRow) {
+        delete form.dataset.recordSource;
+    }
+
+    return fromRow && Boolean(formMeta?.dataEndpoint) && Boolean(form?.dataset?.entityUid);
+}
+
+/**
  * Record shown/edited by an entity form. A schema can name its own
  * "dataEndpoint" (with {uid}) when the generic entity API does not return
  * everything the form needs (e.g. a role with its permissions).
@@ -2553,6 +2602,12 @@ async function setupFormBlock(formCol, formMeta) {
 
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;
+
+        // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+        if (isTableRowForOwnRecord(form, formMeta)) {
+            formData = null;
+            entityData = null;
+        }
 
         if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
             entityData = formData;
@@ -4521,6 +4576,12 @@ async function renderFormForModal(formElement, formMeta) {
 
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
+
+    // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+    if (isTableRowForOwnRecord(formElement, formMeta)) {
+        formData = null;
+        entityData = null;
+    }
 
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
@@ -9485,6 +9546,19 @@ function applyBindingTransform(value, transformName) {
     }
 }
 
+/**
+ * "prefix": put before a value that is only a name or a relative path
+ * (e.g. a stored file name: "/profile-picture/" + "abc.png"); full URLs,
+ * data: URIs and paths starting with "/" are left as they are.
+ */
+function applyBindingPrefix(value, prefix) {
+    if (!prefix || typeof value !== 'string' || value === '' || /^(https?:|data:|\/)/i.test(value)) {
+        return value;
+    }
+
+    return `${prefix}${value}`;
+}
+
 function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
     const rawValue = getFirstRowValue(
         row,
@@ -9493,7 +9567,7 @@ function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
         fieldConfig.fallback ?? ''
     );
 
-    return applyBindingTransform(rawValue, fieldConfig.transform);
+    return applyBindingTransform(applyBindingPrefix(rawValue, fieldConfig.prefix), fieldConfig.transform);
 }
 
 function replaceTemplateTokens(template = '', values = {}) {
@@ -9546,12 +9620,35 @@ function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
     return binding.fallback_template || '';
 }
 
+/**
+ * "type": "badges": a value or a list (e.g. a business entity's
+ * "labels.roles") as one badge per item, inserted as text.
+ *   {"type": "badges", "paths": ["labels.roles"], "class": "badge text-bg-light border",
+ *    "template": "<div>__BADGES__</div>", "fallback_template": ""}
+ */
+function renderBadgesBinding(binding = {}, row = {}, metaMap = {}) {
+    const value = getFirstRowValue(row, metaMap, binding.paths || [], null);
+    const items = (Array.isArray(value) ? value : [value])
+        .filter((item) => item !== null && item !== undefined && item !== '');
+
+    if (items.length === 0) {
+        return binding.fallback_template || '';
+    }
+
+    const className = escapeDetailHtml(binding.class || 'badge text-bg-light border me-1 mb-1');
+    const badges = items.map((item) => `<span class="${className}">${escapeDetailHtml(item)}</span>`).join('');
+
+    return (binding.template || '__BADGES__').replace('__BADGES__', badges);
+}
+
 function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
     switch (binding.type) {
         case 'template':
             return renderTemplateBinding(binding, row, metaMap);
         case 'key_value_rows':
             return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'badges':
+            return renderBadgesBinding(binding, row, metaMap);
         case 'text':
         default:
             return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
@@ -9705,6 +9802,87 @@ function renderFallbackDetailComponent(data = {}) {
             </table>
         </div>
     `;
+}
+
+/**
+ * Loading placeholder while a details component loads: the usual record
+ * layout (picture, title, subtitle, a few label/value rows), like the form
+ * skeleton does for forms.
+ */
+function renderComponentSkeleton() {
+    const row = () => `
+        <div class="d-flex flex-column flex-sm-row gap-1 gap-sm-3 py-1">
+            <span class="placeholder col-4 col-sm-3 rounded"></span>
+            <span class="placeholder col-7 col-sm-6 rounded"></span>
+        </div>`;
+
+    return `
+        <div class="component-skeleton placeholder-glow px-3 px-lg-4 pb-3" aria-hidden="true">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="placeholder rounded-circle flex-shrink-0" style="width: 72px; height: 72px;"></span>
+                <div class="flex-grow-1">
+                    <span class="placeholder col-6 rounded mb-2 d-block" style="height: 1.25rem;"></span>
+                    <span class="placeholder col-4 rounded d-block"></span>
+                </div>
+            </div>
+            ${row()}${row()}${row()}${row()}${row()}
+        </div>`;
+}
+
+/**
+ * The record a details component shows: the table row plus the full record
+ * from the record source, so a component can show what the list doesn't
+ * load (e.g. a user's roles from a business entity: "labels.roles").
+ *
+ * Record source, in order:
+ * - table schema "details_source": an entity or "business-entity/{slug}";
+ * - the "dataEndpoint" of the table's form (form_schema_uid);
+ * - none: the row alone (as before).
+ * A failed fetch also falls back to the row.
+ */
+async function loadDetailRecord(schema = {}, detailConfig = {}, row = {}) {
+    const uid = row?.uid;
+
+    if (!uid) {
+        return row;
+    }
+
+    let url = null;
+    const source = getSchemaConfigValue(schema, ['details_source', 'details-source']);
+
+    if (source && typeof entityRecordUrl === 'function') {
+        url = entityRecordUrl('show', source, uid);
+    } else if (detailConfig.formSchemaUid && typeof getFormSchema === 'function') {
+        const formSchema = await getFormSchema(detailConfig.formSchemaUid);
+        const dataEndpoint = formSchema?.dataEndpoint ?? formSchema?.schema?.dataEndpoint ?? null;
+        url = dataEndpoint ? dataEndpoint.replace('{uid}', encodeURIComponent(uid)) : null;
+    }
+
+    if (!url || typeof fetchSessionJsonData !== 'function') {
+        return row;
+    }
+
+    const record = await fetchSessionJsonData(url);
+
+    return record && typeof record === 'object' && !Array.isArray(record) ? mergeDetailRecord(row, record) : row;
+}
+
+/**
+ * Row + record: the record's values win, but "meta" lists are combined, so
+ * the row's meta (e.g. a user's profile_picture) survives a record that has
+ * other meta, or none.
+ */
+function mergeDetailRecord(row = {}, record = {}) {
+    const merged = { ...row, ...record };
+    const rowMeta = Array.isArray(row.meta) ? row.meta : [];
+    const recordMeta = Array.isArray(record.meta) ? record.meta : [];
+
+    if (rowMeta.length > 0 || recordMeta.length > 0) {
+        const recordKeys = new Set(recordMeta.map((item) => item?.meta_key));
+        merged.meta = [...rowMeta.filter((item) => !recordKeys.has(item?.meta_key)), ...recordMeta];
+    }
+
+    return merged;
 }
 
 function resolveDetailConfig(schema = {}) {
@@ -10236,10 +10414,18 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
+        // A component renders first: a record-shaped skeleton, not a form's.
+        const componentFirst = detailAttempts[0]?.type === DETAIL_RENDER_MODE_COMPONENT;
+        if (componentFirst) {
+            contentContainer.innerHTML = renderComponentSkeleton();
+        }
+
         // Shape the skeleton like the form that will render: use the cached
         // schema now, or fetch it in parallel with the template (setupForm
         // then gets it from the same cache / pending request).
-        const skeletonSchemaId = detailAttempts.find((attempt) => attempt.schemaId)?.schemaId;
+        const skeletonSchemaId = componentFirst
+            ? null
+            : detailAttempts.find((attempt) => attempt.type === DETAIL_RENDER_MODE_FORM)?.schemaId;
         if (skeletonSchemaId) {
             const cachedSchema = getCachedFormSchema(skeletonSchemaId);
             if (cachedSchema) {
@@ -10280,12 +10466,15 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             let result = null;
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
-                const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
+                const [template, record] = await Promise.all([
+                    fetchComponentTemplate(attempt.componentName, attempt.schemaId),
+                    loadDetailRecord(schema, detailConfig, data),
+                ]);
 
                 result = template.success
                     ? {
                         success: true,
-                        html: hydrateComponentTemplate(template.html, template.bindings || {}, data),
+                        html: hydrateComponentTemplate(template.html, template.bindings || {}, record),
                     }
                     : template;
             } else {
@@ -10316,6 +10505,8 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
+                // The list row: a form with its own dataEndpoint loads its record instead.
+                form.dataset.recordSource = 'table-row';
                 form.dataset.formMode = attempt.type === DETAIL_RENDER_MODE_FORM
                     ? detailContext.requestedFormMode
                     : 'view';
