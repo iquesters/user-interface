@@ -53,10 +53,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* ----------------------------
+       Mobile: keep the sidebar right under the header
+    ----------------------------
+       The sidebar is fixed; without a top it stays where it was first laid
+       out, so once the page scrolls (the admin bar goes, the sticky header
+       stays) the page showed through a gap above it. Its top follows the
+       header's bottom edge instead (CSS --ui-sidebar-top). */
+    const header = document.querySelector('header.sticky-top');
+    let placeQueued = false;
+
+    function placeSidebar() {
+        placeQueued = false;
+        const top = isMobile() && header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : null;
+
+        if (top === null) {
+            document.documentElement.style.removeProperty('--ui-sidebar-top');
+        } else {
+            document.documentElement.style.setProperty('--ui-sidebar-top', `${top}px`);
+        }
+    }
+
+    function queuePlaceSidebar() {
+        if (!placeQueued) {
+            placeQueued = true;
+            window.requestAnimationFrame(placeSidebar);
+        }
+    }
+
+    placeSidebar();
+    window.addEventListener('scroll', queuePlaceSidebar, { passive: true });
+    window.addEventListener('resize', queuePlaceSidebar);
+
+    /* ----------------------------
        Toggle sidebar
     ---------------------------- */
     function toggleSidebar() {
         if (isMobile()) {
+            placeSidebar();
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
 

@@ -1,4 +1,5 @@
-<div class="table-skeleton placeholder-wave">
+{{-- mt-2: the same gap below the actions bar as the DataTable's first row (Bootstrap 5 layout "row mt-2"). --}}
+<div class="table-skeleton placeholder-wave mt-2">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
         <div class="bg-info-subtle rounded col-3 p-3"></div>
         <div class="bg-info-subtle rounded col-4 p-3"></div>

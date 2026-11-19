@@ -29,11 +29,39 @@ const API_CONFIG = {
  */
 window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
 
-/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+/** uiApiUrl('form/user-form') → '/api/user-interface/v1/form/user-form' */
 function uiApiUrl(path = '') {
     return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
 }
 window.uiApiUrl = uiApiUrl;
+
+/**
+ * Entity data API (entity and business entity records), served by foundation.
+ * Override window.ENTITY_API_BASE before this file loads to point elsewhere.
+ */
+window.ENTITY_API_BASE = window.ENTITY_API_BASE || '/api/foundation/v1';
+
+/** entityApiUrl('entity/list/users') → '/api/foundation/v1/entity/list/users' */
+function entityApiUrl(path = '') {
+    return `${window.ENTITY_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.entityApiUrl = entityApiUrl;
+
+/**
+ * Record URL for a schema "entity": an entity table ("customers") or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ * entityRecordUrl('show', 'customers', uid)  → '/api/foundation/v1/entity/show/customers/{uid}'
+ * entityRecordUrl('list', 'business-entity/customer-profile') → '/api/foundation/v1/business-entity/list/customer-profile'
+ */
+function entityRecordUrl(action, entity, uid = null) {
+    const name = String(entity);
+    const business = name.startsWith('business-entity/');
+    const target = business ? name.slice('business-entity/'.length) : name;
+    const tail = uid ? `/${encodeURIComponent(uid)}` : '';
+
+    return entityApiUrl(`${business ? 'business-entity' : 'entity'}/${action}/${target}${tail}`);
+}
+window.entityRecordUrl = entityRecordUrl;
 
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,

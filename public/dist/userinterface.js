@@ -270,11 +270,39 @@ const API_CONFIG = {
  */
 window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
 
-/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+/** uiApiUrl('form/user-form') → '/api/user-interface/v1/form/user-form' */
 function uiApiUrl(path = '') {
     return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
 }
 window.uiApiUrl = uiApiUrl;
+
+/**
+ * Entity data API (entity and business entity records), served by foundation.
+ * Override window.ENTITY_API_BASE before this file loads to point elsewhere.
+ */
+window.ENTITY_API_BASE = window.ENTITY_API_BASE || '/api/foundation/v1';
+
+/** entityApiUrl('entity/list/users') → '/api/foundation/v1/entity/list/users' */
+function entityApiUrl(path = '') {
+    return `${window.ENTITY_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.entityApiUrl = entityApiUrl;
+
+/**
+ * Record URL for a schema "entity": an entity table ("customers") or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ * entityRecordUrl('show', 'customers', uid)  → '/api/foundation/v1/entity/show/customers/{uid}'
+ * entityRecordUrl('list', 'business-entity/customer-profile') → '/api/foundation/v1/business-entity/list/customer-profile'
+ */
+function entityRecordUrl(action, entity, uid = null) {
+    const name = String(entity);
+    const business = name.startsWith('business-entity/');
+    const target = business ? name.slice('business-entity/'.length) : name;
+    const tail = uid ? `/${encodeURIComponent(uid)}` : '';
+
+    return entityApiUrl(`${business ? 'business-entity' : 'entity'}/${action}/${target}${tail}`);
+}
+window.entityRecordUrl = entityRecordUrl;
 
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,
@@ -1145,10 +1173,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* ----------------------------
+       Mobile: keep the sidebar right under the header
+    ----------------------------
+       The sidebar is fixed; without a top it stays where it was first laid
+       out, so once the page scrolls (the admin bar goes, the sticky header
+       stays) the page showed through a gap above it. Its top follows the
+       header's bottom edge instead (CSS --ui-sidebar-top). */
+    const header = document.querySelector('header.sticky-top');
+    let placeQueued = false;
+
+    function placeSidebar() {
+        placeQueued = false;
+        const top = isMobile() && header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : null;
+
+        if (top === null) {
+            document.documentElement.style.removeProperty('--ui-sidebar-top');
+        } else {
+            document.documentElement.style.setProperty('--ui-sidebar-top', `${top}px`);
+        }
+    }
+
+    function queuePlaceSidebar() {
+        if (!placeQueued) {
+            placeQueued = true;
+            window.requestAnimationFrame(placeSidebar);
+        }
+    }
+
+    placeSidebar();
+    window.addEventListener('scroll', queuePlaceSidebar, { passive: true });
+    window.addEventListener('resize', queuePlaceSidebar);
+
+    /* ----------------------------
        Toggle sidebar
     ---------------------------- */
     function toggleSidebar() {
         if (isMobile()) {
+            placeSidebar();
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
 
@@ -2423,7 +2484,27 @@ async function loadRemoteFieldOptions(formMeta) {
         .map(async field => {
             const options = await fetchSessionJsonData(field.optionsFrom.url);
             field.options = Array.isArray(options) ? options : [];
+            // "empty": a first option for "nothing picked" (selects).
+            if (typeof field.optionsFrom.empty === 'string') {
+                field.options.unshift({ value: '', label: field.optionsFrom.empty });
+            }
         }));
+}
+
+/**
+ * Tables hand the clicked row to the detail form (data-record-source="table-row").
+ * That row is the form's record only when both read the same data: a form
+ * with its own "dataEndpoint" (e.g. a business entity, keys "user__name")
+ * loads its record instead. Once loaded, view/edit switches reuse it.
+ */
+function isTableRowForOwnRecord(form, formMeta) {
+    const fromRow = form?.dataset?.recordSource === 'table-row';
+
+    if (fromRow) {
+        delete form.dataset.recordSource;
+    }
+
+    return fromRow && Boolean(formMeta?.dataEndpoint) && Boolean(form?.dataset?.entityUid);
 }
 
 /**
@@ -2522,6 +2603,12 @@ async function setupFormBlock(formCol, formMeta) {
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;
 
+        // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+        if (isTableRowForOwnRecord(form, formMeta)) {
+            formData = null;
+            entityData = null;
+        }
+
         if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
             entityData = formData;
         }
@@ -2581,6 +2668,12 @@ async function addField(field, addTo,formMeta) {
         input.setAttribute(ATTR_CONS.AUTOCOMPLETE, ATTR_CONS.OFF);
         applyFieldValidation(field, input);
         addTo.appendChild(input);
+        return;
+    }
+
+    // Repeatable group (repeater-field.js): its own edit and view rendering.
+    if (typeof isRepeaterField === 'function' && isRepeaterField(field)) {
+        renderRepeaterField(field, addTo, typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta));
         return;
     }
 
@@ -3000,7 +3093,13 @@ function getReadOnlyFieldDisplayValue(field) {
     const value = field.value;
 
     if (Array.isArray(value)) {
-        return value.length > 0 ? value.join(', ') : '—';
+        // Several picked options (checkboxes): their labels.
+        const options = Array.isArray(field.options) ? field.options : [];
+        const labels = value.map(item => {
+            const option = options.find(opt => String(opt?.value ?? '') === String(item ?? ''));
+            return option ? (option.label || option.text || item) : item;
+        });
+        return labels.length > 0 ? labels.join(', ') : '—';
     }
 
     if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
@@ -3089,7 +3188,7 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
  * components/form.blade.php.
  */
 function autoFieldSize(field = {}) {
-    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'].includes(field.type)
+    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext', 'repeater'].includes(field.type)
         || (field.type === 'checkbox' && Array.isArray(field.options))
         || Boolean(field.optionsFrom?.url && field.type === 'checkbox');
 
@@ -3421,7 +3520,7 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
-        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+        const showUrl = entityRecordUrl('show', entity, entityUId);
 
         if (typeof apiClient !== 'undefined' && apiClient) {
             return await apiClient.get(showUrl);
@@ -4478,6 +4577,12 @@ async function renderFormForModal(formElement, formMeta) {
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
 
+    // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+    if (isTableRowForOwnRecord(formElement, formMeta)) {
+        formData = null;
+        entityData = null;
+    }
+
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
     }
@@ -5121,14 +5226,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('update', formMeta.entity, entityUid);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('delete', formMeta.entity, entityUid);
     }
 
-    return uiApiUrl(`entity/store/${formMeta.entity}`);
+    return entityRecordUrl('store', formMeta.entity);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
@@ -5166,6 +5271,11 @@ function getSerializedFieldValue(form, field) {
     const escapedName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
         ? CSS.escape(fieldName)
         : fieldName;
+
+    // Repeatable group (repeater-field.js): the whole list of rows.
+    if (field.type === 'repeater' && typeof collectRepeaterValue === 'function') {
+        return collectRepeaterValue(form, field);
+    }
 
     if (field.type === 'checkbox') {
         const checkboxInputs = form.querySelectorAll(`[name="${escapedName}"], [name="${escapedName}[]"]`);
@@ -6143,6 +6253,277 @@ async function waitForImageCrops(form) {
         .filter(Boolean);
 
     await Promise.all(pending);
+}
+
+;/* ---- js/form/repeater-field.js ---- */
+/**
+ * Repeatable group field: "type": "repeater".
+ *
+ *   {"id": "notes", "type": "repeater", "label": "Notes", "addLabel": "Add note",
+ *    "fields": [{"id": "body", "type": "text", "label": "Body", "required": true},
+ *               {"id": "phone", "type": "text", "label": "Phone", "meta": true}]}
+ *
+ * Every row has the group's "fields" (a meta field goes under the row's
+ * "meta"). The value is the whole list, sent and received as
+ *   [{"uid": "…", "body": "…", "meta": {"phone": "…"}}, ...]
+ * so a row removed here is removed on the server too. Rows that came from
+ * the server keep their uid (or id). Used by business entity lists of rows
+ * (has_many / morph_many).
+ *
+ * DOM is built with textContent only (no HTML from data).
+ */
+
+function isRepeaterField(field) {
+    return field?.type === 'repeater';
+}
+
+function repeaterRowsOf(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string' && value.trim().startsWith('[')) {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    return [];
+}
+
+function repeaterSubFields(field) {
+    return (Array.isArray(field.fields) ? field.fields : []).filter(sub => sub && sub.id);
+}
+
+function repeaterCellValue(row, sub) {
+    const source = sub.meta === true ? (row?.meta || {}) : (row || {});
+    const value = source[sub.id];
+
+    return value === null || value === undefined ? '' : value;
+}
+
+/** Edit mode: a list of row cards with an add button; view mode: a small table. */
+function renderRepeaterField(field, addTo, readOnly) {
+    const fragment = createFieldFragment(field, addTo);
+    const container = document.createElement('div');
+    container.classList.add('lab-repeater', readOnly ? 'lab-view-field' : 'mb-1');
+    container.dataset.repeaterFor = field.id;
+    fragment.appendChild(container);
+
+    if (field.label) {
+        const label = document.createElement('div');
+        label.classList.add(...(readOnly ? ['lab-view-label', 'small', 'text-body-secondary', 'mb-1'] : ['form-label', 'mb-1']));
+        label.textContent = field.label;
+        container.appendChild(label);
+    }
+
+    const rows = repeaterRowsOf(field.value);
+
+    if (readOnly) {
+        container.appendChild(renderRepeaterTable(field, rows));
+        return;
+    }
+
+    // Anchor for server errors on this field (form.js maps errors by name).
+    const anchor = document.createElement('input');
+    anchor.type = 'hidden';
+    anchor.name = field.id;
+    anchor.dataset.repeaterAnchor = 'true';
+    container.appendChild(anchor);
+
+    const list = document.createElement('div');
+    list.classList.add('lab-repeater-rows', 'd-flex', 'flex-column', 'gap-2');
+    container.appendChild(list);
+
+    rows.forEach(row => list.appendChild(renderRepeaterRow(field, row)));
+
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.classList.add('btn', 'btn-sm', 'btn-outline-secondary', 'mt-2');
+    const icon = document.createElement('i');
+    icon.className = 'fa-regular fa-fw fa-plus';
+    const text = document.createElement('span');
+    text.classList.add('ms-1');
+    text.textContent = field.addLabel || 'Add row';
+    add.append(icon, text);
+    add.addEventListener('click', () => {
+        const row = renderRepeaterRow(field, {});
+        list.appendChild(row);
+        row.querySelector('input, select, textarea')?.focus();
+    });
+    container.appendChild(add);
+
+    if (typeof createHelperText === 'function' && field.helperText) {
+        createHelperText(field, fragment);
+    }
+}
+
+function renderRepeaterRow(field, row) {
+    const card = document.createElement('div');
+    card.classList.add('lab-repeater-row', 'border', 'rounded', 'p-2');
+    card.dataset.uid = row?.uid || '';
+    card.dataset.id = row?.uid ? '' : (row?.id ?? '');
+
+    const grid = document.createElement('div');
+    grid.classList.add('row', 'g-2', 'align-items-end');
+
+    repeaterSubFields(field).forEach(sub => {
+        const col = document.createElement('div');
+        col.classList.add('col-12', 'col-md');
+        const id = `rep-${Math.random().toString(36).slice(2)}`;
+
+        const label = document.createElement('label');
+        label.classList.add('form-label', 'small', 'mb-1');
+        label.htmlFor = id;
+        label.textContent = sub.label || sub.id;
+        if (sub.required) {
+            const star = document.createElement('span');
+            star.classList.add('text-danger', 'ms-1');
+            star.textContent = '*';
+            label.appendChild(star);
+        }
+
+        const control = repeaterControl(sub, repeaterCellValue(row, sub));
+        control.id = id;
+        control.dataset.repeaterField = sub.id;
+        control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
+
+        col.append(label, control);
+        grid.appendChild(col);
+    });
+
+    const actions = document.createElement('div');
+    actions.classList.add('col-auto');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.classList.add('btn', 'btn-sm', 'btn-outline-danger');
+    remove.title = 'Remove row';
+    remove.setAttribute('aria-label', 'Remove row');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-fw fa-trash';
+    remove.appendChild(icon);
+    remove.addEventListener('click', () => card.remove());
+    actions.appendChild(remove);
+    grid.appendChild(actions);
+
+    card.appendChild(grid);
+
+    return card;
+}
+
+function repeaterControl(sub, value) {
+    let control;
+
+    if (sub.type === 'textarea') {
+        control = document.createElement('textarea');
+        control.rows = 2;
+        control.value = value;
+    } else if (sub.type === 'select' || (Array.isArray(sub.options) && sub.options.length > 0 && sub.type !== 'checkbox')) {
+        control = document.createElement('select');
+        control.classList.add('form-select', 'form-select-sm');
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '—';
+        control.appendChild(empty);
+        (sub.options || []).forEach(opt => {
+            const option = document.createElement('option');
+            option.value = String(opt?.value ?? '');
+            option.textContent = opt?.label ?? opt?.text ?? option.value;
+            option.selected = String(value) === option.value;
+            control.appendChild(option);
+        });
+
+        return control;
+    } else if (sub.type === 'checkbox') {
+        control = document.createElement('input');
+        control.type = 'checkbox';
+        control.classList.add('form-check-input');
+        control.checked = value === true || value === 1 || value === '1' || value === 'true';
+
+        return control;
+    } else {
+        control = document.createElement('input');
+        control.type = ['number', 'email', 'date', 'datetime-local', 'time'].includes(sub.type) ? sub.type : 'text';
+        control.value = value;
+    }
+
+    control.classList.add('form-control', 'form-control-sm');
+    if (sub.required) control.required = true;
+    if (sub.maxLength) control.maxLength = sub.maxLength;
+    if (sub.placeholder) control.placeholder = sub.placeholder;
+
+    return control;
+}
+
+function renderRepeaterTable(field, rows) {
+    if (rows.length === 0) {
+        const empty = document.createElement('div');
+        empty.classList.add('lab-view-value', 'fw-medium');
+        empty.textContent = '—';
+        return empty;
+    }
+
+    const subs = repeaterSubFields(field);
+    const wrap = document.createElement('div');
+    wrap.classList.add('table-responsive');
+    const table = document.createElement('table');
+    table.classList.add('table', 'table-sm', 'mb-0');
+
+    const head = table.createTHead().insertRow();
+    subs.forEach(sub => {
+        const th = document.createElement('th');
+        th.classList.add('small', 'text-body-secondary', 'fw-normal');
+        th.textContent = sub.label || sub.id;
+        head.appendChild(th);
+    });
+
+    const body = table.createTBody();
+    rows.forEach(row => {
+        const tr = body.insertRow();
+        subs.forEach(sub => {
+            const td = tr.insertCell();
+            const value = repeaterCellValue(row, sub);
+            td.textContent = typeof getReadOnlyFieldDisplayValue === 'function'
+                ? String(getReadOnlyFieldDisplayValue({ ...sub, value }))
+                : (value === '' ? '—' : String(value));
+        });
+    });
+
+    wrap.appendChild(table);
+
+    return wrap;
+}
+
+/** The list sent on submit: [{uid?, field: value, meta: {}}]. */
+function collectRepeaterValue(form, field) {
+    const escaped = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(field.id) : field.id;
+    const container = form.querySelector(`[data-repeater-for="${escaped}"]`);
+
+    if (!container) {
+        return [];
+    }
+
+    return Array.from(container.querySelectorAll('.lab-repeater-row')).map(rowEl => {
+        const row = {};
+        const meta = {};
+
+        if (rowEl.dataset.uid) row.uid = rowEl.dataset.uid;
+        else if (rowEl.dataset.id) row.id = rowEl.dataset.id;
+
+        rowEl.querySelectorAll('[data-repeater-field]').forEach(control => {
+            const value = control.type === 'checkbox' ? control.checked : control.value;
+            (control.dataset.repeaterMeta === 'true' ? meta : row)[control.dataset.repeaterField] = value;
+        });
+
+        if (Object.keys(meta).length > 0) {
+            row.meta = meta;
+        }
+
+        return row;
+    });
 }
 
 ;/* ---- js/form/validation/customValidationMessage.js ---- */
@@ -7696,7 +8077,6 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 // Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
 const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
-const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
@@ -8755,6 +9135,14 @@ function removeTableSkeleton(tableElement) {
 }
 
 /**
+ * List URL for a table schema's "entity": an entity table ("customers"), or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ */
+function entityListUrl(entity) {
+    return entityRecordUrl('list', entity);
+}
+
+/**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
  */
 async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
@@ -8762,7 +9150,7 @@ async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
+    const response = await apiClient.get(entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
@@ -9158,6 +9546,19 @@ function applyBindingTransform(value, transformName) {
     }
 }
 
+/**
+ * "prefix": put before a value that is only a name or a relative path
+ * (e.g. a stored file name: "/profile-picture/" + "abc.png"); full URLs,
+ * data: URIs and paths starting with "/" are left as they are.
+ */
+function applyBindingPrefix(value, prefix) {
+    if (!prefix || typeof value !== 'string' || value === '' || /^(https?:|data:|\/)/i.test(value)) {
+        return value;
+    }
+
+    return `${prefix}${value}`;
+}
+
 function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
     const rawValue = getFirstRowValue(
         row,
@@ -9166,7 +9567,7 @@ function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
         fieldConfig.fallback ?? ''
     );
 
-    return applyBindingTransform(rawValue, fieldConfig.transform);
+    return applyBindingTransform(applyBindingPrefix(rawValue, fieldConfig.prefix), fieldConfig.transform);
 }
 
 function replaceTemplateTokens(template = '', values = {}) {
@@ -9219,12 +9620,35 @@ function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
     return binding.fallback_template || '';
 }
 
+/**
+ * "type": "badges": a value or a list (e.g. a business entity's
+ * "labels.roles") as one badge per item, inserted as text.
+ *   {"type": "badges", "paths": ["labels.roles"], "class": "badge text-bg-light border",
+ *    "template": "<div>__BADGES__</div>", "fallback_template": ""}
+ */
+function renderBadgesBinding(binding = {}, row = {}, metaMap = {}) {
+    const value = getFirstRowValue(row, metaMap, binding.paths || [], null);
+    const items = (Array.isArray(value) ? value : [value])
+        .filter((item) => item !== null && item !== undefined && item !== '');
+
+    if (items.length === 0) {
+        return binding.fallback_template || '';
+    }
+
+    const className = escapeDetailHtml(binding.class || 'badge text-bg-light border me-1 mb-1');
+    const badges = items.map((item) => `<span class="${className}">${escapeDetailHtml(item)}</span>`).join('');
+
+    return (binding.template || '__BADGES__').replace('__BADGES__', badges);
+}
+
 function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
     switch (binding.type) {
         case 'template':
             return renderTemplateBinding(binding, row, metaMap);
         case 'key_value_rows':
             return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'badges':
+            return renderBadgesBinding(binding, row, metaMap);
         case 'text':
         default:
             return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
@@ -9378,6 +9802,87 @@ function renderFallbackDetailComponent(data = {}) {
             </table>
         </div>
     `;
+}
+
+/**
+ * Loading placeholder while a details component loads: the usual record
+ * layout (picture, title, subtitle, a few label/value rows), like the form
+ * skeleton does for forms.
+ */
+function renderComponentSkeleton() {
+    const row = () => `
+        <div class="d-flex flex-column flex-sm-row gap-1 gap-sm-3 py-1">
+            <span class="placeholder col-4 col-sm-3 rounded"></span>
+            <span class="placeholder col-7 col-sm-6 rounded"></span>
+        </div>`;
+
+    return `
+        <div class="component-skeleton placeholder-glow px-3 px-lg-4 pb-3" aria-hidden="true">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="placeholder rounded-circle flex-shrink-0" style="width: 72px; height: 72px;"></span>
+                <div class="flex-grow-1">
+                    <span class="placeholder col-6 rounded mb-2 d-block" style="height: 1.25rem;"></span>
+                    <span class="placeholder col-4 rounded d-block"></span>
+                </div>
+            </div>
+            ${row()}${row()}${row()}${row()}${row()}
+        </div>`;
+}
+
+/**
+ * The record a details component shows: the table row plus the full record
+ * from the record source, so a component can show what the list doesn't
+ * load (e.g. a user's roles from a business entity: "labels.roles").
+ *
+ * Record source, in order:
+ * - table schema "details_source": an entity or "business-entity/{slug}";
+ * - the "dataEndpoint" of the table's form (form_schema_uid);
+ * - none: the row alone (as before).
+ * A failed fetch also falls back to the row.
+ */
+async function loadDetailRecord(schema = {}, detailConfig = {}, row = {}) {
+    const uid = row?.uid;
+
+    if (!uid) {
+        return row;
+    }
+
+    let url = null;
+    const source = getSchemaConfigValue(schema, ['details_source', 'details-source']);
+
+    if (source && typeof entityRecordUrl === 'function') {
+        url = entityRecordUrl('show', source, uid);
+    } else if (detailConfig.formSchemaUid && typeof getFormSchema === 'function') {
+        const formSchema = await getFormSchema(detailConfig.formSchemaUid);
+        const dataEndpoint = formSchema?.dataEndpoint ?? formSchema?.schema?.dataEndpoint ?? null;
+        url = dataEndpoint ? dataEndpoint.replace('{uid}', encodeURIComponent(uid)) : null;
+    }
+
+    if (!url || typeof fetchSessionJsonData !== 'function') {
+        return row;
+    }
+
+    const record = await fetchSessionJsonData(url);
+
+    return record && typeof record === 'object' && !Array.isArray(record) ? mergeDetailRecord(row, record) : row;
+}
+
+/**
+ * Row + record: the record's values win, but "meta" lists are combined, so
+ * the row's meta (e.g. a user's profile_picture) survives a record that has
+ * other meta, or none.
+ */
+function mergeDetailRecord(row = {}, record = {}) {
+    const merged = { ...row, ...record };
+    const rowMeta = Array.isArray(row.meta) ? row.meta : [];
+    const recordMeta = Array.isArray(record.meta) ? record.meta : [];
+
+    if (rowMeta.length > 0 || recordMeta.length > 0) {
+        const recordKeys = new Set(recordMeta.map((item) => item?.meta_key));
+        merged.meta = [...rowMeta.filter((item) => !recordKeys.has(item?.meta_key)), ...recordMeta];
+    }
+
+    return merged;
 }
 
 function resolveDetailConfig(schema = {}) {
@@ -9604,7 +10109,7 @@ async function handleHybridDetailDelete(detailContext) {
         return;
     }
 
-    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
+    const endpoint = entityRecordUrl('delete', entity, entityUid);
     window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
@@ -9637,6 +10142,8 @@ async function handleHybridDetailDelete(detailContext) {
         const parentContainer = rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const listTable = parentContainer?.querySelector(TABLE_SELECTOR_INBOX_LIST);
         const rootTable = document.querySelector(TABLE_SELECTOR_LAB_TABLE);
+        // The record is gone: back to the list on small screens.
+        setInboxDetailOpen(rightPanelEle, false);
 
         if (rootTable && typeof window.clearLabTableCache === 'function') {
             window.clearLabTableCache(rootTable);
@@ -9742,7 +10249,15 @@ function getNestedDetailValue(source, paths = []) {
     return null;
 }
 
+/** Split view on small screens: show the record over the list, or the list again. */
+function setInboxDetailOpen(rightPanelEle, open) {
+    rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.classList.toggle('inbox-detail-open', open);
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
+    // Phones/tablets: the record covers the list (CSS .inbox-detail-open).
+    setInboxDetailOpen(rightPanelEle, true);
+
     window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
@@ -9818,6 +10333,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
         // Closing the details returns to the full table view.
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        setInboxDetailOpen(rightPanelEle, false);
         const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
         if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
             viewManager.setViewMode(VIEW_MODE_TABLE);
@@ -9909,10 +10425,21 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
+        // A component renders first: a record-shaped skeleton, not a form's.
+        const componentFirst = detailAttempts[0]?.type === DETAIL_RENDER_MODE_COMPONENT;
+        if (componentFirst) {
+            contentContainer.innerHTML = renderComponentSkeleton();
+            // The Edit/Delete row goes above the component: add it now, so the
+            // skeleton sits where the component will (no jump when it renders).
+            appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+        }
+
         // Shape the skeleton like the form that will render: use the cached
         // schema now, or fetch it in parallel with the template (setupForm
         // then gets it from the same cache / pending request).
-        const skeletonSchemaId = detailAttempts.find((attempt) => attempt.schemaId)?.schemaId;
+        const skeletonSchemaId = componentFirst
+            ? null
+            : detailAttempts.find((attempt) => attempt.type === DETAIL_RENDER_MODE_FORM)?.schemaId;
         if (skeletonSchemaId) {
             const cachedSchema = getCachedFormSchema(skeletonSchemaId);
             if (cachedSchema) {
@@ -9953,12 +10480,15 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             let result = null;
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
-                const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
+                const [template, record] = await Promise.all([
+                    fetchComponentTemplate(attempt.componentName, attempt.schemaId),
+                    loadDetailRecord(schema, detailConfig, data),
+                ]);
 
                 result = template.success
                     ? {
                         success: true,
-                        html: hydrateComponentTemplate(template.html, template.bindings || {}, data),
+                        html: hydrateComponentTemplate(template.html, template.bindings || {}, record),
                     }
                     : template;
             } else {
@@ -9989,6 +10519,8 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
+                // The list row: a form with its own dataEndpoint loads its record instead.
+                form.dataset.recordSource = 'table-row';
                 form.dataset.formMode = attempt.type === DETAIL_RENDER_MODE_FORM
                     ? detailContext.requestedFormMode
                     : 'view';
@@ -10002,6 +10534,9 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
                 appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+            } else {
+                // A form has its own actions: drop the row added for the component.
+                rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             }
 
             if (typeof setupCoreFormElement === 'function') {
@@ -10021,10 +10556,11 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
                 uid: data?.uid || data?.id || null,
                 preferredMode,
             });
+            rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             initializeDetailViewScripts(contentContainer);
         }
-        
+
     } catch (error) {
         console.error(TABLE_LOG_DETAIL_COMPONENT_ERROR, {
             entity: schema?.entity,

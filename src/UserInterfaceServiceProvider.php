@@ -11,10 +11,10 @@ use Iquesters\Foundation\System\Providers\BaseServiceProvider;
 use Iquesters\UserInterface\Install\InstallSteps;
 use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Models\TableSchema;
-use Iquesters\UserInterface\Services\Entity\EntitySchemaResolver;
 use Iquesters\UserInterface\Support\Assets;
 use Iquesters\UserInterface\Support\InfoPages;
 use Iquesters\UserInterface\Support\NavigationMenu;
+use Iquesters\UserInterface\Support\RecordComponents;
 use Iquesters\UserInterface\Support\SetupLinkInjector;
 
 /**
@@ -29,12 +29,11 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
     {
         parent::register();
 
-        // One schema resolver per request, so its introspection cache is shared
-        // by the entity API services.
-        $this->app->scoped(EntitySchemaResolver::class);
-
         // Module navigation is built once per request.
         $this->app->scoped(NavigationMenu::class);
+
+        // Record components (table list / right panel), registered by key by the modules that own them.
+        $this->app->singleton(RecordComponents::class);
 
         // Foundation's entity builder stores generated schemas in our models.
         $this->app->singleton(SchemaModels::class, fn () => new class implements SchemaModels
