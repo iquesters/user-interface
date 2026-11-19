@@ -26,9 +26,29 @@ Options are the active children of the master data key: `value` is the child key
 { "id": "permissions", "type": "checkbox", "optionsFrom": { "url": "/admin/permission-options" } }
 ```
 
-The endpoint returns `{"success": true, "data": [{"value": "...", "label": "..."}]}`. Use this for anything that should not be public: the schema endpoint (`/api/.../noauth/form/{slug}`) is public, so never put private data in the schema itself.
+The endpoint returns `{"success": true, "data": [{"value": "...", "label": "..."}]}`. `"empty": "— None —"` adds a first option with value `""` here too. Use this for anything that should not be public: the schema endpoint (`/api/.../noauth/form/{slug}`) is public, so never put private data in the schema itself.
 
-In view mode, a select or radio field shows the option label, not the stored value.
+In view mode, a select or radio field shows the option label, not the stored value; a checkbox group shows the labels of the picked options.
+
+## Repeatable group
+
+`"type": "repeater"` edits a list of rows that all have the same fields. Business entity forms use it for a has-many part.
+
+```json
+{
+  "id": "notes", "type": "repeater", "label": "Notes", "addLabel": "Add note",
+  "fields": [
+    {"id": "body", "type": "text", "label": "Body", "required": true},
+    {"id": "phone", "type": "text", "label": "Phone", "meta": true}
+  ]
+}
+```
+
+- **Value:** the whole list, `[{"uid": "…", "body": "…", "meta": {"phone": "…"}}]`. Rows loaded from the record keep their `uid` (or `id`). Rows removed in the form are left out, so the server removes them.
+- **Row fields:** a meta field goes under the row's `meta`. Supported types: text, number, email, date, datetime-local, time, textarea, select (with `options`) and checkbox.
+- **Edit mode:** a card per row with a remove button, and an add button.
+- **View mode:** a small table.
+- **Server errors:** shown under the field, keyed by its `id`.
 
 ## Record from the schema's own endpoint
 

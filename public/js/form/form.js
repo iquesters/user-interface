@@ -1557,6 +1557,11 @@ function getSerializedFieldValue(form, field) {
         ? CSS.escape(fieldName)
         : fieldName;
 
+    // Repeatable group (repeater-field.js): the whole list of rows.
+    if (field.type === 'repeater' && typeof collectRepeaterValue === 'function') {
+        return collectRepeaterValue(form, field);
+    }
+
     if (field.type === 'checkbox') {
         const checkboxInputs = form.querySelectorAll(`[name="${escapedName}"], [name="${escapedName}[]"]`);
 

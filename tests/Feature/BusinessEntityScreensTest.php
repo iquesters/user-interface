@@ -3,8 +3,11 @@
 namespace Iquesters\UserInterface\Tests\Feature;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Iquesters\Foundation\Models\BusinessEntity;
+use Iquesters\Foundation\Models\Entity;
+use Iquesters\Foundation\Services\Schema\EntitySchemaService;
 use Iquesters\Foundation\Support\BusinessEntity\BusinessEntityDefinitionValidator;
 use Iquesters\UserInterface\Tests\TestCase;
 
@@ -85,5 +88,75 @@ class BusinessEntityScreensTest extends TestCase
             ->assertSee('businessEntityBuilder', false)
             ->assertSee('js/business-entity-builder.js', false);
         $this->get("/business-entity/{$uid}/edit")->assertOk()->assertSee('client-card');
+    }
+
+    public function test_the_builder_gets_relation_types_models_and_its_urls(): void
+    {
+        $this->actingAs($this->makeUser('super-admin'));
+
+        $html = $this->get('/business-entity/create')->assertOk()->getContent();
+        preg_match('#<script type="application/json" id="businessEntityData">(.*?)</script>#s', $html, $match);
+        $data = json_decode(html_entity_decode($match[1] ?? ''), true);
+
+        $this->assertContains('has_many', array_column($data['relationTypes'], 'name'));
+        $this->assertContains('morph_to_many', array_column($data['relationTypes'], 'name'));
+        $this->assertContains('role', array_column($data['models'], 'key'));
+        $this->assertStringEndsWith('/business-entity/check', $data['urls']['check']);
+        $this->assertContains('customer_id', collect($data['entities'])->firstWhere('table', 'addresses')['columns']);
+    }
+
+    public function test_check_validates_without_saving_and_reports_missing_pivots(): void
+    {
+        $this->actingAs($this->makeUser('super-admin'));
+        $definition = json_decode($this->definition, true);
+
+        $this->postJson('/business-entity/check', ['definition' => $this->definition])
+            ->assertOk()->assertJsonPath('valid', true);
+
+        $definition['parts'][] = ['alias' => 'roles', 'model' => 'role', 'link' => ['type' => 'belongs_to_many', 'to' => 'customer',
+            'pivot' => ['table' => 'customer_role', 'foreign_pivot_key' => 'customer_id', 'related_pivot_key' => 'role_id']]];
+
+        $this->postJson('/business-entity/check', ['definition' => json_encode($definition)])
+            ->assertOk()
+            ->assertJsonPath('valid', false)
+            ->assertJsonPath('missing_pivots.0.table', 'customer_role');
+
+        $this->assertDatabaseCount('business_entities', 0);
+        $this->assertFalse(Schema::hasTable('customer_role'));
+
+        $this->getJson('/business-entity/columns?table=model_has_roles')->assertJsonPath('exists', true);
+        $this->getJson('/business-entity/columns?table=nope_nope')->assertJsonPath('exists', false);
+        $this->getJson('/business-entity/columns?table=bad;name')->assertJsonPath('exists', false);
+    }
+
+    public function test_saving_again_updates_the_same_schemas(): void
+    {
+        $this->actingAs($this->makeUser('super-admin'));
+        $this->post('/business-entity', ['name' => 'Client Card', 'definition' => $this->definition]);
+        $businessEntity = BusinessEntity::where('slug', 'client-card')->firstOrFail();
+
+        $this->put("/business-entity/{$businessEntity->uid}", ['name' => 'Client Card', 'definition' => $this->definition])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(1, DB::table('form_schemas')->where('slug', 'business-client-card-form')->count());
+        $this->assertSame(1, DB::table('table_schemas')->where('slug', 'business-client-card-table')->count());
+    }
+
+    public function test_entity_schemas_are_generated_once_and_updated_in_place(): void
+    {
+        $this->actingAs($this->makeUser('super-admin'));
+        $entity = Entity::where('entity_name', 'Customer')->firstOrFail();
+        $service = app(EntitySchemaService::class);
+        $fields = ['name' => ['name' => 'name', 'type' => 'string', 'label' => 'Name']];
+
+        $first = $service->sync($entity, $fields, []);
+        $second = $service->sync($entity->fresh(), $fields + ['email' => ['name' => 'email', 'type' => 'string', 'label' => 'Email']], []);
+
+        $this->assertSame($first, $second);
+        $this->assertSame($first['form_schema_uid'], $entity->fresh()->getMeta('form_schema_uid'));
+        $form = DB::table('form_schemas')->where('uid', $first['form_schema_uid'])->first();
+        $this->assertSame('customers-form', $form->slug);
+        $this->assertSame(['name', 'email'], array_column(json_decode($form->schema, true)['fields'], 'id'));
+        $this->assertSame(1, DB::table('form_schemas')->where('slug', 'customers-form')->count());
     }
 }

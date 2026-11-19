@@ -8,6 +8,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ### Added
 - **Business entities in tables and forms:** a schema `"entity": "business-entity/{slug}"` lists, loads, saves and deletes its records through foundation's business entity API.
 - JS: `entityApiUrl(path)` and `entityRecordUrl(action, entity, uid)` in `api-client.js` build entity and business entity API URLs (base `window.ENTITY_API_BASE`, default `/api/foundation/v1`).
+- **Form fields: `"type": "repeater"`**, a repeatable group of rows with the same `fields` (`public/js/form/repeater-field.js`):
+  - the value is the whole list `[{uid?, field, meta: {}}]`;
+  - edit mode shows a card per row with remove and add buttons; view mode shows a small table.
+  - Business entity forms use it for has-many parts.
+- Form fields: `"optionsFrom": {"url": …, "empty": "…"}` adds a first "nothing" option. In view mode, a checkbox group shows the labels of the picked options, not their values.
 - **Tables:** in table view, clicking a row switches to split view with that record's details on the right and the row selected; the details' close button returns to table view (Ctrl/Cmd/Shift-click on the name link still opens it in a new tab).
 - **Tables:** table schema `"create": {"form": "<form schema>", "label": "Create user"}` adds a Create button to the list page's action row; it opens that form in create mode in a modal and reloads the table after saving. `showModal({formId, formMode: 'create'})` renders a schema's create mode.
 - Form fields: `"requiredIn": ["create"]` (required only in those modes). Modal forms use the same responsive field widths as page forms.

@@ -122,6 +122,12 @@ async function addField(field, addTo,formMeta) {
         return;
     }
 
+    // Repeatable group (repeater-field.js): its own edit and view rendering.
+    if (typeof isRepeaterField === 'function' && isRepeaterField(field)) {
+        renderRepeaterField(field, addTo, typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta));
+        return;
+    }
+
     if (typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta)) {
         renderReadOnlyField(field, addTo);
         return;
@@ -538,7 +544,13 @@ function getReadOnlyFieldDisplayValue(field) {
     const value = field.value;
 
     if (Array.isArray(value)) {
-        return value.length > 0 ? value.join(', ') : '—';
+        // Several picked options (checkboxes): their labels.
+        const options = Array.isArray(field.options) ? field.options : [];
+        const labels = value.map(item => {
+            const option = options.find(opt => String(opt?.value ?? '') === String(item ?? ''));
+            return option ? (option.label || option.text || item) : item;
+        });
+        return labels.length > 0 ? labels.join(', ') : '—';
     }
 
     if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
@@ -627,7 +639,7 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
  * components/form.blade.php.
  */
 function autoFieldSize(field = {}) {
-    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'].includes(field.type)
+    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext', 'repeater'].includes(field.type)
         || (field.type === 'checkbox' && Array.isArray(field.options))
         || Boolean(field.optionsFrom?.url && field.type === 'checkbox');
 

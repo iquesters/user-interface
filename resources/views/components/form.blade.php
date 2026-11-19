@@ -55,7 +55,7 @@
                     // "auto": same rule as autoFieldSize() in form-block-builder.js.
                     if ($size === 'auto') {
                         $type = $field['type'] ?? null;
-                        $wide = in_array($type, ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'], true)
+                        $wide = in_array($type, ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext', 'repeater'], true)
                             || ($type === 'checkbox' && (! empty($field['options']) || ! empty($field['optionsFrom']['url'])));
                         $size = $wide ? ['xs' => 12] : ['xs' => 12, 'md' => 6];
                     }

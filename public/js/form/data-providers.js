@@ -85,6 +85,10 @@ async function loadRemoteFieldOptions(formMeta) {
         .map(async field => {
             const options = await fetchSessionJsonData(field.optionsFrom.url);
             field.options = Array.isArray(options) ? options : [];
+            // "empty": a first option for "nothing picked" (selects).
+            if (typeof field.optionsFrom.empty === 'string') {
+                field.options.unshift({ value: '', label: field.optionsFrom.empty });
+            }
         }));
 }
 
