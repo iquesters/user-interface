@@ -11,7 +11,6 @@ use Iquesters\Foundation\System\Providers\BaseServiceProvider;
 use Iquesters\UserInterface\Install\InstallSteps;
 use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Models\TableSchema;
-use Iquesters\UserInterface\Services\Entity\EntitySchemaResolver;
 use Iquesters\UserInterface\Support\Assets;
 use Iquesters\UserInterface\Support\InfoPages;
 use Iquesters\UserInterface\Support\NavigationMenu;
@@ -28,10 +27,6 @@ class UserInterfaceServiceProvider extends BaseServiceProvider
     public function register(): void
     {
         parent::register();
-
-        // One schema resolver per request, so its introspection cache is shared
-        // by the entity API services.
-        $this->app->scoped(EntitySchemaResolver::class);
 
         // Module navigation is built once per request.
         $this->app->scoped(NavigationMenu::class);

@@ -270,11 +270,39 @@ const API_CONFIG = {
  */
 window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
 
-/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+/** uiApiUrl('form/user-form') → '/api/user-interface/v1/form/user-form' */
 function uiApiUrl(path = '') {
     return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
 }
 window.uiApiUrl = uiApiUrl;
+
+/**
+ * Entity data API (entity and business entity records), served by foundation.
+ * Override window.ENTITY_API_BASE before this file loads to point elsewhere.
+ */
+window.ENTITY_API_BASE = window.ENTITY_API_BASE || '/api/foundation/v1';
+
+/** entityApiUrl('entity/list/users') → '/api/foundation/v1/entity/list/users' */
+function entityApiUrl(path = '') {
+    return `${window.ENTITY_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.entityApiUrl = entityApiUrl;
+
+/**
+ * Record URL for a schema "entity": an entity table ("customers") or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ * entityRecordUrl('show', 'customers', uid)  → '/api/foundation/v1/entity/show/customers/{uid}'
+ * entityRecordUrl('list', 'business-entity/customer-profile') → '/api/foundation/v1/business-entity/list/customer-profile'
+ */
+function entityRecordUrl(action, entity, uid = null) {
+    const name = String(entity);
+    const business = name.startsWith('business-entity/');
+    const target = business ? name.slice('business-entity/'.length) : name;
+    const tail = uid ? `/${encodeURIComponent(uid)}` : '';
+
+    return entityApiUrl(`${business ? 'business-entity' : 'entity'}/${action}/${target}${tail}`);
+}
+window.entityRecordUrl = entityRecordUrl;
 
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,
@@ -3421,7 +3449,7 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
-        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+        const showUrl = entityRecordUrl('show', entity, entityUId);
 
         if (typeof apiClient !== 'undefined' && apiClient) {
             return await apiClient.get(showUrl);
@@ -5121,14 +5149,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('update', formMeta.entity, entityUid);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('delete', formMeta.entity, entityUid);
     }
 
-    return uiApiUrl(`entity/store/${formMeta.entity}`);
+    return entityRecordUrl('store', formMeta.entity);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
@@ -7696,7 +7724,6 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 // Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
 const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
-const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
@@ -8755,6 +8782,14 @@ function removeTableSkeleton(tableElement) {
 }
 
 /**
+ * List URL for a table schema's "entity": an entity table ("customers"), or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ */
+function entityListUrl(entity) {
+    return entityRecordUrl('list', entity);
+}
+
+/**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
  */
 async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
@@ -8762,7 +8797,7 @@ async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
+    const response = await apiClient.get(entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
@@ -9604,7 +9639,7 @@ async function handleHybridDetailDelete(detailContext) {
         return;
     }
 
-    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
+    const endpoint = entityRecordUrl('delete', entity, entityUid);
     window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,

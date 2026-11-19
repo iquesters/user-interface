@@ -39,7 +39,6 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 // Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
 const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
-const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';

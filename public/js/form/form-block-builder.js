@@ -959,7 +959,7 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
-        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+        const showUrl = entityRecordUrl('show', entity, entityUId);
 
         if (typeof apiClient !== 'undefined' && apiClient) {
             return await apiClient.get(showUrl);

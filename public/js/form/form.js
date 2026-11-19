@@ -1511,14 +1511,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('update', formMeta.entity, entityUid);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('delete', formMeta.entity, entityUid);
     }
 
-    return uiApiUrl(`entity/store/${formMeta.entity}`);
+    return entityRecordUrl('store', formMeta.entity);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
