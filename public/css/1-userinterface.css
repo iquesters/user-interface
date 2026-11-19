@@ -494,6 +494,81 @@ ol.breadcrumb {
     cursor: default !important;
 }
 
+/* Tables on phones: the page-size select and the search box share one row.
+   DataTables (Bootstrap 5 styling) puts them in a .row as .dt-layout-start
+   and .dt-layout-end; below md each .row child is 100% wide, so they stacked.
+   The search takes the rest of the row. */
+@media (max-width: 767.98px) {
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) {
+    flex-wrap: nowrap;
+    align-items: center;
+    column-gap: 0.5rem;
+  }
+
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) > .dt-layout-start {
+    width: auto;
+    flex: 0 0 auto;
+    margin: 0 !important;
+  }
+
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) > .dt-layout-end {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 !important;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* Right-aligned: the search area spans its cell and pushes the box right. */
+  .dt-container > .row:has(> .dt-layout-end .dt-search) .dt-search {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    margin-left: auto;
+  }
+
+  .dt-container > .row:has(> .dt-layout-end .dt-search) .dt-search input {
+    width: 100%;
+    max-width: 260px;
+    margin-left: auto;
+  }
+}
+
+/* Split view on phones and tablets: one panel at a time. The list fills the
+   width; an opened record (container .inbox-detail-open, set by the table
+   JS) covers it, and its close button returns to the list. The panels are
+   the container's first (list) and last (record) children. */
+@media (max-width: 991.98px) {
+  .inbox-view-container > .inbox-resizer {
+    display: none !important;
+  }
+
+  .inbox-view-container > :first-child {
+    width: 100% !important;
+  }
+
+  /* Its own stacking context: the record covers the list's sticky header
+     (z-index 10) without rising above the page's header, menus or dialogs. */
+  .inbox-view-container {
+    isolation: isolate;
+  }
+
+  .inbox-view-container > :last-child {
+    display: none !important;
+  }
+
+  .inbox-view-container.inbox-detail-open > :last-child {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    width: 100% !important;
+    background-color: var(--bs-body-bg);
+  }
+}
+
 .inbox-list-table .checkbox-column {
     padding: 8px !important;
 }

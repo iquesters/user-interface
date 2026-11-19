@@ -10142,6 +10142,8 @@ async function handleHybridDetailDelete(detailContext) {
         const parentContainer = rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const listTable = parentContainer?.querySelector(TABLE_SELECTOR_INBOX_LIST);
         const rootTable = document.querySelector(TABLE_SELECTOR_LAB_TABLE);
+        // The record is gone: back to the list on small screens.
+        setInboxDetailOpen(rightPanelEle, false);
 
         if (rootTable && typeof window.clearLabTableCache === 'function') {
             window.clearLabTableCache(rootTable);
@@ -10247,7 +10249,15 @@ function getNestedDetailValue(source, paths = []) {
     return null;
 }
 
+/** Split view on small screens: show the record over the list, or the list again. */
+function setInboxDetailOpen(rightPanelEle, open) {
+    rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.classList.toggle('inbox-detail-open', open);
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
+    // Phones/tablets: the record covers the list (CSS .inbox-detail-open).
+    setInboxDetailOpen(rightPanelEle, true);
+
     window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
@@ -10323,6 +10333,7 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
         // Closing the details returns to the full table view.
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        setInboxDetailOpen(rightPanelEle, false);
         const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
         if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
             viewManager.setViewMode(VIEW_MODE_TABLE);
@@ -10418,6 +10429,9 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         const componentFirst = detailAttempts[0]?.type === DETAIL_RENDER_MODE_COMPONENT;
         if (componentFirst) {
             contentContainer.innerHTML = renderComponentSkeleton();
+            // The Edit/Delete row goes above the component: add it now, so the
+            // skeleton sits where the component will (no jump when it renders).
+            appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
         }
 
         // Shape the skeleton like the form that will render: use the cached
@@ -10520,6 +10534,9 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
                 appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+            } else {
+                // A form has its own actions: drop the row added for the component.
+                rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             }
 
             if (typeof setupCoreFormElement === 'function') {
@@ -10539,10 +10556,11 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
                 uid: data?.uid || data?.id || null,
                 preferredMode,
             });
+            rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             initializeDetailViewScripts(contentContainer);
         }
-        
+
     } catch (error) {
         console.error(TABLE_LOG_DETAIL_COMPONENT_ERROR, {
             entity: schema?.entity,

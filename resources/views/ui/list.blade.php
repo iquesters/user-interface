@@ -37,20 +37,8 @@
 
     {{-- Actions Bar with Refresh, Bulk Actions, Select Hint, and View Toggle --}}
     <div class="d-flex justify-content-between align-items-center">
-        {{-- Left side: Create, Refresh and Select Hint/Bulk Actions --}}
+        {{-- Left side: Refresh and Select Hint/Bulk Actions --}}
         <div class="d-flex align-items-center gap-2">
-            @if ($create)
-                {{-- Create (table schema "create"); behaviour in public/js/table/table-create.js --}}
-                <button type="button"
-                        class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
-                        id="createRecordBtn"
-                        data-form="{{ $create['form'] }}"
-                        data-label="{{ $create['label'] ?? 'Create' }}">
-                    <i class="fas fa-plus"></i>
-                    <span class="d-none d-sm-inline">{{ $create['label'] ?? 'Create' }}</span>
-                </button>
-            @endif
-
             {{-- Refresh Button (Always visible) --}}
             <button type="button"
                     class="btn btn-sm btn-outline-secondary text-muted border-0"
@@ -225,7 +213,7 @@
             </div>
         </div>
 
-        {{-- Right side: Selection Count, Clear Button, and View Toggle --}}
+        {{-- Right side: Selection Count, Clear Button, Create and View Toggle --}}
         <div class="d-flex align-items-center gap-2">
             {{-- Selection Count Badge (Visible when items selected) --}}
             <span id="selectionCount" class="d-none fw-semibold text-muted" style="min-width: 80px;">
@@ -239,6 +227,20 @@
                     style="min-width: 40px;">
                 Clear
             </button>
+
+            @if ($create)
+                {{-- Create (table schema "create"): outlined, right before the view switch.
+                     Behaviour in public/js/table/table-create.js. --}}
+                <button type="button"
+                        class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                        id="createRecordBtn"
+                        data-form="{{ $create['form'] }}"
+                        data-label="{{ $create['label'] ?? 'Create' }}"
+                        title="{{ $create['label'] ?? 'Create' }}">
+                    <i class="fas fa-plus"></i>
+                    <span class="d-none d-sm-inline">{{ $create['label'] ?? 'Create' }}</span>
+                </button>
+            @endif
 
             {{-- View Toggle Button (Always visible) --}}
             <button type="button"

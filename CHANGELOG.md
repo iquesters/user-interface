@@ -53,6 +53,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   - **Cause:** the table passed its list row to the form, and the form used that row as its record, but its fields have other keys (`user__name`).
   - **Fix:** such a form now loads its record from `dataEndpoint`; switching between view and edit reuses that record.
   - Forms without `dataEndpoint`, and the right panel's order (component → form in view mode → default row component), are unchanged.
+- **Phones:** a table's page-size select and search box share one row, with the search on the right.
+- **List page actions:** the **Create** button is outlined and sits on the right, before the table/split view switch.
+- **List page skeleton:** keeps the same gap below the actions bar as the loaded table, so nothing moves when the table appears.
+- **Right panel, no jump:** the Edit/Delete row of a component-backed record is added before loading, so the skeleton sits where the component will render.
+- **Phones and tablets, split view:** one panel at a time.
+  - The list fills the width; an opened record covers it, and its close button returns to the list. Deleting the record does the same.
+  - The resizer is hidden; desktop is unchanged.
 - **Phones and tablets:** after scrolling, page content (breadcrumb, headings) showed through a gap at the top of the open sidebar.
   - The sidebar now starts at the header's bottom edge, kept in place on scroll and resize (`--ui-sidebar-top`, `public/js/app.js`).
   - It fills the rest of the screen and scrolls its own menu; its last items stay above the bottom module bar.
