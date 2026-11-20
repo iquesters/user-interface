@@ -57,6 +57,7 @@ abstract class TestCase extends Orchestra
     {
         $user = User::create([
             'name' => 'Test '.Str::random(6),
+            'status' => 'active',
             'email' => Str::random(10).'@example.test',
             'password' => bcrypt(Str::random(20)),
         ]);

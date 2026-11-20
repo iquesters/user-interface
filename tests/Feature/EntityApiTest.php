@@ -86,8 +86,8 @@ class EntityApiTest extends TestCase
 
         $this->getJson("/api/entity/list/{$table}")->assertNotFound()->assertJsonPath('message', "Entity {$table} not found");
         $this->getJson("/api/entity/show/{$table}/1")->assertNotFound();
-        $this->deleteJson("/api/entity/delete/{$table}/1")->assertNotFound();
-        $this->postJson("/api/entity/store/{$table}", ['name' => 'x'])->assertNotFound();
+        $this->deleteJson("/api/entity/delete/{$table}/1")->assertStatus($table === 'users' ? 403 : 404);
+        $this->postJson("/api/entity/store/{$table}", ['name' => 'x'])->assertStatus($table === 'users' ? 403 : 404);
     }
 
     public function test_soft_deleted_records_are_hidden(): void
@@ -169,7 +169,7 @@ class EntityApiTest extends TestCase
         $this->actingAsAdmin();
         $before = DB::table('users')->count();
 
-        $this->deleteJson('/api/entity/delete/users/1')->assertNotFound();
+        $this->deleteJson('/api/entity/delete/users/1')->assertForbidden();
 
         $this->assertSame($before, DB::table('users')->count());
     }
