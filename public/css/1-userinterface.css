@@ -494,6 +494,18 @@ ol.breadcrumb {
     cursor: default !important;
 }
 
+/* Page tabs (layouts/common/tabs) scroll sideways on small screens. The
+   scroll clips Bootstrap's -1px overlap that hides the line under the active
+   tab, so the line is an inset shadow the active tab covers instead. */
+.ui-page-tabs {
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--bs-border-color);
+}
+
+.ui-page-tabs .nav-link {
+  margin-bottom: 0;
+}
+
 /* Tables on phones: the page-size select and the search box share one row.
    DataTables (Bootstrap 5 styling) puts them in a .row as .dt-layout-start
    and .dt-layout-end; below md each .row child is 100% wide, so they stacked.

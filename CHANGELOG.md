@@ -6,6 +6,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **Breadcrumbs on every page**, built from navigation: `Module › Item › Tab › page`. A page adds its last crumb with `@section('breadcrumb', …)`. On phones they show as a "‹ back" link. Diglactic definitions still win where they exist.
+  - The module crumb links to the module's dashboard; on the dashboard it is the only crumb.
+- **Tabs from navigation:** a page shows the tabs (child items) of its sidebar item, so no `$tabs` array is needed. The sidebar reads `navigation_items` when foundation has them, and falls back to the old menu JSON.
+  - A sidebar item's own page is shown where its "own page" tab sits in the order, not always first.
+  - Clicking a module opens its dashboard, wherever the dashboard is in the sidebar order (it opened the first item).
+
+### Changed
+- **Tabs:**
+  - one scrollable line on phones, with icon and label side by side and the active tab in view;
+  - labels are printed as text (they were raw HTML);
+  - the placeholder "history" tab is removed;
+  - a view's own `$tabs` array is deprecated;
+  - the list page no longer repeats its title as a tab.
 - **Business entities in tables and forms:** a schema `"entity": "business-entity/{slug}"` lists, loads, saves and deletes its records through foundation's business entity API.
 - JS: `entityApiUrl(path)` and `entityRecordUrl(action, entity, uid)` in `api-client.js` build entity and business entity API URLs (base `window.ENTITY_API_BASE`, default `/api/foundation/v1`).
 - **Record components by key** (`Support\RecordComponents`, `docs/record-components.md`):

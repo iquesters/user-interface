@@ -1,114 +1,71 @@
 @php
-    use Illuminate\Support\Str;
+    /*
+     * Page tabs.
+     * - From navigation (default): the tabs ("children") of the sidebar item
+     *   this page belongs to, managed in Admin → Navigation.
+     * - Deprecated: a view's own $tabs array [{route, params, icon, label, permission}].
+     * One scrollable line on small screens; labels are text, never HTML.
+     */
+    $navigationMenu = app(\Iquesters\UserInterface\Support\NavigationMenu::class);
+    $navActive = $navigationMenu->active();
+    $tabItems = [];
 
-    // Layout-controlled defaults
-    $tabId     = 'tabs';
-    $sticky    = false;
-    $secondary = false;
+    if (isset($tabs) && is_array($tabs)) {
+        foreach ($tabs as $tab) {
+            if (! empty($tab['permission']) && auth()->check() && ! auth()->user()->can($tab['permission'])) {
+                continue;
+            }
+            $routeName = $tab['route'] ?? null;
+            $tabItems[] = [
+                'label' => strip_tags((string) ($tab['label'] ?? '')),
+                'icon' => $tab['icon'] ?? null,
+                'url' => $routeName && Route::has($routeName) ? route($routeName, array_filter($tab['params'] ?? [], fn ($v) => ! is_null($v))) : '#',
+                'active' => $routeName && request()->routeIs($routeName),
+            ];
+        }
+    } elseif (! empty($navActive['item']['children'])) {
+        $item = $navActive['item'];
+        $children = $item['children'];
+        $activeChild = $navActive['child']['key'] ?? null;
 
-    // Filter tabs user can actually see
-    $visibleTabs = collect($tabs)->filter(function ($tab) {
-        if (!empty($tab['permission']) && auth()->check()) {
-            return auth()->user()->can($tab['permission']);
+        // The item's own page is a tab: its "own page" tab (kind self), where
+        // the admin put it; else first, unless a tab already opens it (e.g. "Current").
+        $pageIsATab = collect($children)->contains(fn ($child) => ($child['kind'] ?? null) === 'self'
+            || rtrim($child['url'], '/') === rtrim($item['url'], '/'));
+        if (! $pageIsATab) {
+            $tabItems[] = ['label' => $item['label'], 'icon' => $item['icon'], 'url' => $item['url'], 'active' => $activeChild === null];
         }
 
-        return true;
-    })->values();
+        foreach ($children as $child) {
+            $tabItems[] = $child + ['active' => $activeChild === $child['key']];
+        }
+    }
 @endphp
 
-@if ($visibleTabs->count() > 0)
-    <ul
-        id="{{ $tabId }}"
-        class="nav {{ $secondary ? 'nav-pills' : 'nav-tabs' }}
-               mb-2 {{ $sticky ? 'nav-tabs-sticky-top' : '' }}"
-        role="tablist"
-    >
-        @foreach ($visibleTabs as $index => $tab)
-            @php
-                // Route params (safe)
-                $routeParams = array_filter($tab['params'] ?? [], fn ($v) => !is_null($v));
-
-                // Auto-generate stable tab id
-                $autoTabId = 'tab-' . Str::slug($tab['route'] . '-' . $index);
-
-                // Server-side active (basic)
-                $isActive = request()->routeIs($tab['route']);
-            @endphp
-
-            <li class="nav-item" role="presentation">
-                <a
-                    id="{{ $autoTabId }}"
-                    href="{{ Route::has($tab['route']) ? route($tab['route'], $routeParams) : '#' }}"
-                    class="nav-link
-                           {{ $isActive ? 'active' : '' }}
-                           d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
-                >
-                    @isset($tab['icon'])
-                        <i class="{{ $tab['icon'] }} me-1"></i>
-                    @endisset
-
-                    {!! $tab['label'] !!}
+@if (count($tabItems) > 1 || (isset($tabs) && count($tabItems) > 0))
+    <ul class="nav nav-tabs ui-page-tabs flex-nowrap overflow-x-auto overflow-y-hidden mb-2" role="tablist">
+        @foreach ($tabItems as $tab)
+            <li class="nav-item flex-shrink-0" role="presentation">
+                <a href="{{ $tab['url'] }}"
+                   class="nav-link text-nowrap d-flex align-items-center gap-1 px-2 px-md-3 {{ $tab['active'] ? 'active' : '' }}"
+                   @if ($tab['active']) aria-current="page" @endif>
+                    @if (! empty($tab['icon']))
+                        <i class="{{ $tab['icon'] }}" aria-hidden="true"></i>
+                    @endif
+                    <span>{{ $tab['label'] }}</span>
                 </a>
             </li>
         @endforeach
-
-         <li class="nav-item" role="presentation">
-            <a
-                href="#"
-                class="nav-link d-flex d-lg-block flex-column flex-lg-row align-items-center px-2 px-md-3"
-            >
-                <i class="fas fa-fw fa-clock-rotate-left me-1"></i>
-            </a>
-        </li>
-
     </ul>
+
+    @once
+        @push('scripts')
+            <script>
+                // Small screens: bring the active tab into view.
+                document.querySelectorAll('.ui-page-tabs .nav-link.active').forEach((link) => {
+                    link.scrollIntoView({ block: 'nearest', inline: 'center' });
+                });
+            </script>
+        @endpush
+    @endonce
 @endif
-
-@once
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('ul.nav.nav-tabs, ul.nav.nav-pills').forEach(nav => {
-        const links = nav.querySelectorAll('.nav-link');
-        const currentPath = window.location.pathname.replace(/\/$/, '');
-
-        let matched = false;
-
-        // Exact match
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            if (!href || href === '#') return;
-
-            const linkPath = new URL(href, window.location.origin)
-                .pathname.replace(/\/$/, '');
-
-            if (currentPath === linkPath) {
-                links.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-                matched = true;
-            }
-        });
-
-        // Prefix match (nested routes)
-        if (!matched) {
-            links.forEach(link => {
-                const href = link.getAttribute('href');
-                if (!href || href === '#') return;
-
-                const linkPath = new URL(href, window.location.origin)
-                    .pathname.replace(/\/$/, '');
-
-                if (
-                    currentPath === linkPath ||
-                    currentPath.startsWith(linkPath + '/')
-                ) {
-                    links.forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
-                }
-            });
-        }
-    });
-});
-</script>
-@endpush
-@endonce

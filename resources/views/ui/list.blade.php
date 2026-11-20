@@ -10,14 +10,6 @@
         ? $table_schema->schema['create']
         : null;
 
-    $tabs = [
-        [
-            'route' => request()->route()->getName(),
-            'params' => request()->route()->parameters(),
-            'icon' => 'fas fa-fw fa-table',
-            'label' => $entity,
-        ],
-    ];
 @endphp
 
 @section('page-title', \Iquesters\Foundation\Helpers\MetaHelper::make([$entity]))
