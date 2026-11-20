@@ -868,6 +868,12 @@ async function renderFormForModal(formElement, formMeta) {
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
 
+    // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+    if (isTableRowForOwnRecord(formElement, formMeta)) {
+        formData = null;
+        entityData = null;
+    }
+
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
     }
@@ -1511,14 +1517,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('update', formMeta.entity, entityUid);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('delete', formMeta.entity, entityUid);
     }
 
-    return uiApiUrl(`entity/store/${formMeta.entity}`);
+    return entityRecordUrl('store', formMeta.entity);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
@@ -1556,6 +1562,11 @@ function getSerializedFieldValue(form, field) {
     const escapedName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
         ? CSS.escape(fieldName)
         : fieldName;
+
+    // Repeatable group (repeater-field.js): the whole list of rows.
+    if (field.type === 'repeater' && typeof collectRepeaterValue === 'function') {
+        return collectRepeaterValue(form, field);
+    }
 
     if (field.type === 'checkbox') {
         const checkboxInputs = form.querySelectorAll(`[name="${escapedName}"], [name="${escapedName}[]"]`);

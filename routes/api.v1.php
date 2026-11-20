@@ -12,10 +12,10 @@
 */
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\Foundation\Http\Controllers\DynamicEntityController;
 use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
-use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
 
 // Public: form schemas used before login (login, register, setup).
 Route::get('noauth/form/{slug}', [FormController::class, 'getNoAuthFormSchema'])->name('noauth.form');
@@ -25,8 +25,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('auth/table/{slug}', [TableController::class, 'getAuthTableSchema'])->name('table');
     Route::get('components/templates/{component}', [ComponentTemplateController::class, 'show'])->name('components.template');
 
-    // Generic entity CRUD. Each action checks entity.{table}.{view|create|update|delete}
-    // (admins always pass) inside DynamicEntityController.
+    // Deprecated: the entity API moved to foundation (/api/foundation/v1/entity/...).
+    // Kept as aliases for existing clients and stored form schemas; removed in 3.0.
     Route::prefix('entity')->name('entity.')->group(function () {
         Route::get('list/{entity_name}', [DynamicEntityController::class, 'list'])->name('list');
         Route::get('show/{entity_name}/{data_uid}', [DynamicEntityController::class, 'show'])->name('show');

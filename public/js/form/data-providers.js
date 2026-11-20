@@ -85,7 +85,27 @@ async function loadRemoteFieldOptions(formMeta) {
         .map(async field => {
             const options = await fetchSessionJsonData(field.optionsFrom.url);
             field.options = Array.isArray(options) ? options : [];
+            // "empty": a first option for "nothing picked" (selects).
+            if (typeof field.optionsFrom.empty === 'string') {
+                field.options.unshift({ value: '', label: field.optionsFrom.empty });
+            }
         }));
+}
+
+/**
+ * Tables hand the clicked row to the detail form (data-record-source="table-row").
+ * That row is the form's record only when both read the same data: a form
+ * with its own "dataEndpoint" (e.g. a business entity, keys "user__name")
+ * loads its record instead. Once loaded, view/edit switches reuse it.
+ */
+function isTableRowForOwnRecord(form, formMeta) {
+    const fromRow = form?.dataset?.recordSource === 'table-row';
+
+    if (fromRow) {
+        delete form.dataset.recordSource;
+    }
+
+    return fromRow && Boolean(formMeta?.dataEndpoint) && Boolean(form?.dataset?.entityUid);
 }
 
 /**

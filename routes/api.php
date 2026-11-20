@@ -7,12 +7,12 @@
 */
 
 use Illuminate\Support\Facades\Route;
+use Iquesters\Foundation\Http\Controllers\DynamicEntityController;
 use Iquesters\Foundation\System\Http\Middleware\RequestMiddleware;
 use Iquesters\Foundation\System\Http\Middleware\ResponseMiddleware;
 use Iquesters\UserInterface\Http\Controllers\Api\ComponentTemplateController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\FormController;
 use Iquesters\UserInterface\Http\Controllers\Api\Meta\TableController;
-use Iquesters\UserInterface\Http\Controllers\DynamicEntityController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,8 +51,8 @@ Route::prefix('api')
                 ->name('auth.table');
         });
 
-        // Generic entity CRUD. Each action checks entity.{table}.{view|create|update|delete}
-        // (admins always pass) inside DynamicEntityController.
+        // Deprecated: the entity API moved to foundation (/api/foundation/v1/entity/...).
+        // Each action checks entity.{table}.{view|create|update|delete} (admins always pass).
         Route::middleware(['auth:sanctum'])->group(function () {
 
             Route::get('entity/list/{entity_name}', [DynamicEntityController::class, 'list'])
