@@ -3,6 +3,7 @@
 namespace Iquesters\UserInterface\Tests\Feature;
 
 use Illuminate\Support\Str;
+use Iquesters\UserInterface\Models\FormSchema;
 use Iquesters\UserInterface\Models\TableSchema;
 use Iquesters\UserInterface\Tests\TestCase;
 
@@ -80,7 +81,7 @@ class ListPageUrlTest extends TestCase
     public function test_the_form_api_names_the_form_and_finds_it_by_uid_too(): void
     {
         // List page URLs name the form by uid; pages and schemas by slug.
-        $form = \Iquesters\UserInterface\Models\FormSchema::create([
+        $form = FormSchema::create([
             'uid' => (string) Str::ulid(),
             'slug' => 'demo-form',
             'name' => 'Demo form',

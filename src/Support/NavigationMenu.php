@@ -225,32 +225,32 @@ class NavigationMenu
 
         foreach ($this->modules() as $index => $module) {
             foreach ($this->menu($module) as $top) {
-              foreach (array_merge([[$top, null]], array_map(fn ($c) => [$top, $c], $top['children'] ?? [])) as [$parent, $child]) {
-                $item = $child ?? $parent;
+                foreach (array_merge([[$top, null]], array_map(fn ($c) => [$top, $c], $top['children'] ?? [])) as [$parent, $child]) {
+                    $item = $child ?? $parent;
 
-                if (empty($item['url']) || $item['url'] === '#') {
-                    continue;
+                    if (empty($item['url']) || $item['url'] === '#') {
+                        continue;
+                    }
+
+                    $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
+
+                    if (rtrim($item['url'], '/') === $fullUrl) {
+                        $score = PHP_INT_MAX; // exact, query string included
+                    } elseif ($itemPath === $currentPath) {
+                        $score = PHP_INT_MAX - 1;
+                    } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
+                        $score = strlen($itemPath);
+                    } else {
+                        continue;
+                    }
+
+                    // A tab wins a tie with its sidebar item (same page, more precise).
+                    if ($score > $bestScore || ($score === $bestScore && $child !== null)) {
+                        $bestScore = $score;
+                        // url: the sidebar item to highlight; item/child: for tabs and breadcrumbs.
+                        $best = ['index' => $index, 'module' => $module, 'url' => $parent['url'], 'item' => $parent, 'child' => $child];
+                    }
                 }
-
-                $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
-
-                if (rtrim($item['url'], '/') === $fullUrl) {
-                    $score = PHP_INT_MAX; // exact, query string included
-                } elseif ($itemPath === $currentPath) {
-                    $score = PHP_INT_MAX - 1;
-                } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
-                    $score = strlen($itemPath);
-                } else {
-                    continue;
-                }
-
-                // A tab wins a tie with its sidebar item (same page, more precise).
-                if ($score > $bestScore || ($score === $bestScore && $child !== null)) {
-                    $bestScore = $score;
-                    // url: the sidebar item to highlight; item/child: for tabs and breadcrumbs.
-                    $best = ['index' => $index, 'module' => $module, 'url' => $parent['url'], 'item' => $parent, 'child' => $child];
-                }
-              }
             }
         }
 
