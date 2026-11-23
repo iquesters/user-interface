@@ -1080,7 +1080,10 @@ function normalizeDynamicFormErrors(errors, formMeta, payload = {}) {
     const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
     const metaPayload = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
 
-    Object.entries(errors || {}).forEach(([errorKey, messages]) => {
+    Object.entries(errors || {}).forEach(([rawKey, messages]) => {
+        // The entity API names meta field errors "meta.batch": show them under the Batch field.
+        const metaKey = /^meta[.[]([^\]]+)\]?$/.exec(rawKey)?.[1];
+        const errorKey = metaKey && fields.some((item) => item?.id === metaKey && item?.meta === true) ? metaKey : rawKey;
         const field = fields.find((item) => item?.id === errorKey);
 
         if (field) {

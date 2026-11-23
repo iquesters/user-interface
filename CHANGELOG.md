@@ -76,6 +76,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
 
 ### Fixed
+- Merged Track B (user-interface#55): its updated entity API test expectations apply to the copies in foundation (`tests/Feature/EntityApiTest.php`, `EntityPermissionTest.php`), which moved there with the entity API.
+- **Form errors in a modal showed up to three times** (e.g. "The given data was invalid." twice plus the field message). The modal repeated the form's messages, once for `lab-form:*` and again for the old `shoz-form:*` alias. Now the form alone shows them: under each field, or one toast for errors not tied to a field. The modal only closes on success.
+- **Errors for meta fields** (sent by the entity API as `meta.batch`) now show under the field instead of in a toast.
 - **Form buttons above the fields** (e.g. "Continue" above "Email address" on `/auth/unified`): the fields wait for the record and remote options, but the form added its default buttons without waiting for them. The buttons now come after the fields.
 - **Table split view with a form that has its own `dataEndpoint`** (e.g. Users with roles): the panel showed "—" for most fields.
   - **Cause:** the table passed its list row to the form, and the form used that row as its record, but its fields have other keys (`user__name`).

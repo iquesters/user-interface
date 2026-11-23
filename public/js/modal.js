@@ -235,70 +235,24 @@ function showModal(modalContent = {}) {
     return renderBasicModal(modalContent)
 }
 
-function showModalSnackbar(message, type = 'info') {
-    const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
-
-    if (typeof window !== 'undefined' && typeof window.showSnackbar === 'function') {
-        window.showSnackbar(text, type, {
-            duration: type === 'error' ? 4500 : 3000,
-        })
-        return
-    }
-
-    if (typeof apiClient !== 'undefined' && typeof apiClient.showToast === 'function') {
-        apiClient.showToast(text, type, {
-            duration: type === 'error' ? 4500 : 3000,
-        })
-        return
-    }
-
-    if (typeof Toastify !== 'undefined') {
-        Toastify({
-            text,
-            duration: type === 'error' ? 4500 : 3000,
-            gravity: 'top',
-            position: 'right',
-            backgroundColor: type === 'error' ? '#dc3545' : '#198754',
-        }).showToast()
-        return
-    }
-
-    if (typeof toastr !== 'undefined') {
-        const toastrMethod = type === 'error' ? 'error' : 'success'
-        toastr[toastrMethod](text)
-        return
-    }
-
-    window.uiDebug?.(`[${type.toUpperCase()}] ${text}`)
-}
-
 function handleSchemaFormSubmitted(event) {
-    const { formId, message } = event.detail || {}
+    const { formId } = event.detail || {}
 
     if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
         return
     }
 
-    showModalSnackbar(message, 'success')
-
+    // No toast here: the form shows its own success message (notifyDynamicFormOutcome).
     if (activeSchemaFormModalState.closeOnSuccess) {
         bootstrap.Modal.getInstance(document.getElementById('labModal'))?.hide()
     }
 }
 
-function handleSchemaFormSubmitFailed(event) {
-    const { formId, message } = event.detail || {}
+// A failed submit needs nothing here: the form already shows the errors, under
+// each field, or as one toast for errors not tied to a field.
 
-    if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
-        return
-    }
-
-    showModalSnackbar(message, 'error')
-}
-
+// Only the lab-form:* events: form.js also fires the old shoz-form:* names for
+// older listeners, and handling both showed every message twice.
 window.addEventListener('lab-form:submitted', handleSchemaFormSubmitted)
-window.addEventListener('shoz-form:submitted', handleSchemaFormSubmitted)
-window.addEventListener('lab-form:submit-failed', handleSchemaFormSubmitFailed)
-window.addEventListener('shoz-form:submit-failed', handleSchemaFormSubmitFailed)
 
 resetModalState()
