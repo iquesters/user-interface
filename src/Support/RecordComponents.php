@@ -6,10 +6,10 @@ use InvalidArgumentException;
 use Iquesters\UserInterface\Contracts\RecordComponentSource;
 
 /**
- * Record components: what a table shows for a record, in its list
- * ("summary", table schema "summary_component") and in its right panel
- * ("details", table schema "details_component"). Schemas name them by key,
- * e.g. "user.details", never by file path.
+ * Record components: what a list shows for a record, in its rows
+ * ("summary", table schema "row_component") and when the record is open in
+ * view mode ("details", form schema "modes.view.component"). Schemas name
+ * them by key, e.g. "user.details", never by file path.
  *
  * Where a key comes from, in order:
  * 1. a RecordComponentSource bound with the tag self::SOURCES_TAG (e.g.

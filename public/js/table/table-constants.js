@@ -162,7 +162,8 @@ const TABLE_EVENT_INBOX_DETAIL_LOADED = 'inboxDetailLoaded';
 const TABLE_EVENT_VIEW_MODE_CHANGED = 'viewModeChanged';
 const TABLE_EVENT_ROW_SELECTION_CHANGED = 'rowSelectionChanged';
 
-const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['summary_component', 'summary-component'];
+// The row's component in the split view's list; summary_component is the deprecated name.
+const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['row_component', 'row-component', 'summary_component', 'summary-component'];
 const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';

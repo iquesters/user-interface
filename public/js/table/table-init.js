@@ -14,8 +14,16 @@ class ViewModeManager {
         
         window.uiDebug?.(TABLE_LOG_STORED_ORIGINAL_PARENT, this.originalParent?.className);
         
-        // Initialize view mode from local storage or use default
-        this.currentViewMode = this.getStoredViewMode() || this.defaultViewMode;
+        // View mode: the URL's ?mode, else the one stored for this table, else the default.
+        const urlState = typeof parseTableUrl === 'function' ? parseTableUrl() : null;
+        this.currentViewMode = (urlState && urlState.mode)
+            || this.getStoredViewMode()
+            || this.defaultViewMode;
+
+        // Table mode with a record open: the record shows full width in place
+        // of the table (split mode shows it in the right panel).
+        this.recordFull = this.currentViewMode === VIEW_MODE_TABLE && this.urlRecordUid(urlState) !== null;
+        this.openUid = null;
         
         // Setup toggle button
         this.setupToggleButton();
@@ -69,7 +77,22 @@ class ViewModeManager {
     }
     
     async toggleViewMode() {
-        await this.setViewMode(this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE);
+        const next = this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE;
+        // A history entry per switch: Back returns to the other mode.
+        this.writeModeToUrl(next, true);
+        await this.setViewMode(next);
+    }
+
+    /** The view mode in the URL (?mode=table|split), left out when it is the table's default. */
+    writeModeToUrl(mode, push = false) {
+        if (typeof setTableUrlMode === 'function') {
+            setTableUrlMode(mode, this.defaultViewMode, { push });
+        }
+    }
+
+    /** The record uid in the URL (view/edit), or null. */
+    urlRecordUid(state = (typeof parseTableUrl === 'function' ? parseTableUrl() : null)) {
+        return state && state.uid && (state.action === 'view' || state.action === 'edit') ? state.uid : null;
     }
 
     /** Switch to a view mode (stored per table) and re-render. No-op if already in it. */
@@ -83,6 +106,11 @@ class ViewModeManager {
 
         this.storeViewMode(newMode);
         this.currentViewMode = newMode;
+        this.writeModeToUrl(newMode);
+
+        // A record in the URL stays open: full width in table mode, the right panel in split mode.
+        const recordUid = this.urlRecordUid();
+        this.recordFull = newMode === VIEW_MODE_TABLE && recordUid !== null;
 
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (toggleBtn) this.updateToggleButton(toggleBtn);
@@ -93,6 +121,11 @@ class ViewModeManager {
         }));
 
         await this.reRenderView();
+
+        if (recordUid) {
+            this.openUid = null;
+            await this.openRecordFromUrl();
+        }
     }
 
     /** The split view's container for this table (null in table mode). */
@@ -102,11 +135,15 @@ class ViewModeManager {
     }
 
     /**
-     * Table mode row click: switch to split view, show that record on the
-     * right and highlight its row (when it is on the visible page).
+     * Open a record: in split mode in the right panel (its row highlighted);
+     * in table mode full width in place of the table. The URL follows
+     * (loadDetailComponent writes /view|edit/{form}/{uid}).
      */
-    async openRowInSplit(rowData) {
-        await this.setViewMode(VIEW_MODE_INBOX);
+    async openRecord(rowData, { formMode = 'view' } = {}) {
+        if (this.currentViewMode === VIEW_MODE_TABLE && !this.recordFull) {
+            this.recordFull = true;
+            await this.reRenderView();
+        }
 
         const container = this.inboxContainer();
         const rightPanel = container?.__rightPanel;
@@ -115,7 +152,14 @@ class ViewModeManager {
             return;
         }
 
-        await loadDetailComponent(rightPanel, this.schema, rowData);
+        await loadDetailComponent(rightPanel, this.schema, rowData, {
+            formMode,
+            preferredMode: formMode === 'edit' ? DETAIL_RENDER_MODE_FORM : undefined,
+        });
+
+        if (this.recordFull) {
+            return;
+        }
 
         const uid = String(rowData?.uid || rowData?.id || '');
         const highlight = () => {
@@ -131,6 +175,116 @@ class ViewModeManager {
         // The list may still be loading its first page.
         if (!highlight() && listTable && typeof $ !== 'undefined') {
             $(listTable).one('draw.dt', () => setTimeout(highlight, 0));
+        }
+    }
+
+    /** Kept for callers of the old name. */
+    async openRowInSplit(rowData) {
+        return this.openRecord(rowData);
+    }
+
+    /** Open the record named in the URL (a reload, a shared link, Back/Forward). */
+    async openRecordFromUrl(state = parseTableUrl()) {
+        const uid = this.urlRecordUid(state);
+        if (!uid) {
+            return;
+        }
+
+        // The record's placeholder while it loads (the panel showed "Select an item").
+        if (this.currentViewMode === VIEW_MODE_TABLE && !this.recordFull) {
+            this.recordFull = true;
+            await this.reRenderView();
+        }
+        const panel = this.inboxContainer()?.__rightPanel;
+        if (panel && typeof renderRecordSkeleton === 'function') {
+            panel.innerHTML = renderRecordSkeleton();
+            setInboxDetailOpen(panel, true);
+        }
+
+        let row = { uid };
+        if (typeof fetchSessionJsonData === 'function' && typeof entityRecordUrl === 'function') {
+            const record = await fetchSessionJsonData(entityRecordUrl('show', this.entity, uid));
+            if (record && typeof record === 'object' && !Array.isArray(record)) {
+                row = { uid, ...record };
+            }
+        }
+
+        await this.openRecord(row, { formMode: state.action === 'edit' ? 'edit' : 'view' });
+    }
+
+    /**
+     * The record's close button: back to the list (a history entry). Table
+     * mode shows the table again; split mode returns to table view, as before.
+     */
+    async closeRecord() {
+        if (typeof setTableUrlRecord === 'function') {
+            setTableUrlRecord(null);
+        }
+        this.openUid = null;
+
+        if (this.recordFull) {
+            this.recordFull = false;
+            await this.reRenderView();
+            return;
+        }
+
+        await this.setViewMode(VIEW_MODE_TABLE);
+    }
+
+    /** The open record was deleted: drop it from the URL; a full width record returns to the table. */
+    async recordDeleted({ reloadList = true } = {}) {
+        if (typeof setTableUrlRecord === 'function') {
+            setTableUrlRecord(null, { push: false });
+        }
+        this.openUid = null;
+
+        if (typeof window.clearLabTableCache === 'function') {
+            window.clearLabTableCache(this.tableElement);
+        }
+
+        if (this.recordFull) {
+            this.recordFull = false;
+            await this.reRenderView();
+            return;
+        }
+
+        const listTable = this.inboxContainer()?.__listTable;
+        if (reloadList && listTable && $.fn.DataTable.isDataTable(listTable)) {
+            $(listTable).DataTable().ajax.reload(null, false);
+        }
+    }
+
+    /** Back / Forward: show what the URL says (mode, record, create form) without a reload. */
+    async applyUrl() {
+        const state = parseTableUrl();
+        if (!state) {
+            return;
+        }
+
+        const mode = state.mode || this.defaultViewMode;
+        const uid = this.urlRecordUid(state);
+        const full = mode === VIEW_MODE_TABLE && uid !== null;
+
+        if (mode !== this.currentViewMode || full !== this.recordFull) {
+            this.currentViewMode = mode;
+            this.storeViewMode(mode);
+            this.recordFull = full;
+            const toggleBtn = document.getElementById('toggleViewBtn');
+            if (toggleBtn) this.updateToggleButton(toggleBtn);
+            await this.reRenderView();
+            this.openUid = null;
+        }
+
+        if (uid && uid !== this.openUid) {
+            await this.openRecordFromUrl(state);
+        } else if (!uid && this.openUid && mode === VIEW_MODE_INBOX) {
+            // Split mode, record closed: the list with an empty panel.
+            await this.reRenderView();
+            this.openUid = null;
+        }
+
+        if (typeof applyCreateFormUrl === 'function') {
+            applyCreateFormUrl(state);
         }
     }
 
@@ -197,17 +351,18 @@ class ViewModeManager {
         
         window.uiDebug?.(`${TABLE_LOG_RENDERING_VIEW} ${this.currentViewMode}`);
         
-        // Re-render based on current view mode
-        if (this.currentViewMode === VIEW_MODE_INBOX) {
+        // Re-render based on current view mode (a full width record uses the split layout, list hidden)
+        if (this.currentViewMode === VIEW_MODE_INBOX || this.recordFull) {
             await ensureSummaryComponentTemplate(this.schema);
             renderInboxView(
-                this.tableElement, 
-                this.cache, 
-                this.dtConfig, 
-                this.entity, 
+                this.tableElement,
+                this.cache,
+                this.dtConfig,
+                this.entity,
                 this.schema,
                 targetParent  // Pass the correct parent
             );
+            this.markRecordFull();
         } else {
             // Make sure table is visible and in DOM for table mode
             this.tableElement.style.display = '';
@@ -234,6 +389,11 @@ class ViewModeManager {
         if (typeof setupBulkActions === 'function') {
             setupBulkActions(this.entity);
         }
+    }
+
+    /** Table mode record: the split layout shows only the record (CSS .inbox-record-full). */
+    markRecordFull() {
+        this.inboxContainer()?.classList.toggle('inbox-record-full', this.recordFull);
     }
 }
 
@@ -292,13 +452,26 @@ async function initLabTable(tableElement) {
     // Store manager instance on table element for debugging/access
     tableElement.__viewManager = viewManager;
 
+    tableElement.__defaultPageLength = entriesPerPage;
+
     removeTableSkeleton(tableElement);
-    // Render initial view based on stored preference
-    if (viewManager.currentViewMode === VIEW_MODE_INBOX) {
+    // Render the initial view (URL ?mode, stored preference or default)
+    if (viewManager.currentViewMode === VIEW_MODE_INBOX || viewManager.recordFull) {
         await ensureSummaryComponentTemplate(schema);
         renderInboxView(tableElement, cache, mergedConfig, entity, schema);
+        viewManager.markRecordFull();
     } else {
         renderLazyDataTable(tableElement, cache, mergedConfig, entity);
+    }
+
+    // The URL shows the mode in use (a stored preference too), then opens
+    // what it names: a record (reload, shared link) or the create form.
+    viewManager.writeModeToUrl(viewManager.currentViewMode);
+    const urlState = typeof parseTableUrl === 'function' ? parseTableUrl() : null;
+    if (viewManager.urlRecordUid(urlState)) {
+        await viewManager.openRecordFromUrl(urlState);
+    } else if (urlState?.action === 'create' && typeof applyCreateFormUrl === 'function') {
+        applyCreateFormUrl(urlState);
     }
 
     // Listen for view mode changes to clear selections

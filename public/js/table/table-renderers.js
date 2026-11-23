@@ -458,6 +458,29 @@ function renderComponentSkeleton() {
 }
 
 /**
+ * Loading placeholder for a whole record panel (header, actions row,
+ * component), shown while the record itself loads, e.g. a record URL opened
+ * by a reload. Matches the record placeholder in ui/inc/list-skeleton.
+ */
+function renderRecordSkeleton() {
+    return `
+        <div class="placeholder-glow d-flex flex-column w-100" aria-hidden="true">
+            <div class="d-flex justify-content-between align-items-center pt-2 pb-1 px-3 border-bottom">
+                <div class="flex-grow-1">
+                    <span class="placeholder col-5 col-md-3 rounded d-block mb-1" style="height: 1rem;"></span>
+                    <span class="placeholder col-3 col-md-2 rounded d-block" style="height: 0.6rem;"></span>
+                </div>
+                <span class="placeholder rounded" style="width: 1rem; height: 1rem;"></span>
+            </div>
+            <div class="d-flex gap-2 px-3 py-2">
+                <span class="placeholder rounded" style="width: 3.5rem; height: 1.25rem;"></span>
+                <span class="placeholder rounded" style="width: 4rem; height: 1.25rem;"></span>
+            </div>
+            <div class="pt-2">${renderComponentSkeleton()}</div>
+        </div>`;
+}
+
+/**
  * The record a details component shows: the table row plus the full record
  * from the record source, so a component can show what the list doesn't
  * load (e.g. a user's roles from a business entity: "labels.roles").
@@ -513,6 +536,26 @@ function mergeDetailRecord(row = {}, record = {}) {
     return merged;
 }
 
+/**
+ * The component a form shows in view mode: form schema
+ * "modes": {"view": {"component": "user.details"}}. Null when none.
+ */
+async function resolveFormViewComponent(formSchemaUid) {
+    if (!formSchemaUid || typeof getFormSchema !== 'function') {
+        return null;
+    }
+
+    const formSchema = await getFormSchema(formSchemaUid);
+    const modes = formSchema?.modes ?? formSchema?.schema?.modes ?? {};
+
+    return modes?.view?.component || null;
+}
+
+/**
+ * Which form and components a table's records use. The record's component
+ * comes from its form (modes.view.component, set by loadDetailComponent);
+ * the table's own "details_component" is the deprecated fallback.
+ */
 function resolveDetailConfig(schema = {}) {
     const columns = schema?.["dt-options"]?.columns || [];
     const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
@@ -773,6 +816,14 @@ async function handleHybridDetailDelete(detailContext) {
         // The record is gone: back to the list on small screens.
         setInboxDetailOpen(rightPanelEle, false);
 
+        // Out of the URL; a full width record (table mode) returns to the table.
+        const deletedFromManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
+        if (deletedFromManager?.recordFull) {
+            await deletedFromManager.recordDeleted();
+            return;
+        }
+        deletedFromManager?.recordDeleted?.({ reloadList: false });
+
         if (rootTable && typeof window.clearLabTableCache === 'function') {
             window.clearLabTableCache(rootTable);
         }
@@ -959,12 +1010,12 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     closeButton.onclick = (e) => {
         e.stopPropagation();
 
-        // Closing the details returns to the full table view.
+        // Closing the details returns to the table (and the list URL).
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         setInboxDetailOpen(rightPanelEle, false);
         const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
-        if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
-            viewManager.setViewMode(VIEW_MODE_TABLE);
+        if (viewManager?.closeRecord) {
+            viewManager.closeRecord();
             return;
         }
 
@@ -1041,6 +1092,23 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     
     try {
         const detailConfig = resolveDetailConfig(schema);
+        // The form's view mode component wins over the table's deprecated details_component.
+        detailConfig.detailsComponent = (await resolveFormViewComponent(detailConfig.formSchemaUid))
+            || detailConfig.detailsComponent;
+
+        // On the list page, the URL names the open record: /list/{table}/{view|edit}/{form}/{uid}.
+        const viewManager = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.__listTable?.__sourceTable?.__viewManager;
+        if (viewManager && data?.uid && detailConfig.formSchemaUid) {
+            viewManager.openUid = String(data.uid);
+            if (typeof setTableUrlRecord === 'function') {
+                setTableUrlRecord({
+                    action: options.formMode === 'edit' ? 'edit' : 'view',
+                    form: detailConfig.formSchemaUid,
+                    uid: data.uid,
+                });
+            }
+        }
+
         const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
         const detailContext = createDetailContext(
             rightPanelEle,

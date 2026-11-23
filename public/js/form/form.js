@@ -398,6 +398,11 @@ async function switchFormMode(formElement, nextMode, formMeta) {
 
     showFormSkeleton(detailContainer, getCachedFormSchema(formMeta.id), nextMode);
 
+    // List page: the URL follows view ↔ edit (/list/{table}/{view|edit}/{form}/{uid}).
+    if (typeof setTableUrlRecord === 'function') {
+        setTableUrlRecord({ action: nextMode === 'edit' ? 'edit' : 'view', form: formMeta.id, uid: entityUid });
+    }
+
     const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.lab-form');
 
     if (!result?.success || !result?.html) {
@@ -470,6 +475,12 @@ async function handleFormDeleteAction(formElement, formMeta) {
                     Record deleted successfully.
                 </div>
             `;
+        }
+
+        // A record open on the list page: drop it from the URL and refresh the list.
+        if (detailContainer && tableElement?.__viewManager?.recordDeleted) {
+            await tableElement.__viewManager.recordDeleted();
+            return;
         }
 
         if (tableElement && typeof window.clearLabTableCache === 'function') {
@@ -682,10 +693,24 @@ async function setupForm(formElement) {
         setupFormHeader(cardHeader, formMeta, formElement);
     }
 
-    if (formMeta.fields || formMeta.actions) {
+    // View mode with a component (schema "modes": {"view": {"component": "user.details"}}):
+    // the component shows the record instead of the fields. In a table's
+    // right panel the panel renders it (recordSource "table-row").
+    const viewComponent = formMeta.formMode === 'view'
+        && formElement.dataset.recordSource !== 'table-row'
+        && formElement.dataset.entityUid
+        ? (resolveModeConfig(formMeta).component || null)
+        : null;
+    const componentShown = viewComponent
+        ? await renderFormViewComponent(cardProvider.getCardBody(), formMeta, formElement, viewComponent)
+        : false;
+
+    if (!componentShown && (formMeta.fields || formMeta.actions)) {
         if (formMeta.fields) {
             const cardBody = cardProvider.getCardBody();
-            setupFormBody(cardBody, formMeta);
+            // Awaited: the fields wait for the record and remote options, and the
+            // buttons below must come after them (else "Continue" sits above the input).
+            await setupFormBody(cardBody, formMeta);
         }
         if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
@@ -840,6 +865,44 @@ async function setupForm(formElement) {
 
     bindDynamicFormSubmit(formElement, formMeta);
     return formMeta;
+}
+
+/**
+ * A form's view mode component (e.g. on /view/{form}/{uid}): the record from
+ * the form's dataEndpoint (else the entity API), shown with the registered
+ * component. False when the component can't be loaded: the fields show.
+ */
+async function renderFormViewComponent(container, formMeta, formElement, componentName) {
+    if (typeof fetchComponentTemplate !== 'function' || typeof hydrateComponentTemplate !== 'function') {
+        return false;
+    }
+
+    const uid = formElement.dataset.entityUid;
+    container.innerHTML = typeof renderComponentSkeleton === 'function' ? renderComponentSkeleton() : '';
+
+    const endpoint = formMeta.dataEndpoint
+        ? formMeta.dataEndpoint.replace('{uid}', encodeURIComponent(uid))
+        : (formMeta.entity && typeof entityRecordUrl === 'function' ? entityRecordUrl('show', formMeta.entity, uid) : null);
+
+    const [template, record] = await Promise.all([
+        fetchComponentTemplate(componentName, null),
+        endpoint && typeof fetchSessionJsonData === 'function' ? fetchSessionJsonData(endpoint) : null,
+    ]);
+
+    if (!template?.success || !template.html) {
+        console.warn('View mode component could not be loaded; showing the fields.', { componentName });
+        container.innerHTML = '';
+        return false;
+    }
+
+    const row = record && typeof record === 'object' && !Array.isArray(record) ? { uid, ...record } : { uid };
+    container.innerHTML = hydrateComponentTemplate(template.html, template.bindings || {}, row);
+
+    if (typeof initializeDetailViewScripts === 'function') {
+        initializeDetailViewScripts(container);
+    }
+
+    return true;
 }
 
 async function renderFormForModal(formElement, formMeta) {
@@ -1758,7 +1821,7 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
  * @param {*} cardBody 
  * @param {*} formMeta 
  */
-function setupFormBody(cardBody, formMeta) {
+async function setupFormBody(cardBody, formMeta) {
     // <div class="row row-cols-1 g-2">
 
     const fragment = document.createElement('div');
@@ -1782,7 +1845,7 @@ function setupFormBody(cardBody, formMeta) {
     fragment.appendChild(formCol)
 
     if (formMeta.fields) {
-        setupFormBlock(formCol, formMeta);
+        await setupFormBlock(formCol, formMeta);
     }
 
     // removing placeholder

@@ -1,6 +1,6 @@
 {
     "file": "dist/userinterface.js",
-    "hash": "b7db67fd7c60",
+    "hash": "b2a8f0de49c7",
     "sources": [
         "js/00-ui-shared-constants.js",
         "js/api-client.js",
@@ -41,6 +41,7 @@
         "js/table/table-providers.js",
         "js/table/table-renderers.js",
         "js/table/table-runtime.js",
+        "js/table/table-url-state.js",
         "js/table/table.js",
         "js/viewport-height.js"
     ]

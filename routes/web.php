@@ -23,6 +23,13 @@ Route::middleware(['web'])->group(function () {
         // which enforces per-entity permissions.
         Route::prefix('')->name('ui')->group(function () {
             Route::get('/list/{default_table_schema_uid}', [UIController::class, 'list'])->name('.list');
+            // The same list page with a record (or the create form) open:
+            // /list/{table}/{view|edit}/form/{form}/data/{uid} or /create/form/{form};
+            // the view mode is ?mode=table|split. The page's JS opens it, and
+            // keeps the URL in step without reloads.
+            Route::get('/list/{default_table_schema_uid}/{record}', [UIController::class, 'list'])
+                ->where('record', '(view|edit)/form/[^/]+/data/[^/]+|create/form/[^/]+')
+                ->name('.list.record');
             // Currently, entity_uid is optional for View routes but will be used in the future.
             Route::get('/view/{form_schema_id}/{entity_uid?}', [UIController::class, 'view'])->name('.view');
             Route::get('/edit/{form_schema_id}/{entity_uid?}', [UIController::class, 'edit'])->name('.edit');

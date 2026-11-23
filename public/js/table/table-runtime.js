@@ -133,6 +133,8 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         ...dtConfig,
         pageLength: cache.pageSize,
         order: [],
+        // Search, sort, page and page size from the URL (?q, sort/dir, page, per_page).
+        ...(typeof tableUrlDataTableOptions === 'function' ? tableUrlDataTableOptions(tableElement.__sortFields, tableElement.__defaultPageLength) : {}),
         columns: resolvedColumns,
         columnDefs: [
             {
@@ -162,12 +164,17 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
 
     applyTableModeLayout(tableElement);
 
+    // The URL follows search, sort and paging.
+    if (typeof bindTableUrlSync === 'function') {
+        bindTableUrlSync(tableElement, tableElement.__sortFields, tableElement.__defaultPageLength);
+    }
+
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
 
-    // Row click: open the record in split view (table on the left, details on
-    // the right). Checkboxes and controls keep their own behaviour, and
-    // Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
+    // Row click: open the record full width in place of the table (URL
+    // /list/{table}/view/{form}/{uid}). Checkboxes and controls keep their own
+    // behaviour, and Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
     $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
         if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
             return;
@@ -183,7 +190,7 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         }
 
         event.preventDefault();
-        manager.openRowInSplit(data);
+        manager.openRecord(data);
     });
 
     window.uiDebug?.(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
@@ -352,33 +359,44 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
 // ---------------------------
 // 🌀 UI HELPERS
 // ---------------------------
+/**
+ * While a page of rows loads: placeholder rows shaped like the rows that
+ * will come (no spinner). Table view: one bar per column; split view's
+ * list: a picture and two lines, like a row component.
+ */
 function showTableLoader(tableElement) {
     const tbody = tableElement.querySelector(TABLE_SELECTOR_TBODY);
     if (!tbody) return;
 
+    const pageLength = typeof $ !== 'undefined' && $.fn.DataTable?.isDataTable(tableElement)
+        ? $(tableElement).DataTable().page.len()
+        : 10;
+    const rowCount = Math.min(Math.max(pageLength, 1), 10);
+
     if (tableElement.classList.contains(TABLE_SELECTOR_INBOX_LIST.slice(1))) {
-        tbody.innerHTML = `
-            <tr class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_2} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
-                <td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)} ${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}"></td>
-                <td class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
-                    <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED} py-4">
-                        <div class="spinner-border spinner-border-sm" role="status"></div>
-                        <span>${TABLE_MESSAGE_LOADING}</span>
+        const row = `
+            <tr class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}" aria-hidden="true">
+                <td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)}"><span class="placeholder rounded d-inline-block" style="width: 1rem; height: 1rem;"></span></td>
+                <td>
+                    <div class="${TABLE_CLASS_D_FLEX} ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} placeholder-glow py-1">
+                        <span class="placeholder rounded-circle flex-shrink-0" style="width: 2.25rem; height: 2.25rem;"></span>
+                        <div class="flex-grow-1">
+                            <span class="placeholder col-7 rounded d-block mb-1"></span>
+                            <span class="placeholder col-5 rounded d-block" style="height: 0.6rem;"></span>
+                        </div>
                     </div>
                 </td>
             </tr>`;
+        tbody.innerHTML = row.repeat(rowCount);
         return;
     }
 
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="100%" class="${TABLE_CLASS_TEXT_CENTER} py-4">
-                <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED}">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <span>${TABLE_MESSAGE_LOADING}</span>
-                </div>
-            </td>
-        </tr>`;
+    const columnCount = Math.max(tableElement.querySelectorAll('thead th').length, 1);
+    const cells = Array.from({ length: columnCount }, (_, index) => index === 0
+        ? `<td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)}"><span class="placeholder rounded d-inline-block" style="width: 1rem; height: 1rem;"></span></td>`
+        : `<td><span class="placeholder rounded d-block" style="width: ${50 + ((index * 17) % 40)}%;"></span></td>`
+    ).join('');
+    tbody.innerHTML = `<tr class="placeholder-glow" aria-hidden="true">${cells}</tr>`.repeat(rowCount);
 }
 
 function showAuthWarning() {

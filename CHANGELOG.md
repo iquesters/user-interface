@@ -12,6 +12,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
   - A sidebar item's own page is shown where its "own page" tab sits in the order, not always first.
   - Clicking a module opens its dashboard, wherever the dashboard is in the sidebar order (it opened the first item).
 
+- **List page URLs** (`docs/record-components.md`): the address bar follows the list without reloading the page.
+  - `/list/{table}/view|edit/form/{form}/data/{uid}` opens a record, and `/list/{table}/create/form/{form}` the create form.
+  - `{form}` is the form schema's uid. The form API now finds a form by slug or uid, and returns its `schemaUid` and `schemaSlug` with the schema.
+  - `?mode=table|split` sets the view mode, and `?q`, `sort`/`dir`, `page`, `per_page` set the search, sort and paging.
+  - Back and Forward work, and a reload or shared link opens the same state (`public/js/table/table-url-state.js`).
+- **Table view:** a row click opens the record **full width in place of the table**; it used to switch to split view. Its close button brings the table back, and split view still opens records in the right panel.
+- **List page loading placeholders for each view mode:**
+  - the page-load skeleton matches what will show: the table in table view, or the list and the record panel in split view, with the record full width or on the right when the URL names one (one panel at a time on small screens);
+  - the mode comes from `?mode`, the browser's saved mode or the default;
+  - rows that load show placeholder rows (columns, or a picture and two lines in split view) instead of a "Loading…" spinner;
+  - a record opened from the URL shows its placeholder instead of "Select an item".
+- **Form schema `modes.view.component`:** the component a form shows in view mode, in the table's right panel, the full width record and the standalone `/view/{form}/{uid}` page. Edit shows the fields.
+
 ### Changed
 - **Tabs:**
   - one scrollable line on phones, with icon and label side by side and the active tab in view;
@@ -53,6 +66,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - **The entity data API moved to iquesters/foundation**: the controller, `Services\Entity\*`, `DynamicEntityListQuery`, `EntityListParams` and `EntityScopeResolver`. This module now keeps presentation only. Requires iquesters/foundation `^2.1`.
   - The JS uses `/api/foundation/v1/entity/...` (see foundation `docs/developer/entity-api.md`).
   - **Deprecated, removed in 3.0:**
+    - table schema `summary_component` (now `row_component`), `details_component` (now the form's `modes.view.component`) and `details_source` (the form's `dataEndpoint`); still read;
     - component names given as view paths (`userinterface::components.lab-user-*`): use registered keys. The `lab-user-*` views moved to user-management (`user.summary`, `user.details`);
     - `/api/user-interface/v1/entity/...` and `/api/entity/...` (now served by foundation's controller);
     - the old `Iquesters\UserInterface\Services\Entity\*`, `Http\Controllers\DynamicEntityController`, `Http\Query\DynamicEntityListQuery`, `Constants\EntityListParams` and `Contracts\EntityScopeResolver` class names, which resolve to foundation's classes (`src/deprecated-aliases.php`).
@@ -62,6 +76,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
 
 ### Fixed
+- **Form buttons above the fields** (e.g. "Continue" above "Email address" on `/auth/unified`): the fields wait for the record and remote options, but the form added its default buttons without waiting for them. The buttons now come after the fields.
 - **Table split view with a form that has its own `dataEndpoint`** (e.g. Users with roles): the panel showed "—" for most fields.
   - **Cause:** the table passed its list row to the form, and the form used that row as its record, but its fields have other keys (`user__name`).
   - **Fix:** such a form now loads its record from `dataEndpoint`; switching between view and edit reuses that record.

@@ -163,6 +163,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         responsive: false,
         autoWidth: false,
         pageLength: cache.pageSize,
+        // Search, page and page size from the URL (this list doesn't sort).
+        ...(typeof tableUrlDataTableOptions === 'function' ? tableUrlDataTableOptions(null, tableElement.__defaultPageLength) : {}),
         columns: resolvedColumns,
         columnDefs: [
             {
@@ -202,6 +204,11 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     styleInboxRows(listTable);
     applyInboxStickyStyles(leftPanel);
     initializeInboxSummaryComponents(listTable);
+
+    // The URL follows search and paging.
+    if (typeof bindTableUrlSync === 'function') {
+        bindTableUrlSync(listTable, null, tableElement.__defaultPageLength);
+    }
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);

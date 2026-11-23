@@ -581,6 +581,37 @@ ol.breadcrumb {
   }
 }
 
+/* Split view placeholder (ui/inc/list-skeleton) on phones and tablets: one
+   panel at a time, like the split view itself: the list, or the open record. */
+@media (max-width: 991.98px) {
+    .ui-split-skeleton > .ui-split-skeleton-list {
+        width: 100% !important;
+        border: 0 !important;
+    }
+
+    .ui-split-skeleton > .ui-split-skeleton-record,
+    .ui-split-skeleton.has-record > .ui-split-skeleton-list {
+        display: none;
+    }
+
+    .ui-split-skeleton.has-record > .ui-split-skeleton-record {
+        display: block;
+    }
+}
+
+/* Table view with a record open (/list/{table}/view/{form}/{uid}): the record
+   takes the whole width in place of the table, on every screen size. */
+.inbox-view-container.inbox-record-full > :first-child,
+.inbox-view-container.inbox-record-full > .inbox-resizer {
+    display: none !important;
+}
+
+.inbox-view-container.inbox-record-full > :last-child {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
+}
+
 .inbox-list-table .checkbox-column {
     padding: 8px !important;
 }
