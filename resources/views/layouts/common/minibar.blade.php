@@ -17,11 +17,12 @@
             </ul>
 
             <ul class="minibar-body">
-                <div class="d-flex flex-column align-items-center border-start border-white position-relative">
+                <div class="d-flex flex-column align-items-center w-100 px-1 position-relative">
                     @include('userinterface::components.module-tabs', [
-                        'installedModules' => $installedModules, 
+                        'installedModules' => $installedModules,
                         'viewMode' => 'vertical'
                     ])
+                </div>
             </ul>
         </div>
     </div>

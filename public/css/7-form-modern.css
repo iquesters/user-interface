@@ -1,0 +1,132 @@
+/*
+ * Forms (user-interface form engine), edit and create mode: titled sections,
+ * clear labels, comfortable inputs and a sticky action bar. Mobile first.
+ * Theme colours come from Bootstrap's CSS variables, so every theme keeps working.
+ */
+
+/* ---- Sections ("type": "section"): a soft panel holding its fields ---- */
+.lab-form-section {
+    margin-bottom: 0.25rem;
+}
+.lab-form-section > .lab-form-section-header,
+.lab-form-section > .lab-form-section-body {
+    background: var(--bs-tertiary-bg);
+}
+.lab-form-section > .lab-form-section-header {
+    padding: 1rem 1.15rem 0.35rem;
+    border-radius: 0.9rem 0.9rem 0 0;
+}
+.lab-form-section > .lab-form-section-body {
+    /* The grid's gutter stays inside the panel. */
+    margin: 0;
+    padding: 0.35rem 0.6rem 1rem;
+    border-radius: 0 0 0.9rem 0.9rem;
+}
+.lab-form-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+    color: var(--bs-emphasis-color);
+}
+.lab-form-section-description {
+    font-size: 0.82rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.4rem;
+}
+/* Inputs stand out on the panel. */
+.lab-form-section form.needs-validation .form-control,
+.lab-form-section .form-control,
+.lab-form-section .form-select {
+    background-color: var(--bs-body-bg);
+}
+
+/* ---- Fields ---- */
+form.lab-form .form-label,
+form.needs-validation .form-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--bs-emphasis-color);
+    margin-bottom: 0.35rem;
+}
+form.needs-validation .form-control,
+form.needs-validation .form-select {
+    min-height: 2.6rem;
+    border-radius: 0.6rem;
+    padding: 0.5rem 0.8rem;
+    border-color: var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+form.needs-validation textarea.form-control {
+    min-height: 5rem;
+}
+form.needs-validation .form-control:focus,
+form.needs-validation .form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.15);
+}
+form.needs-validation .form-control.is-invalid,
+form.needs-validation .form-select.is-invalid {
+    box-shadow: none;
+}
+form.needs-validation .form-check-input {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+.lab-form-help {
+    font-size: 0.8rem !important;
+    line-height: 1.35;
+    margin-top: 0.3rem;
+    white-space: normal;
+}
+form.needs-validation .invalid-feedback {
+    font-size: 0.8rem;
+}
+
+/* ---- Action bar: stays in view at the bottom of long forms ---- */
+.lab-form-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-top: 1.25rem;
+    padding: 0.75rem 0;
+    background: var(--bs-body-bg);
+    border-top: 1px solid var(--bs-border-color-translucent);
+    align-items: center;
+}
+.lab-form-actions .btn {
+    min-height: 2.5rem;
+    padding-left: 1.1rem;
+    padding-right: 1.1rem;
+    border-radius: 0.6rem;
+    font-weight: 500;
+}
+.lab-form-actions .btn[type="submit"] {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+}
+
+/* ---- Phones ---- */
+@media (max-width: 575.98px) {
+    .lab-form-section > .lab-form-section-header {
+        padding: 0.85rem 0.9rem 0.25rem;
+    }
+    .lab-form-section > .lab-form-section-body {
+        padding: 0.25rem 0.35rem 0.85rem;
+    }
+    /* 16px stops iOS zooming into a field. */
+    form.needs-validation .form-control,
+    form.needs-validation .form-select {
+        font-size: 16px;
+        min-height: 2.9rem;
+    }
+    .lab-form-actions {
+        padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    }
+    /* Buttons share the full width, easy to tap. */
+    .lab-form-actions .btn {
+        flex: 1 1 0;
+        min-height: 2.9rem;
+    }
+}

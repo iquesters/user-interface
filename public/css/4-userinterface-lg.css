@@ -52,6 +52,25 @@
         white-space: nowrap;
     }
 
+    /* Minibar (70px): a tab fills the bar instead of its fixed 80px (which cut the
+       label off at both ends), and the label wraps to at most two lines. */
+    .minibar .module-tab-vertical {
+        width: 100%;
+        padding: 0.45rem 0.2rem;
+    }
+
+    .minibar .module-tab-vertical .module-tab-label {
+        font-size: 0.65rem;
+        line-height: 1.15;
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+    }
+
     /* Header left and right sections maintain min-width on large screens */
     .header-left,
     .header-right {

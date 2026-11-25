@@ -5,7 +5,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Fixed
+- **Sidebar and minibar looked different (and broken) for some users:** sidebar items showed as white boxes on the tinted sidebar. Items now sit on the sidebar background as rounded rows (tinted on hover, filled for the current page), and the minibar tabs are rounded tiles with only the current module filled. The minibar's unclosed `<div>` and its white border line are gone. One set of styles for every user and role.
+
 ### Added
+- **Modern forms** (edit and create mode, `public/css/7-form-modern.css`): labels above larger rounded inputs with a soft focus ring, wrapping helper text, and a **sticky action bar** (Save / Cancel stay visible at the bottom of long forms). Phones: 16px inputs (no iOS zoom), taller touch targets, buttons sharing the full width, room for the home indicator.
+- **`"type": "section"` fields:** a titled group with an optional description (`{"id", "type": "section", "label", "description"}`). The fields after it, up to the next section, sit inside a soft rounded panel with the title on top (edit and view mode). Never submitted or validated (`isLayoutField`).
+- **Table schema `data_url`:** rows come from the module's own endpoint instead of foundation's entity API: same parameters (`offset`, `length`, `search`, `sort`) and response (`response_schema.data` + `meta.pagination.total`), plus the page's own query parameters (e.g. `?status=` from a navigation tab). A record opens from `{data_url}/{uid}`. Lets a module decide which rows a user sees (e.g. an organisation admin's own organisations). Table mode, split mode, search, sort, paging and list URLs work as before.
+- **Record sections** (table schema `record`): a record shows as several parts, one under another, in the split panel and the full-width record: `{"form": slug, "mode": "view"|"edit"}`, `{"component": key}`, `{"html": url}` (HTML the module renders for the record, `{uid}` replaced; for lists such as files or history), each optionally `"when": {field: [values]}` and `"title"`. A form's `{uid}` is the record's. After a section's form saves, the record reloads in place and the list refreshes.
+- **`{uid}` in a field's `optionsFrom.url`** is replaced with the form's record uid (`data-entity-uid`), like the form's endpoint, so options can depend on the record (e.g. community's matching records for an application).
+- **Header widgets from other modules:** the header shows every service tagged `header-widgets` (`render(?Authenticatable $user): ?string`), e.g. organisation's switcher. user-interface doesn't depend on those modules.
 - **Breadcrumbs on every page**, built from navigation: `Module › Item › Tab › page`. A page adds its last crumb with `@section('breadcrumb', …)`. On phones they show as a "‹ back" link. Diglactic definitions still win where they exist.
   - The module crumb links to the module's dashboard; on the dashboard it is the only crumb.
 - **Tabs from navigation:** a page shows the tabs (child items) of its sidebar item, so no `$tabs` array is needed. The sidebar reads `navigation_items` when foundation has them, and falls back to the old menu JSON.
@@ -76,6 +85,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
 
 ### Fixed
+- **Minibar labels were cut off** ("oundation"): a vertical tab was 80px wide in the 70px minibar. Tabs now fill the bar and labels wrap to two lines. Module names read as words ("User Interface"; a module can set the `module_label` meta).
+- **The Organisations page opened user-interface's sidebar** (Dashboard, Forms, Tables, Navigation): user-interface's seeder still declared an "All Organisations" item, which belongs to the organisation module. Removed; `user-interface:seed` hides it. User-interface's own "Navigation" item (the module order table) is now "Module order", apart from foundation's Navigation editor.
+- **Tabs that differ only by query string** (e.g. `?status=approved`): such a tab is active when the page has its values (other parameters such as `?mode=table` may be there too). Before, every tab of the page matched its path and the last one was highlighted.
 - Merged Track B (user-interface#55): its updated entity API test expectations apply to the copies in foundation (`tests/Feature/EntityApiTest.php`, `EntityPermissionTest.php`), which moved there with the entity API.
 - **Form errors in a modal showed up to three times** (e.g. "The given data was invalid." twice plus the field message). The modal repeated the form's messages, once for `lab-form:*` and again for the old `shoz-form:*` alias. Now the form alone shows them: under each field, or one toast for errors not tied to a field. The modal only closes on success.
 - **Errors for meta fields** (sent by the entity API as `meta.batch`) now show under the field instead of in a toast.

@@ -714,6 +714,7 @@ async function setupForm(formElement) {
         }
         if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
+            cardFooter.classList.add('lab-form-actions');
             setupFormFooter(cardFooter, formMeta, formElement);
         }
     }
@@ -723,7 +724,7 @@ async function setupForm(formElement) {
     if (!isFormReadOnly(formMeta) && !hasSchemaActions && (formMeta.submitButtonLabel || formMeta.allowSubmit || formMeta.allowCancel)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
-        btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
+        btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2, 'lab-form-actions'); // sticky action bar (7-form-modern.css)
 
 
         // Cancel button
@@ -949,7 +950,7 @@ async function renderFormForModal(formElement, formMeta) {
         formElement.__entityDataCache = entityData;
     }
 
-    await loadRemoteFieldOptions(formMeta);
+    await loadRemoteFieldOptions(formMeta, formElement.dataset.entityUid || null);
 
     if (Array.isArray(formMeta.fields)) {
         formMeta.fields.forEach((field, index) => {
@@ -1601,7 +1602,7 @@ function serializeDynamicFormPayload(form, formMeta) {
     fields.forEach(field => {
         // Not shown in this mode ("showIn"), or a layout spacer: not part of the submission.
         if (!isFieldShownInMode(field, formMeta.formMode)
-            || (typeof isSpacerField === 'function' && isSpacerField(field))) {
+            || (typeof isLayoutField === 'function' ? isLayoutField(field) : (typeof isSpacerField === 'function' && isSpacerField(field)))) {
             return;
         }
 

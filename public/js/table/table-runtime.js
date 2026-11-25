@@ -252,6 +252,8 @@ function buildListQuery(params, tableElement) {
 // 🔁 ENHANCED AJAX FETCH HANDLER
 // ---------------------------
 async function handleAjaxFetch(params, callback, cache, entityName, tableElement, schema = null) {
+    // Table mode doesn't pass the schema; its view manager has it (data_url, record sections).
+    schema = schema || tableElement?.__viewManager?.schema || null;
     const start = params.start || 0;
     const length = params.length || cache.pageSize;
     const page = Math.floor(start / length) + 1;
@@ -296,7 +298,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     window.uiDebug?.(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
-    const result = await fetchEntityData(entityName, start, length, query);
+    const result = await fetchEntityData(entityName, start, length, query, schema?.data_url || null);
 
     // The user changed the search/sort while this was loading: drop it
     // (DataTables also ignores the stale draw).
@@ -342,7 +344,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
     window.uiDebug?.(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
 
     const queryKey = cache.queryKey;
-    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {})
+    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {}, schema?.data_url || null)
         .then(result => {
             // Ignore a prefetch for a search/sort that is no longer active.
             if (cache.queryKey === queryKey && result.success && result.data?.length) {

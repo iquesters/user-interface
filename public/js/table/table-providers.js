@@ -19,13 +19,16 @@ function entityListUrl(entity) {
 
 /**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
+ * @param {string|null} dataUrl the table schema's "data_url": rows from the module's own
+ *   endpoint (same parameters and response) instead of the entity API; it also gets the
+ *   page's own filters (e.g. ?status= from a navigation tab)
  */
-async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
-    const params = { offset, length };
+async function fetchEntityData(entity, offset = 0, length = 50, query = {}, dataUrl = null) {
+    const params = { ...(dataUrl && typeof tablePageFilters === 'function' ? tablePageFilters() : {}), offset, length };
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(entityListUrl(entity), params);
+    const response = await apiClient.get(dataUrl || entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);

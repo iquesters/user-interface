@@ -77,13 +77,15 @@ async function fetchSessionJsonData(url) {
  * endpoint (an array of {value, label}). The endpoint's own auth applies, so
  * options that are not public never travel in the (public) schema.
  */
-async function loadRemoteFieldOptions(formMeta) {
+async function loadRemoteFieldOptions(formMeta, entityUid = null) {
     const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
 
     await Promise.all(fields
         .filter(field => field?.optionsFrom?.url && !(Array.isArray(field.options) && field.options.length > 0))
         .map(async field => {
-            const options = await fetchSessionJsonData(field.optionsFrom.url);
+            // "{uid}" in the URL: the form's record (like the form's own endpoint).
+            const url = entityUid ? field.optionsFrom.url.replace('{uid}', encodeURIComponent(entityUid)) : field.optionsFrom.url;
+            const options = await fetchSessionJsonData(url);
             field.options = Array.isArray(options) ? options : [];
             // "empty": a first option for "nothing picked" (selects).
             if (typeof field.optionsFrom.empty === 'string') {

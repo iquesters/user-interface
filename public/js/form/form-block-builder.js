@@ -78,10 +78,11 @@ async function setupFormBlock(formCol, formMeta) {
             form.__entityDataCache = entityData;
         }
 
-        await loadRemoteFieldOptions(formMeta);
+        await loadRemoteFieldOptions(formMeta, form.dataset.entityUid || null);
 
-        // add fields to form
+        // add fields to form (a section's fields go inside its panel)
         if (formMeta.fields && formMeta.fields.length > 0) {
+            let target = form;
             formMeta.fields.forEach((field, index) => {
                 if (!isFieldShownInMode(field, formMeta.formMode)) {
                     return;
@@ -91,7 +92,11 @@ async function setupFormBlock(formCol, formMeta) {
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
                 field.value = resolveFieldValue(field.id, formData, entityData);
-                addField(field, form, formMeta);
+                if (isSectionField(field)) {
+                    target = renderFormSection(field, form);
+                    return;
+                }
+                addField(field, target, formMeta);
             });
         } else {
             if (APP_ENV === 'dev') {
@@ -115,6 +120,7 @@ async function addField(field, addTo,formMeta) {
         renderFormSpacer(field, addTo);
         return;
     }
+
 
     if (field.type === INPUT_TYPE.HIDDEN) {
         const input = document.createElement(HTML_TAG.INPUT);
@@ -362,6 +368,54 @@ async function addField(field, addTo,formMeta) {
 
 function isSpacerField(field = {}) {
     return field?.type === INPUT_TYPE.SPACER || field?.type === CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+}
+
+/**
+ * A section starts a group of fields: {"id": "when", "type": "section",
+ * "label": "When and where", "description": "Date, time and venue"}.
+ * It carries no value (like a spacer).
+ */
+function isSectionField(field = {}) {
+    return field?.type === 'section';
+}
+
+/** Fields that only shape the layout: never submitted, never validated. */
+function isLayoutField(field = {}) {
+    return isSpacerField(field) || isSectionField(field);
+}
+
+/**
+ * A section: a soft panel with its title and description, and a grid for the
+ * fields that follow it (until the next section). Returns that grid.
+ */
+function renderFormSection(field, addTo) {
+    const section = document.createElement(HTML_TAG.DIV);
+    section.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
+    section.className = 'col-12 lab-form-section';
+    section.dataset.layoutType = 'section';
+
+    const header = document.createElement(HTML_TAG.DIV);
+    header.className = 'lab-form-section-header';
+    if (field.label) {
+        const title = document.createElement('h6');
+        title.className = 'lab-form-section-title';
+        title.textContent = field.label;
+        header.appendChild(title);
+    }
+    if (field.description) {
+        const description = document.createElement('p');
+        description.className = 'lab-form-section-description';
+        description.textContent = field.description;
+        header.appendChild(description);
+    }
+    section.appendChild(header);
+
+    const grid = document.createElement(HTML_TAG.DIV);
+    grid.className = 'row row-cols-1 g-3 lab-form-section-body';
+    section.appendChild(grid);
+
+    addTo.appendChild(section);
+    return grid;
 }
 
 function renderFormSpacer(field, addTo) {
@@ -705,9 +759,7 @@ function createHelperText(field, container) {
         helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_MUTED);
         helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
         helper.style.display = 'block';
-        helper.style.overflow = 'hidden';
-        helper.style.textOverflow = 'ellipsis';
-        helper.style.whiteSpace = 'nowrap';
+        helper.classList.add('lab-form-help');
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = helperText;
         helper.title = helperText;

@@ -2476,13 +2476,15 @@ async function fetchSessionJsonData(url) {
  * endpoint (an array of {value, label}). The endpoint's own auth applies, so
  * options that are not public never travel in the (public) schema.
  */
-async function loadRemoteFieldOptions(formMeta) {
+async function loadRemoteFieldOptions(formMeta, entityUid = null) {
     const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
 
     await Promise.all(fields
         .filter(field => field?.optionsFrom?.url && !(Array.isArray(field.options) && field.options.length > 0))
         .map(async field => {
-            const options = await fetchSessionJsonData(field.optionsFrom.url);
+            // "{uid}" in the URL: the form's record (like the form's own endpoint).
+            const url = entityUid ? field.optionsFrom.url.replace('{uid}', encodeURIComponent(entityUid)) : field.optionsFrom.url;
+            const options = await fetchSessionJsonData(url);
             field.options = Array.isArray(options) ? options : [];
             // "empty": a first option for "nothing picked" (selects).
             if (typeof field.optionsFrom.empty === 'string') {
@@ -2621,10 +2623,11 @@ async function setupFormBlock(formCol, formMeta) {
             form.__entityDataCache = entityData;
         }
 
-        await loadRemoteFieldOptions(formMeta);
+        await loadRemoteFieldOptions(formMeta, form.dataset.entityUid || null);
 
-        // add fields to form
+        // add fields to form (a section's fields go inside its panel)
         if (formMeta.fields && formMeta.fields.length > 0) {
+            let target = form;
             formMeta.fields.forEach((field, index) => {
                 if (!isFieldShownInMode(field, formMeta.formMode)) {
                     return;
@@ -2634,7 +2637,11 @@ async function setupFormBlock(formCol, formMeta) {
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
                 field.value = resolveFieldValue(field.id, formData, entityData);
-                addField(field, form, formMeta);
+                if (isSectionField(field)) {
+                    target = renderFormSection(field, form);
+                    return;
+                }
+                addField(field, target, formMeta);
             });
         } else {
             if (APP_ENV === 'dev') {
@@ -2658,6 +2665,7 @@ async function addField(field, addTo,formMeta) {
         renderFormSpacer(field, addTo);
         return;
     }
+
 
     if (field.type === INPUT_TYPE.HIDDEN) {
         const input = document.createElement(HTML_TAG.INPUT);
@@ -2905,6 +2913,54 @@ async function addField(field, addTo,formMeta) {
 
 function isSpacerField(field = {}) {
     return field?.type === INPUT_TYPE.SPACER || field?.type === CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+}
+
+/**
+ * A section starts a group of fields: {"id": "when", "type": "section",
+ * "label": "When and where", "description": "Date, time and venue"}.
+ * It carries no value (like a spacer).
+ */
+function isSectionField(field = {}) {
+    return field?.type === 'section';
+}
+
+/** Fields that only shape the layout: never submitted, never validated. */
+function isLayoutField(field = {}) {
+    return isSpacerField(field) || isSectionField(field);
+}
+
+/**
+ * A section: a soft panel with its title and description, and a grid for the
+ * fields that follow it (until the next section). Returns that grid.
+ */
+function renderFormSection(field, addTo) {
+    const section = document.createElement(HTML_TAG.DIV);
+    section.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
+    section.className = 'col-12 lab-form-section';
+    section.dataset.layoutType = 'section';
+
+    const header = document.createElement(HTML_TAG.DIV);
+    header.className = 'lab-form-section-header';
+    if (field.label) {
+        const title = document.createElement('h6');
+        title.className = 'lab-form-section-title';
+        title.textContent = field.label;
+        header.appendChild(title);
+    }
+    if (field.description) {
+        const description = document.createElement('p');
+        description.className = 'lab-form-section-description';
+        description.textContent = field.description;
+        header.appendChild(description);
+    }
+    section.appendChild(header);
+
+    const grid = document.createElement(HTML_TAG.DIV);
+    grid.className = 'row row-cols-1 g-3 lab-form-section-body';
+    section.appendChild(grid);
+
+    addTo.appendChild(section);
+    return grid;
 }
 
 function renderFormSpacer(field, addTo) {
@@ -3248,9 +3304,7 @@ function createHelperText(field, container) {
         helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_MUTED);
         helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
         helper.style.display = 'block';
-        helper.style.overflow = 'hidden';
-        helper.style.textOverflow = 'ellipsis';
-        helper.style.whiteSpace = 'nowrap';
+        helper.classList.add('lab-form-help');
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = helperText;
         helper.title = helperText;
@@ -4423,6 +4477,7 @@ async function setupForm(formElement) {
         }
         if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
+            cardFooter.classList.add('lab-form-actions');
             setupFormFooter(cardFooter, formMeta, formElement);
         }
     }
@@ -4432,7 +4487,7 @@ async function setupForm(formElement) {
     if (!isFormReadOnly(formMeta) && !hasSchemaActions && (formMeta.submitButtonLabel || formMeta.allowSubmit || formMeta.allowCancel)) {
         // create a container for buttons
         const btnContainer = document.createElement(HTML_TAG.DIV);
-        btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2); // Bootstrap flex + spacing
+        btnContainer.classList.add(STYLE_CLASS.D_FLEX, STYLE_CLASS.GAP_2, 'lab-form-actions'); // sticky action bar (7-form-modern.css)
 
 
         // Cancel button
@@ -4658,7 +4713,7 @@ async function renderFormForModal(formElement, formMeta) {
         formElement.__entityDataCache = entityData;
     }
 
-    await loadRemoteFieldOptions(formMeta);
+    await loadRemoteFieldOptions(formMeta, formElement.dataset.entityUid || null);
 
     if (Array.isArray(formMeta.fields)) {
         formMeta.fields.forEach((field, index) => {
@@ -5310,7 +5365,7 @@ function serializeDynamicFormPayload(form, formMeta) {
     fields.forEach(field => {
         // Not shown in this mode ("showIn"), or a layout spacer: not part of the submission.
         if (!isFieldShownInMode(field, formMeta.formMode)
-            || (typeof isSpacerField === 'function' && isSpacerField(field))) {
+            || (typeof isLayoutField === 'function' ? isLayoutField(field) : (typeof isSpacerField === 'function' && isSpacerField(field)))) {
             return;
         }
 
@@ -9093,7 +9148,10 @@ class ViewModeManager {
 
         let row = { uid };
         if (typeof fetchSessionJsonData === 'function' && typeof entityRecordUrl === 'function') {
-            const record = await fetchSessionJsonData(entityRecordUrl('show', this.entity, uid));
+            const record = await fetchSessionJsonData(
+                (typeof tableRecordDataUrl === 'function' && tableRecordDataUrl(this.schema, uid))
+                    || entityRecordUrl('show', this.entity, uid)
+            );
             if (record && typeof record === 'object' && !Array.isArray(record)) {
                 row = { uid, ...record };
             }
@@ -9401,13 +9459,16 @@ function entityListUrl(entity) {
 
 /**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
+ * @param {string|null} dataUrl the table schema's "data_url": rows from the module's own
+ *   endpoint (same parameters and response) instead of the entity API; it also gets the
+ *   page's own filters (e.g. ?status= from a navigation tab)
  */
-async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
-    const params = { offset, length };
+async function fetchEntityData(entity, offset = 0, length = 50, query = {}, dataUrl = null) {
+    const params = { ...(dataUrl && typeof tablePageFilters === 'function' ? tablePageFilters() : {}), offset, length };
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(entityListUrl(entity), params);
+    const response = await apiClient.get(dataUrl || entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
@@ -9624,6 +9685,192 @@ function mergeColumns(defaultCols, schemaCols, userCols) {
 
 function getUserPersonalization(entityName) {
     return {};
+}
+
+;/* ---- js/table/table-record-sections.js ---- */
+/**
+ * Record sections: a table schema can show a record as several parts, one under
+ * another, in the split panel and the full-width record view:
+ *
+ *   "record": [
+ *     {"form": "application-form", "mode": "view"},
+ *     {"component": "community.application.proofs"},
+ *     {"form": "decision-form", "mode": "edit", "when": {"status": ["applied", "on_hold"]}},
+ *   ]
+ *
+ * - form: a form schema (slug or uid) in "view" or "edit" mode; its {uid} is the record's.
+ * - component: a registered record component (hydrated with the record).
+ * - html: a URL ("{uid}" replaced) whose HTML the module renders for the record,
+ *   for parts that are lists (files, history) rather than a form or a card.
+ * - when: shown only when the record's field has one of the values.
+ *
+ * The record comes from the table's data_url ("{data_url}/{uid}") when it has one,
+ * else the list row. After a form in a section saves, the record reloads in place
+ * and the table refreshes.
+ */
+
+/** Table schema's data_url record address: "{data_url}/{uid}" (query string kept last). */
+function tableRecordDataUrl(schema, uid) {
+    const base = String(schema?.data_url || '');
+    if (!base || !uid) {
+        return null;
+    }
+    const [path, query] = base.split('?');
+    return `${path.replace(/\/+$/, '')}/${encodeURIComponent(uid)}${query ? `?${query}` : ''}`;
+}
+
+/**
+ * The page's own query parameters that aren't the table's (e.g. ?status=on_hold
+ * from a navigation tab), forwarded to a data_url so the module can filter by them.
+ */
+function tablePageFilters() {
+    const owned = ['q', 'sort', 'dir', 'page', 'per_page', 'mode'];
+    const filters = {};
+    new URLSearchParams(window.location.search).forEach((value, key) => {
+        if (!owned.includes(key)) {
+            filters[key] = value;
+        }
+    });
+    return filters;
+}
+
+function recordSectionVisible(section, record) {
+    const when = section?.when;
+    if (!when || typeof when !== 'object') {
+        return true;
+    }
+    return Object.entries(when).every(([field, allowed]) => {
+        const values = Array.isArray(allowed) ? allowed.map(String) : [String(allowed)];
+        return values.includes(String(record?.[field] ?? ''));
+    });
+}
+
+async function loadSectionRecord(schema, row) {
+    const url = tableRecordDataUrl(schema, row?.uid);
+    if (!url || typeof fetchSessionJsonData !== 'function') {
+        return row || {};
+    }
+    const record = await fetchSessionJsonData(url);
+    return record && typeof record === 'object' && !Array.isArray(record) ? { ...row, ...record } : (row || {});
+}
+
+/**
+ * Render the record's sections into the detail panel's content container.
+ * @returns {Promise<boolean>} false when the schema has no sections
+ */
+async function renderRecordSections(contentContainer, schema, row, options = {}) {
+    const sections = Array.isArray(schema?.record) ? schema.record : [];
+    if (!sections.length) {
+        return false;
+    }
+
+    if (typeof renderRecordSkeleton === 'function') {
+        contentContainer.innerHTML = renderRecordSkeleton();
+    }
+
+    const record = await loadSectionRecord(schema, row);
+    const visible = sections.filter((section) => recordSectionVisible(section, record));
+    contentContainer.innerHTML = '';
+
+    for (const section of visible) {
+        const wrapper = document.createElement('section');
+        wrapper.className = 'ui-record-section mb-3 pb-3 border-bottom';
+        if (section.title) {
+            const heading = document.createElement('h6');
+            heading.className = 'fs-6 mb-2';
+            heading.textContent = section.title;
+            wrapper.appendChild(heading);
+        }
+        const body = document.createElement('div');
+        wrapper.appendChild(body);
+        contentContainer.appendChild(wrapper);
+
+        if (section.html) {
+            await renderSectionHtml(body, section, record);
+        } else if (section.component) {
+            await renderSectionComponent(body, section, record);
+        } else if (section.form) {
+            await renderSectionForm(body, section, record, () => {
+                renderRecordSections(contentContainer, schema, record, options);
+                refreshSectionTable(contentContainer);
+            });
+        }
+    }
+
+    contentContainer.lastElementChild?.classList.remove('border-bottom', 'pb-3', 'mb-3');
+    if (typeof initializeDetailViewScripts === 'function') {
+        initializeDetailViewScripts(contentContainer);
+    }
+
+    return true;
+}
+
+async function renderSectionHtml(body, section, record) {
+    body.innerHTML = typeof renderComponentSkeleton === 'function' ? renderComponentSkeleton() : '';
+    try {
+        const url = String(section.html).replace('{uid}', encodeURIComponent(record.uid || ''));
+        const response = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'text/html', 'X-Requested-With': 'XMLHttpRequest' } });
+        body.innerHTML = response.ok ? await response.text() : '';
+    } catch (error) {
+        console.warn('Record section could not be loaded.', section.html, error);
+        body.innerHTML = '';
+    }
+}
+
+async function renderSectionComponent(body, section, record) {
+    if (typeof fetchComponentTemplate !== 'function') {
+        return;
+    }
+    body.innerHTML = typeof renderComponentSkeleton === 'function' ? renderComponentSkeleton() : '';
+    const template = await fetchComponentTemplate(section.component, null);
+    body.innerHTML = template?.success && template.html
+        ? hydrateComponentTemplate(template.html, template.bindings || {}, record)
+        : '';
+}
+
+async function renderSectionForm(body, section, record, onSaved) {
+    if (typeof fetchHtmlComponent !== 'function' || typeof setupForm !== 'function') {
+        return;
+    }
+    const result = await fetchHtmlComponent(section.form, record.uid);
+    if (!result?.success || !result.html) {
+        return;
+    }
+    body.innerHTML = result.html;
+
+    const form = body.querySelector(TABLE_SELECTOR_DETAIL_FORM);
+    if (!form) {
+        return;
+    }
+    form.dataset.entityUid = record.uid || '';
+    form.dataset.formData = JSON.stringify(record);
+    form.__entityDataCache = record;
+    form.dataset.recordSource = 'record-section';
+    form.dataset.formMode = section.mode === 'edit' ? 'edit' : 'view';
+    await setupForm(form);
+
+    // Saved: show the record again (e.g. the new status) instead of leaving the page.
+    const listener = (event) => {
+        if (event.detail?.formId !== form.id || !document.body.contains(form)) {
+            return;
+        }
+        window.removeEventListener('lab-form:submitted', listener);
+        onSaved();
+    };
+    window.addEventListener('lab-form:submitted', listener);
+}
+
+function refreshSectionTable(contentContainer) {
+    const container = contentContainer.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+    const listTable = container?.__listTable;
+    const sourceTable = listTable?.__sourceTable;
+    if (sourceTable && typeof window.clearLabTableCache === 'function') {
+        window.clearLabTableCache(sourceTable);
+    }
+    // Same reload as after a delete (the list keeps its page).
+    if (listTable && window.$?.fn?.DataTable?.isDataTable(listTable)) {
+        window.$(listTable).DataTable().ajax.reload(null, false);
+    }
 }
 
 ;/* ---- js/table/table-renderers.js ---- */
@@ -10738,6 +10985,12 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             }
         }
 
+        // Record sections ("record": [...]): several forms / components, one under another.
+        if (Array.isArray(schema?.record) && schema.record.length && typeof renderRecordSections === 'function') {
+            await renderRecordSections(contentContainer, schema, data, options);
+            return;
+        }
+
         const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
         const detailContext = createDetailContext(
             rightPanelEle,
@@ -11196,6 +11449,8 @@ function buildListQuery(params, tableElement) {
 // 🔁 ENHANCED AJAX FETCH HANDLER
 // ---------------------------
 async function handleAjaxFetch(params, callback, cache, entityName, tableElement, schema = null) {
+    // Table mode doesn't pass the schema; its view manager has it (data_url, record sections).
+    schema = schema || tableElement?.__viewManager?.schema || null;
     const start = params.start || 0;
     const length = params.length || cache.pageSize;
     const page = Math.floor(start / length) + 1;
@@ -11240,7 +11495,7 @@ async function handleAjaxFetch(params, callback, cache, entityName, tableElement
     window.uiDebug?.(TABLE_LOG_CACHE_MISS);
     showTableLoader(tableElement);
 
-    const result = await fetchEntityData(entityName, start, length, query);
+    const result = await fetchEntityData(entityName, start, length, query, schema?.data_url || null);
 
     // The user changed the search/sort while this was loading: drop it
     // (DataTables also ignores the stale draw).
@@ -11286,7 +11541,7 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
     window.uiDebug?.(`${TABLE_LOG_PREFETCHING} ${nextOffset}`);
 
     const queryKey = cache.queryKey;
-    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {})
+    const prefetchPromise = fetchEntityData(entityName, nextOffset, currentLength, cache.query || {}, schema?.data_url || null)
         .then(result => {
             // Ignore a prefetch for a search/sort that is no longer active.
             if (cache.queryKey === queryKey && result.success && result.data?.length) {

@@ -13,6 +13,42 @@
   border: none !important;
 }
 
+/* Sidebar items sit on the sidebar's own background (no white box per item),
+   the same for every user and theme; hover and the current item are tinted. */
+.ui-sidebar {
+  background-color: var(--bs-tertiary-bg) !important;
+}
+.ui-sidebar .list-group {
+  padding: 0.35rem;
+  gap: 2px;
+}
+.ui-sidebar .list-group-item {
+  background-color: transparent;
+  color: var(--bs-body-color);
+  border-radius: 0.5rem;
+}
+.ui-sidebar .list-group-item:not(.active):hover,
+.ui-sidebar .list-group-item:not(.active):focus-visible {
+  background-color: rgba(var(--bs-primary-rgb), 0.08);
+}
+.ui-sidebar .list-group-item.active {
+  background-color: var(--bs-primary-bg-subtle) !important;
+  color: var(--bs-primary-text-emphasis) !important;
+}
+
+/* Minibar: tabs are rounded tiles; only the current module's tile is filled. */
+.minibar .module-tab-vertical {
+  border-radius: 0.6rem;
+  margin: 1px 0;
+}
+.minibar .module-tab-vertical:not(.active-module):hover {
+  background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+.minibar .module-tab-vertical.active-module {
+  background-color: var(--bs-body-bg);
+  box-shadow: 0 1px 2px rgba(var(--bs-dark-rgb), 0.08);
+}
+
 /* Mobile behavior - sidebar off by default */
 @media (max-width: 991.98px) {
   .sidebar {

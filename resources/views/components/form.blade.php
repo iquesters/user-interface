@@ -46,7 +46,7 @@
 
             $skeletonMode = $form_mode ?: 'edit';
             $skeletonFieldWidths = collect($decodedSchema['fields'] ?? [])
-                ->filter(fn ($field) => ($field['type'] ?? null) !== 'hidden')
+                ->filter(fn ($field) => ! in_array($field['type'] ?? null, ['hidden', 'section'], true))
                 // "showIn": the field only exists in those modes (see isFieldShownInMode in form.js).
                 ->filter(fn ($field) => ! is_array($field['showIn'] ?? null) || in_array($skeletonMode, $field['showIn'], true))
                 ->map(function ($field) use ($defaultFieldSize) {

@@ -133,6 +133,16 @@
 
         --}}
         <div class="d-flex align-items-center justify-content-end gap-2 header-right">
+            {{-- Widgets from other modules (e.g. organisation's switcher): services tagged
+                 "header-widgets" with render(?Authenticatable $user): ?string. --}}
+            @auth
+                @foreach (app()->tagged('header-widgets') as $headerWidget)
+                    @if (method_exists($headerWidget, 'render') && ($headerWidgetHtml = $headerWidget->render(auth()->user())))
+                        {!! $headerWidgetHtml !!}
+                    @endif
+                @endforeach
+            @endauth
+
             {{-- User avatar / profile dropdown --}}
             @include('userinterface::layouts.header.user')
             

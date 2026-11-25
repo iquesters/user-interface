@@ -1109,6 +1109,12 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             }
         }
 
+        // Record sections ("record": [...]): several forms / components, one under another.
+        if (Array.isArray(schema?.record) && schema.record.length && typeof renderRecordSections === 'function') {
+            await renderRecordSections(contentContainer, schema, data, options);
+            return;
+        }
+
         const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
         const detailContext = createDetailContext(
             rightPanelEle,
