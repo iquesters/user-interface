@@ -19,6 +19,13 @@
     left: 0 !important;
     z-index: 1051;
     transform: translateX(-310px);
+    /* Right under the header (app.js sets --ui-sidebar-top), down to the
+       bottom of the screen, scrolling its own menu: no page showing through. */
+    top: var(--ui-sidebar-top, 56px);
+    height: calc(100dvh - var(--ui-sidebar-top, 56px));
+    overflow-y: auto;
+    /* The module tab bar is fixed to the bottom: the last items stay reachable. */
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
 
   .sidebar.active {
@@ -485,6 +492,124 @@ ol.breadcrumb {
     text-align: center !important;
     vertical-align: middle !important;
     cursor: default !important;
+}
+
+/* Page tabs (layouts/common/tabs) scroll sideways on small screens. The
+   scroll clips Bootstrap's -1px overlap that hides the line under the active
+   tab, so the line is an inset shadow the active tab covers instead. */
+.ui-page-tabs {
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--bs-border-color);
+}
+
+.ui-page-tabs .nav-link {
+  margin-bottom: 0;
+}
+
+/* Tables on phones: the page-size select and the search box share one row.
+   DataTables (Bootstrap 5 styling) puts them in a .row as .dt-layout-start
+   and .dt-layout-end; below md each .row child is 100% wide, so they stacked.
+   The search takes the rest of the row. */
+@media (max-width: 767.98px) {
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) {
+    flex-wrap: nowrap;
+    align-items: center;
+    column-gap: 0.5rem;
+  }
+
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) > .dt-layout-start {
+    width: auto;
+    flex: 0 0 auto;
+    margin: 0 !important;
+  }
+
+  .dt-container > .row:has(> .dt-layout-start .dt-length):has(> .dt-layout-end .dt-search) > .dt-layout-end {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 !important;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* Right-aligned: the search area spans its cell and pushes the box right. */
+  .dt-container > .row:has(> .dt-layout-end .dt-search) .dt-search {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    width: 100%;
+    margin-left: auto;
+  }
+
+  .dt-container > .row:has(> .dt-layout-end .dt-search) .dt-search input {
+    width: 100%;
+    max-width: 260px;
+    margin-left: auto;
+  }
+}
+
+/* Split view on phones and tablets: one panel at a time. The list fills the
+   width; an opened record (container .inbox-detail-open, set by the table
+   JS) covers it, and its close button returns to the list. The panels are
+   the container's first (list) and last (record) children. */
+@media (max-width: 991.98px) {
+  .inbox-view-container > .inbox-resizer {
+    display: none !important;
+  }
+
+  .inbox-view-container > :first-child {
+    width: 100% !important;
+  }
+
+  /* Its own stacking context: the record covers the list's sticky header
+     (z-index 10) without rising above the page's header, menus or dialogs. */
+  .inbox-view-container {
+    isolation: isolate;
+  }
+
+  .inbox-view-container > :last-child {
+    display: none !important;
+  }
+
+  .inbox-view-container.inbox-detail-open > :last-child {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    width: 100% !important;
+    background-color: var(--bs-body-bg);
+  }
+}
+
+/* Split view placeholder (ui/inc/list-skeleton) on phones and tablets: one
+   panel at a time, like the split view itself: the list, or the open record. */
+@media (max-width: 991.98px) {
+    .ui-split-skeleton > .ui-split-skeleton-list {
+        width: 100% !important;
+        border: 0 !important;
+    }
+
+    .ui-split-skeleton > .ui-split-skeleton-record,
+    .ui-split-skeleton.has-record > .ui-split-skeleton-list {
+        display: none;
+    }
+
+    .ui-split-skeleton.has-record > .ui-split-skeleton-record {
+        display: block;
+    }
+}
+
+/* Table view with a record open (/list/{table}/view/{form}/{uid}): the record
+   takes the whole width in place of the table, on every screen size. */
+.inbox-view-container.inbox-record-full > :first-child,
+.inbox-view-container.inbox-record-full > .inbox-resizer {
+    display: none !important;
+}
+
+.inbox-view-container.inbox-record-full > :last-child {
+    display: flex !important;
+    width: 100% !important;
+    flex: 1 1 auto !important;
 }
 
 .inbox-list-table .checkbox-column {

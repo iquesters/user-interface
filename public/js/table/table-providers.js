@@ -10,6 +10,14 @@ function removeTableSkeleton(tableElement) {
 }
 
 /**
+ * List URL for a table schema's "entity": an entity table ("customers"), or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ */
+function entityListUrl(entity) {
+    return entityRecordUrl('list', entity);
+}
+
+/**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
  */
 async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
@@ -17,7 +25,7 @@ async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
+    const response = await apiClient.get(entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);

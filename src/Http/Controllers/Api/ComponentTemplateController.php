@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
 use Iquesters\Foundation\System\Traits\Loggable;
+use Iquesters\UserInterface\Support\RecordComponents;
 
 class ComponentTemplateController extends Controller
 {
@@ -26,30 +27,24 @@ class ComponentTemplateController extends Controller
                 ], 422);
             }
 
-            if (! str_contains($componentName, '::')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Component must be a fully qualified view name.',
-                    'data' => null,
-                ], 422);
-            }
+            // A registered record component key ("user.details"), or (deprecated) a view name.
+            $template = app(RecordComponents::class)->template($componentName);
 
-            if (! view()->exists($componentName)) {
+            if ($template === null) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Component view '{$componentName}' not found.",
+                    'message' => "Component '{$componentName}' not found. Use a registered key such as \"user.details\".",
                     'data' => null,
                 ], 404);
             }
-
-            $html = view($componentName)->render();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Component template loaded successfully',
                 'data' => [
-                    'html' => $html,
+                    'html' => $template['html'],
                     'component' => $componentName,
+                    'deprecated' => $template['deprecated'],
                 ],
             ]);
         } catch (\Throwable $th) {

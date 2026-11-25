@@ -174,6 +174,19 @@ function applyBindingTransform(value, transformName) {
     }
 }
 
+/**
+ * "prefix": put before a value that is only a name or a relative path
+ * (e.g. a stored file name: "/profile-picture/" + "abc.png"); full URLs,
+ * data: URIs and paths starting with "/" are left as they are.
+ */
+function applyBindingPrefix(value, prefix) {
+    if (!prefix || typeof value !== 'string' || value === '' || /^(https?:|data:|\/)/i.test(value)) {
+        return value;
+    }
+
+    return `${prefix}${value}`;
+}
+
 function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
     const rawValue = getFirstRowValue(
         row,
@@ -182,7 +195,7 @@ function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
         fieldConfig.fallback ?? ''
     );
 
-    return applyBindingTransform(rawValue, fieldConfig.transform);
+    return applyBindingTransform(applyBindingPrefix(rawValue, fieldConfig.prefix), fieldConfig.transform);
 }
 
 function replaceTemplateTokens(template = '', values = {}) {
@@ -235,12 +248,35 @@ function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
     return binding.fallback_template || '';
 }
 
+/**
+ * "type": "badges": a value or a list (e.g. a business entity's
+ * "labels.roles") as one badge per item, inserted as text.
+ *   {"type": "badges", "paths": ["labels.roles"], "class": "badge text-bg-light border",
+ *    "template": "<div>__BADGES__</div>", "fallback_template": ""}
+ */
+function renderBadgesBinding(binding = {}, row = {}, metaMap = {}) {
+    const value = getFirstRowValue(row, metaMap, binding.paths || [], null);
+    const items = (Array.isArray(value) ? value : [value])
+        .filter((item) => item !== null && item !== undefined && item !== '');
+
+    if (items.length === 0) {
+        return binding.fallback_template || '';
+    }
+
+    const className = escapeDetailHtml(binding.class || 'badge text-bg-light border me-1 mb-1');
+    const badges = items.map((item) => `<span class="${className}">${escapeDetailHtml(item)}</span>`).join('');
+
+    return (binding.template || '__BADGES__').replace('__BADGES__', badges);
+}
+
 function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
     switch (binding.type) {
         case 'template':
             return renderTemplateBinding(binding, row, metaMap);
         case 'key_value_rows':
             return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'badges':
+            return renderBadgesBinding(binding, row, metaMap);
         case 'text':
         default:
             return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
@@ -396,6 +432,130 @@ function renderFallbackDetailComponent(data = {}) {
     `;
 }
 
+/**
+ * Loading placeholder while a details component loads: the usual record
+ * layout (picture, title, subtitle, a few label/value rows), like the form
+ * skeleton does for forms.
+ */
+function renderComponentSkeleton() {
+    const row = () => `
+        <div class="d-flex flex-column flex-sm-row gap-1 gap-sm-3 py-1">
+            <span class="placeholder col-4 col-sm-3 rounded"></span>
+            <span class="placeholder col-7 col-sm-6 rounded"></span>
+        </div>`;
+
+    return `
+        <div class="component-skeleton placeholder-glow px-3 px-lg-4 pb-3" aria-hidden="true">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="placeholder rounded-circle flex-shrink-0" style="width: 72px; height: 72px;"></span>
+                <div class="flex-grow-1">
+                    <span class="placeholder col-6 rounded mb-2 d-block" style="height: 1.25rem;"></span>
+                    <span class="placeholder col-4 rounded d-block"></span>
+                </div>
+            </div>
+            ${row()}${row()}${row()}${row()}${row()}
+        </div>`;
+}
+
+/**
+ * Loading placeholder for a whole record panel (header, actions row,
+ * component), shown while the record itself loads, e.g. a record URL opened
+ * by a reload. Matches the record placeholder in ui/inc/list-skeleton.
+ */
+function renderRecordSkeleton() {
+    return `
+        <div class="placeholder-glow d-flex flex-column w-100" aria-hidden="true">
+            <div class="d-flex justify-content-between align-items-center pt-2 pb-1 px-3 border-bottom">
+                <div class="flex-grow-1">
+                    <span class="placeholder col-5 col-md-3 rounded d-block mb-1" style="height: 1rem;"></span>
+                    <span class="placeholder col-3 col-md-2 rounded d-block" style="height: 0.6rem;"></span>
+                </div>
+                <span class="placeholder rounded" style="width: 1rem; height: 1rem;"></span>
+            </div>
+            <div class="d-flex gap-2 px-3 py-2">
+                <span class="placeholder rounded" style="width: 3.5rem; height: 1.25rem;"></span>
+                <span class="placeholder rounded" style="width: 4rem; height: 1.25rem;"></span>
+            </div>
+            <div class="pt-2">${renderComponentSkeleton()}</div>
+        </div>`;
+}
+
+/**
+ * The record a details component shows: the table row plus the full record
+ * from the record source, so a component can show what the list doesn't
+ * load (e.g. a user's roles from a business entity: "labels.roles").
+ *
+ * Record source, in order:
+ * - table schema "details_source": an entity or "business-entity/{slug}";
+ * - the "dataEndpoint" of the table's form (form_schema_uid);
+ * - none: the row alone (as before).
+ * A failed fetch also falls back to the row.
+ */
+async function loadDetailRecord(schema = {}, detailConfig = {}, row = {}) {
+    const uid = row?.uid;
+
+    if (!uid) {
+        return row;
+    }
+
+    let url = null;
+    const source = getSchemaConfigValue(schema, ['details_source', 'details-source']);
+
+    if (source && typeof entityRecordUrl === 'function') {
+        url = entityRecordUrl('show', source, uid);
+    } else if (detailConfig.formSchemaUid && typeof getFormSchema === 'function') {
+        const formSchema = await getFormSchema(detailConfig.formSchemaUid);
+        const dataEndpoint = formSchema?.dataEndpoint ?? formSchema?.schema?.dataEndpoint ?? null;
+        url = dataEndpoint ? dataEndpoint.replace('{uid}', encodeURIComponent(uid)) : null;
+    }
+
+    if (!url || typeof fetchSessionJsonData !== 'function') {
+        return row;
+    }
+
+    const record = await fetchSessionJsonData(url);
+
+    return record && typeof record === 'object' && !Array.isArray(record) ? mergeDetailRecord(row, record) : row;
+}
+
+/**
+ * Row + record: the record's values win, but "meta" lists are combined, so
+ * the row's meta (e.g. a user's profile_picture) survives a record that has
+ * other meta, or none.
+ */
+function mergeDetailRecord(row = {}, record = {}) {
+    const merged = { ...row, ...record };
+    const rowMeta = Array.isArray(row.meta) ? row.meta : [];
+    const recordMeta = Array.isArray(record.meta) ? record.meta : [];
+
+    if (rowMeta.length > 0 || recordMeta.length > 0) {
+        const recordKeys = new Set(recordMeta.map((item) => item?.meta_key));
+        merged.meta = [...rowMeta.filter((item) => !recordKeys.has(item?.meta_key)), ...recordMeta];
+    }
+
+    return merged;
+}
+
+/**
+ * The component a form shows in view mode: form schema
+ * "modes": {"view": {"component": "user.details"}}. Null when none.
+ */
+async function resolveFormViewComponent(formSchemaUid) {
+    if (!formSchemaUid || typeof getFormSchema !== 'function') {
+        return null;
+    }
+
+    const formSchema = await getFormSchema(formSchemaUid);
+    const modes = formSchema?.modes ?? formSchema?.schema?.modes ?? {};
+
+    return modes?.view?.component || null;
+}
+
+/**
+ * Which form and components a table's records use. The record's component
+ * comes from its form (modes.view.component, set by loadDetailComponent);
+ * the table's own "details_component" is the deprecated fallback.
+ */
 function resolveDetailConfig(schema = {}) {
     const columns = schema?.["dt-options"]?.columns || [];
     const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
@@ -620,7 +780,7 @@ async function handleHybridDetailDelete(detailContext) {
         return;
     }
 
-    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
+    const endpoint = entityRecordUrl('delete', entity, entityUid);
     window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
@@ -653,6 +813,16 @@ async function handleHybridDetailDelete(detailContext) {
         const parentContainer = rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const listTable = parentContainer?.querySelector(TABLE_SELECTOR_INBOX_LIST);
         const rootTable = document.querySelector(TABLE_SELECTOR_LAB_TABLE);
+        // The record is gone: back to the list on small screens.
+        setInboxDetailOpen(rightPanelEle, false);
+
+        // Out of the URL; a full width record (table mode) returns to the table.
+        const deletedFromManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
+        if (deletedFromManager?.recordFull) {
+            await deletedFromManager.recordDeleted();
+            return;
+        }
+        deletedFromManager?.recordDeleted?.({ reloadList: false });
 
         if (rootTable && typeof window.clearLabTableCache === 'function') {
             window.clearLabTableCache(rootTable);
@@ -758,7 +928,15 @@ function getNestedDetailValue(source, paths = []) {
     return null;
 }
 
+/** Split view on small screens: show the record over the list, or the list again. */
+function setInboxDetailOpen(rightPanelEle, open) {
+    rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.classList.toggle('inbox-detail-open', open);
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
+    // Phones/tablets: the record covers the list (CSS .inbox-detail-open).
+    setInboxDetailOpen(rightPanelEle, true);
+
     window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
@@ -832,11 +1010,12 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     closeButton.onclick = (e) => {
         e.stopPropagation();
 
-        // Closing the details returns to the full table view.
+        // Closing the details returns to the table (and the list URL).
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        setInboxDetailOpen(rightPanelEle, false);
         const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
-        if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
-            viewManager.setViewMode(VIEW_MODE_TABLE);
+        if (viewManager?.closeRecord) {
+            viewManager.closeRecord();
             return;
         }
 
@@ -913,6 +1092,23 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     
     try {
         const detailConfig = resolveDetailConfig(schema);
+        // The form's view mode component wins over the table's deprecated details_component.
+        detailConfig.detailsComponent = (await resolveFormViewComponent(detailConfig.formSchemaUid))
+            || detailConfig.detailsComponent;
+
+        // On the list page, the URL names the open record: /list/{table}/{view|edit}/{form}/{uid}.
+        const viewManager = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.__listTable?.__sourceTable?.__viewManager;
+        if (viewManager && data?.uid && detailConfig.formSchemaUid) {
+            viewManager.openUid = String(data.uid);
+            if (typeof setTableUrlRecord === 'function') {
+                setTableUrlRecord({
+                    action: options.formMode === 'edit' ? 'edit' : 'view',
+                    form: detailConfig.formSchemaUid,
+                    uid: data.uid,
+                });
+            }
+        }
+
         const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
         const detailContext = createDetailContext(
             rightPanelEle,
@@ -925,10 +1121,21 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
+        // A component renders first: a record-shaped skeleton, not a form's.
+        const componentFirst = detailAttempts[0]?.type === DETAIL_RENDER_MODE_COMPONENT;
+        if (componentFirst) {
+            contentContainer.innerHTML = renderComponentSkeleton();
+            // The Edit/Delete row goes above the component: add it now, so the
+            // skeleton sits where the component will (no jump when it renders).
+            appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+        }
+
         // Shape the skeleton like the form that will render: use the cached
         // schema now, or fetch it in parallel with the template (setupForm
         // then gets it from the same cache / pending request).
-        const skeletonSchemaId = detailAttempts.find((attempt) => attempt.schemaId)?.schemaId;
+        const skeletonSchemaId = componentFirst
+            ? null
+            : detailAttempts.find((attempt) => attempt.type === DETAIL_RENDER_MODE_FORM)?.schemaId;
         if (skeletonSchemaId) {
             const cachedSchema = getCachedFormSchema(skeletonSchemaId);
             if (cachedSchema) {
@@ -969,12 +1176,15 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             let result = null;
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
-                const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
+                const [template, record] = await Promise.all([
+                    fetchComponentTemplate(attempt.componentName, attempt.schemaId),
+                    loadDetailRecord(schema, detailConfig, data),
+                ]);
 
                 result = template.success
                     ? {
                         success: true,
-                        html: hydrateComponentTemplate(template.html, template.bindings || {}, data),
+                        html: hydrateComponentTemplate(template.html, template.bindings || {}, record),
                     }
                     : template;
             } else {
@@ -1005,6 +1215,8 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
+                // The list row: a form with its own dataEndpoint loads its record instead.
+                form.dataset.recordSource = 'table-row';
                 form.dataset.formMode = attempt.type === DETAIL_RENDER_MODE_FORM
                     ? detailContext.requestedFormMode
                     : 'view';
@@ -1018,6 +1230,9 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
                 appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+            } else {
+                // A form has its own actions: drop the row added for the component.
+                rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             }
 
             if (typeof setupCoreFormElement === 'function') {
@@ -1037,10 +1252,11 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
                 uid: data?.uid || data?.id || null,
                 preferredMode,
             });
+            rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             initializeDetailViewScripts(contentContainer);
         }
-        
+
     } catch (error) {
         console.error(TABLE_LOG_DETAIL_COMPONENT_ERROR, {
             entity: schema?.entity,

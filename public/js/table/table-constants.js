@@ -39,7 +39,6 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 // Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
 const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
-const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
@@ -163,7 +162,8 @@ const TABLE_EVENT_INBOX_DETAIL_LOADED = 'inboxDetailLoaded';
 const TABLE_EVENT_VIEW_MODE_CHANGED = 'viewModeChanged';
 const TABLE_EVENT_ROW_SELECTION_CHANGED = 'rowSelectionChanged';
 
-const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['summary_component', 'summary-component'];
+// The row's component in the split view's list; summary_component is the deprecated name.
+const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['row_component', 'row-component', 'summary_component', 'summary-component'];
 const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';

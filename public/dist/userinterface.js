@@ -270,11 +270,39 @@ const API_CONFIG = {
  */
 window.UI_API_BASE = window.UI_API_BASE || '/api/user-interface/v1';
 
-/** uiApiUrl('entity/list/users') → '/api/user-interface/v1/entity/list/users' */
+/** uiApiUrl('form/user-form') → '/api/user-interface/v1/form/user-form' */
 function uiApiUrl(path = '') {
     return `${window.UI_API_BASE}/${String(path).replace(/^\/+/, '')}`;
 }
 window.uiApiUrl = uiApiUrl;
+
+/**
+ * Entity data API (entity and business entity records), served by foundation.
+ * Override window.ENTITY_API_BASE before this file loads to point elsewhere.
+ */
+window.ENTITY_API_BASE = window.ENTITY_API_BASE || '/api/foundation/v1';
+
+/** entityApiUrl('entity/list/users') → '/api/foundation/v1/entity/list/users' */
+function entityApiUrl(path = '') {
+    return `${window.ENTITY_API_BASE}/${String(path).replace(/^\/+/, '')}`;
+}
+window.entityApiUrl = entityApiUrl;
+
+/**
+ * Record URL for a schema "entity": an entity table ("customers") or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ * entityRecordUrl('show', 'customers', uid)  → '/api/foundation/v1/entity/show/customers/{uid}'
+ * entityRecordUrl('list', 'business-entity/customer-profile') → '/api/foundation/v1/business-entity/list/customer-profile'
+ */
+function entityRecordUrl(action, entity, uid = null) {
+    const name = String(entity);
+    const business = name.startsWith('business-entity/');
+    const target = business ? name.slice('business-entity/'.length) : name;
+    const tail = uid ? `/${encodeURIComponent(uid)}` : '';
+
+    return entityApiUrl(`${business ? 'business-entity' : 'entity'}/${action}/${target}${tail}`);
+}
+window.entityRecordUrl = entityRecordUrl;
 
 const UI_HTTP_STATUS = window.USER_INTERFACE_SHARED?.HTTP_STATUS || Object.freeze({
     CONTINUE: 100,
@@ -1145,10 +1173,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     /* ----------------------------
+       Mobile: keep the sidebar right under the header
+    ----------------------------
+       The sidebar is fixed; without a top it stays where it was first laid
+       out, so once the page scrolls (the admin bar goes, the sticky header
+       stays) the page showed through a gap above it. Its top follows the
+       header's bottom edge instead (CSS --ui-sidebar-top). */
+    const header = document.querySelector('header.sticky-top');
+    let placeQueued = false;
+
+    function placeSidebar() {
+        placeQueued = false;
+        const top = isMobile() && header ? Math.max(0, Math.round(header.getBoundingClientRect().bottom)) : null;
+
+        if (top === null) {
+            document.documentElement.style.removeProperty('--ui-sidebar-top');
+        } else {
+            document.documentElement.style.setProperty('--ui-sidebar-top', `${top}px`);
+        }
+    }
+
+    function queuePlaceSidebar() {
+        if (!placeQueued) {
+            placeQueued = true;
+            window.requestAnimationFrame(placeSidebar);
+        }
+    }
+
+    placeSidebar();
+    window.addEventListener('scroll', queuePlaceSidebar, { passive: true });
+    window.addEventListener('resize', queuePlaceSidebar);
+
+    /* ----------------------------
        Toggle sidebar
     ---------------------------- */
     function toggleSidebar() {
         if (isMobile()) {
+            placeSidebar();
             sidebar.classList.toggle('active');
             body.classList.toggle('sidebar-active');
 
@@ -2423,7 +2484,27 @@ async function loadRemoteFieldOptions(formMeta) {
         .map(async field => {
             const options = await fetchSessionJsonData(field.optionsFrom.url);
             field.options = Array.isArray(options) ? options : [];
+            // "empty": a first option for "nothing picked" (selects).
+            if (typeof field.optionsFrom.empty === 'string') {
+                field.options.unshift({ value: '', label: field.optionsFrom.empty });
+            }
         }));
+}
+
+/**
+ * Tables hand the clicked row to the detail form (data-record-source="table-row").
+ * That row is the form's record only when both read the same data: a form
+ * with its own "dataEndpoint" (e.g. a business entity, keys "user__name")
+ * loads its record instead. Once loaded, view/edit switches reuse it.
+ */
+function isTableRowForOwnRecord(form, formMeta) {
+    const fromRow = form?.dataset?.recordSource === 'table-row';
+
+    if (fromRow) {
+        delete form.dataset.recordSource;
+    }
+
+    return fromRow && Boolean(formMeta?.dataEndpoint) && Boolean(form?.dataset?.entityUid);
 }
 
 /**
@@ -2522,6 +2603,12 @@ async function setupFormBlock(formCol, formMeta) {
         const entityUId = form.dataset.entityUid;
         let entityData = form.__entityDataCache || null;
 
+        // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+        if (isTableRowForOwnRecord(form, formMeta)) {
+            formData = null;
+            entityData = null;
+        }
+
         if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
             entityData = formData;
         }
@@ -2581,6 +2668,12 @@ async function addField(field, addTo,formMeta) {
         input.setAttribute(ATTR_CONS.AUTOCOMPLETE, ATTR_CONS.OFF);
         applyFieldValidation(field, input);
         addTo.appendChild(input);
+        return;
+    }
+
+    // Repeatable group (repeater-field.js): its own edit and view rendering.
+    if (typeof isRepeaterField === 'function' && isRepeaterField(field)) {
+        renderRepeaterField(field, addTo, typeof isFormReadOnly === 'function' && isFormReadOnly(formMeta));
         return;
     }
 
@@ -3000,7 +3093,13 @@ function getReadOnlyFieldDisplayValue(field) {
     const value = field.value;
 
     if (Array.isArray(value)) {
-        return value.length > 0 ? value.join(', ') : '—';
+        // Several picked options (checkboxes): their labels.
+        const options = Array.isArray(field.options) ? field.options : [];
+        const labels = value.map(item => {
+            const option = options.find(opt => String(opt?.value ?? '') === String(item ?? ''));
+            return option ? (option.label || option.text || item) : item;
+        });
+        return labels.length > 0 ? labels.join(', ') : '—';
     }
 
     if (field.type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options)) {
@@ -3089,7 +3188,7 @@ function resolveFieldSizeConfig(field = {}, formMeta = {}) {
  * components/form.blade.php.
  */
 function autoFieldSize(field = {}) {
-    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext'].includes(field.type)
+    const wide = ['textarea', 'file', 'image', 'radio', 'json', 'editor', 'richtext', 'repeater'].includes(field.type)
         || (field.type === 'checkbox' && Array.isArray(field.options))
         || Boolean(field.optionsFrom?.url && field.type === 'checkbox');
 
@@ -3421,7 +3520,7 @@ async function getfetchEntityData(entity,entityUId) {
             return { success: false, error: 'Missing entity or entity UID' };
         }
 
-        const showUrl = uiApiUrl(`entity/show/${entity}/${entityUId}`);
+        const showUrl = entityRecordUrl('show', entity, entityUId);
 
         if (typeof apiClient !== 'undefined' && apiClient) {
             return await apiClient.get(showUrl);
@@ -4008,6 +4107,11 @@ async function switchFormMode(formElement, nextMode, formMeta) {
 
     showFormSkeleton(detailContainer, getCachedFormSchema(formMeta.id), nextMode);
 
+    // List page: the URL follows view ↔ edit (/list/{table}/{view|edit}/{form}/{uid}).
+    if (typeof setTableUrlRecord === 'function') {
+        setTableUrlRecord({ action: nextMode === 'edit' ? 'edit' : 'view', form: formMeta.id, uid: entityUid });
+    }
+
     const result = await fetchHtmlComponent(formMeta.id, entityUid, 'userinterface::components.lab-form');
 
     if (!result?.success || !result?.html) {
@@ -4080,6 +4184,12 @@ async function handleFormDeleteAction(formElement, formMeta) {
                     Record deleted successfully.
                 </div>
             `;
+        }
+
+        // A record open on the list page: drop it from the URL and refresh the list.
+        if (detailContainer && tableElement?.__viewManager?.recordDeleted) {
+            await tableElement.__viewManager.recordDeleted();
+            return;
         }
 
         if (tableElement && typeof window.clearLabTableCache === 'function') {
@@ -4292,10 +4402,24 @@ async function setupForm(formElement) {
         setupFormHeader(cardHeader, formMeta, formElement);
     }
 
-    if (formMeta.fields || formMeta.actions) {
+    // View mode with a component (schema "modes": {"view": {"component": "user.details"}}):
+    // the component shows the record instead of the fields. In a table's
+    // right panel the panel renders it (recordSource "table-row").
+    const viewComponent = formMeta.formMode === 'view'
+        && formElement.dataset.recordSource !== 'table-row'
+        && formElement.dataset.entityUid
+        ? (resolveModeConfig(formMeta).component || null)
+        : null;
+    const componentShown = viewComponent
+        ? await renderFormViewComponent(cardProvider.getCardBody(), formMeta, formElement, viewComponent)
+        : false;
+
+    if (!componentShown && (formMeta.fields || formMeta.actions)) {
         if (formMeta.fields) {
             const cardBody = cardProvider.getCardBody();
-            setupFormBody(cardBody, formMeta);
+            // Awaited: the fields wait for the record and remote options, and the
+            // buttons below must come after them (else "Continue" sits above the input).
+            await setupFormBody(cardBody, formMeta);
         }
         if (formMeta.actions && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
@@ -4452,6 +4576,44 @@ async function setupForm(formElement) {
     return formMeta;
 }
 
+/**
+ * A form's view mode component (e.g. on /view/{form}/{uid}): the record from
+ * the form's dataEndpoint (else the entity API), shown with the registered
+ * component. False when the component can't be loaded: the fields show.
+ */
+async function renderFormViewComponent(container, formMeta, formElement, componentName) {
+    if (typeof fetchComponentTemplate !== 'function' || typeof hydrateComponentTemplate !== 'function') {
+        return false;
+    }
+
+    const uid = formElement.dataset.entityUid;
+    container.innerHTML = typeof renderComponentSkeleton === 'function' ? renderComponentSkeleton() : '';
+
+    const endpoint = formMeta.dataEndpoint
+        ? formMeta.dataEndpoint.replace('{uid}', encodeURIComponent(uid))
+        : (formMeta.entity && typeof entityRecordUrl === 'function' ? entityRecordUrl('show', formMeta.entity, uid) : null);
+
+    const [template, record] = await Promise.all([
+        fetchComponentTemplate(componentName, null),
+        endpoint && typeof fetchSessionJsonData === 'function' ? fetchSessionJsonData(endpoint) : null,
+    ]);
+
+    if (!template?.success || !template.html) {
+        console.warn('View mode component could not be loaded; showing the fields.', { componentName });
+        container.innerHTML = '';
+        return false;
+    }
+
+    const row = record && typeof record === 'object' && !Array.isArray(record) ? { uid, ...record } : { uid };
+    container.innerHTML = hydrateComponentTemplate(template.html, template.bindings || {}, row);
+
+    if (typeof initializeDetailViewScripts === 'function') {
+        initializeDetailViewScripts(container);
+    }
+
+    return true;
+}
+
 async function renderFormForModal(formElement, formMeta) {
     if (!formElement.querySelector(`input[name="${INPUT_TYPE.FORMID}"]`)) {
         const formIdInput = document.createElement(HTML_TAG.INPUT);
@@ -4477,6 +4639,12 @@ async function renderFormForModal(formElement, formMeta) {
 
     const entityUId = formElement.dataset.entityUid;
     let entityData = formElement.__entityDataCache || null;
+
+    // A table row is not the record of a form with its own dataEndpoint (other keys): load it.
+    if (isTableRowForOwnRecord(formElement, formMeta)) {
+        formData = null;
+        entityData = null;
+    }
 
     if (!entityData && formData && typeof formData === 'object' && !Array.isArray(formData)) {
         entityData = formData;
@@ -4621,7 +4789,10 @@ function normalizeDynamicFormErrors(errors, formMeta, payload = {}) {
     const fields = Array.isArray(formMeta?.fields) ? formMeta.fields : [];
     const metaPayload = payload?.meta && typeof payload.meta === 'object' ? payload.meta : {};
 
-    Object.entries(errors || {}).forEach(([errorKey, messages]) => {
+    Object.entries(errors || {}).forEach(([rawKey, messages]) => {
+        // The entity API names meta field errors "meta.batch": show them under the Batch field.
+        const metaKey = /^meta[.[]([^\]]+)\]?$/.exec(rawKey)?.[1];
+        const errorKey = metaKey && fields.some((item) => item?.id === metaKey && item?.meta === true) ? metaKey : rawKey;
         const field = fields.find((item) => item?.id === errorKey);
 
         if (field) {
@@ -5121,14 +5292,14 @@ function resolveDynamicFormEndpoint(formMeta, form, method) {
     const entityUid = form.dataset.entityUid;
 
     if ((method === 'PUT' || method === 'PATCH') && entityUid) {
-        return uiApiUrl(`entity/update/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('update', formMeta.entity, entityUid);
     }
 
     if (method === 'DELETE' && entityUid) {
-        return uiApiUrl(`entity/delete/${formMeta.entity}/${entityUid}`);
+        return entityRecordUrl('delete', formMeta.entity, entityUid);
     }
 
-    return uiApiUrl(`entity/store/${formMeta.entity}`);
+    return entityRecordUrl('store', formMeta.entity);
 }
 
 function serializeDynamicFormPayload(form, formMeta) {
@@ -5166,6 +5337,11 @@ function getSerializedFieldValue(form, field) {
     const escapedName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
         ? CSS.escape(fieldName)
         : fieldName;
+
+    // Repeatable group (repeater-field.js): the whole list of rows.
+    if (field.type === 'repeater' && typeof collectRepeaterValue === 'function') {
+        return collectRepeaterValue(form, field);
+    }
 
     if (field.type === 'checkbox') {
         const checkboxInputs = form.querySelectorAll(`[name="${escapedName}"], [name="${escapedName}[]"]`);
@@ -5357,7 +5533,7 @@ function setupFormHeader(cardHeader, formMeta, formElement) {
  * @param {*} cardBody 
  * @param {*} formMeta 
  */
-function setupFormBody(cardBody, formMeta) {
+async function setupFormBody(cardBody, formMeta) {
     // <div class="row row-cols-1 g-2">
 
     const fragment = document.createElement('div');
@@ -5381,7 +5557,7 @@ function setupFormBody(cardBody, formMeta) {
     fragment.appendChild(formCol)
 
     if (formMeta.fields) {
-        setupFormBlock(formCol, formMeta);
+        await setupFormBlock(formCol, formMeta);
     }
 
     // removing placeholder
@@ -6143,6 +6319,277 @@ async function waitForImageCrops(form) {
         .filter(Boolean);
 
     await Promise.all(pending);
+}
+
+;/* ---- js/form/repeater-field.js ---- */
+/**
+ * Repeatable group field: "type": "repeater".
+ *
+ *   {"id": "notes", "type": "repeater", "label": "Notes", "addLabel": "Add note",
+ *    "fields": [{"id": "body", "type": "text", "label": "Body", "required": true},
+ *               {"id": "phone", "type": "text", "label": "Phone", "meta": true}]}
+ *
+ * Every row has the group's "fields" (a meta field goes under the row's
+ * "meta"). The value is the whole list, sent and received as
+ *   [{"uid": "…", "body": "…", "meta": {"phone": "…"}}, ...]
+ * so a row removed here is removed on the server too. Rows that came from
+ * the server keep their uid (or id). Used by business entity lists of rows
+ * (has_many / morph_many).
+ *
+ * DOM is built with textContent only (no HTML from data).
+ */
+
+function isRepeaterField(field) {
+    return field?.type === 'repeater';
+}
+
+function repeaterRowsOf(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string' && value.trim().startsWith('[')) {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    return [];
+}
+
+function repeaterSubFields(field) {
+    return (Array.isArray(field.fields) ? field.fields : []).filter(sub => sub && sub.id);
+}
+
+function repeaterCellValue(row, sub) {
+    const source = sub.meta === true ? (row?.meta || {}) : (row || {});
+    const value = source[sub.id];
+
+    return value === null || value === undefined ? '' : value;
+}
+
+/** Edit mode: a list of row cards with an add button; view mode: a small table. */
+function renderRepeaterField(field, addTo, readOnly) {
+    const fragment = createFieldFragment(field, addTo);
+    const container = document.createElement('div');
+    container.classList.add('lab-repeater', readOnly ? 'lab-view-field' : 'mb-1');
+    container.dataset.repeaterFor = field.id;
+    fragment.appendChild(container);
+
+    if (field.label) {
+        const label = document.createElement('div');
+        label.classList.add(...(readOnly ? ['lab-view-label', 'small', 'text-body-secondary', 'mb-1'] : ['form-label', 'mb-1']));
+        label.textContent = field.label;
+        container.appendChild(label);
+    }
+
+    const rows = repeaterRowsOf(field.value);
+
+    if (readOnly) {
+        container.appendChild(renderRepeaterTable(field, rows));
+        return;
+    }
+
+    // Anchor for server errors on this field (form.js maps errors by name).
+    const anchor = document.createElement('input');
+    anchor.type = 'hidden';
+    anchor.name = field.id;
+    anchor.dataset.repeaterAnchor = 'true';
+    container.appendChild(anchor);
+
+    const list = document.createElement('div');
+    list.classList.add('lab-repeater-rows', 'd-flex', 'flex-column', 'gap-2');
+    container.appendChild(list);
+
+    rows.forEach(row => list.appendChild(renderRepeaterRow(field, row)));
+
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.classList.add('btn', 'btn-sm', 'btn-outline-secondary', 'mt-2');
+    const icon = document.createElement('i');
+    icon.className = 'fa-regular fa-fw fa-plus';
+    const text = document.createElement('span');
+    text.classList.add('ms-1');
+    text.textContent = field.addLabel || 'Add row';
+    add.append(icon, text);
+    add.addEventListener('click', () => {
+        const row = renderRepeaterRow(field, {});
+        list.appendChild(row);
+        row.querySelector('input, select, textarea')?.focus();
+    });
+    container.appendChild(add);
+
+    if (typeof createHelperText === 'function' && field.helperText) {
+        createHelperText(field, fragment);
+    }
+}
+
+function renderRepeaterRow(field, row) {
+    const card = document.createElement('div');
+    card.classList.add('lab-repeater-row', 'border', 'rounded', 'p-2');
+    card.dataset.uid = row?.uid || '';
+    card.dataset.id = row?.uid ? '' : (row?.id ?? '');
+
+    const grid = document.createElement('div');
+    grid.classList.add('row', 'g-2', 'align-items-end');
+
+    repeaterSubFields(field).forEach(sub => {
+        const col = document.createElement('div');
+        col.classList.add('col-12', 'col-md');
+        const id = `rep-${Math.random().toString(36).slice(2)}`;
+
+        const label = document.createElement('label');
+        label.classList.add('form-label', 'small', 'mb-1');
+        label.htmlFor = id;
+        label.textContent = sub.label || sub.id;
+        if (sub.required) {
+            const star = document.createElement('span');
+            star.classList.add('text-danger', 'ms-1');
+            star.textContent = '*';
+            label.appendChild(star);
+        }
+
+        const control = repeaterControl(sub, repeaterCellValue(row, sub));
+        control.id = id;
+        control.dataset.repeaterField = sub.id;
+        control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
+
+        col.append(label, control);
+        grid.appendChild(col);
+    });
+
+    const actions = document.createElement('div');
+    actions.classList.add('col-auto');
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.classList.add('btn', 'btn-sm', 'btn-outline-danger');
+    remove.title = 'Remove row';
+    remove.setAttribute('aria-label', 'Remove row');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-fw fa-trash';
+    remove.appendChild(icon);
+    remove.addEventListener('click', () => card.remove());
+    actions.appendChild(remove);
+    grid.appendChild(actions);
+
+    card.appendChild(grid);
+
+    return card;
+}
+
+function repeaterControl(sub, value) {
+    let control;
+
+    if (sub.type === 'textarea') {
+        control = document.createElement('textarea');
+        control.rows = 2;
+        control.value = value;
+    } else if (sub.type === 'select' || (Array.isArray(sub.options) && sub.options.length > 0 && sub.type !== 'checkbox')) {
+        control = document.createElement('select');
+        control.classList.add('form-select', 'form-select-sm');
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '—';
+        control.appendChild(empty);
+        (sub.options || []).forEach(opt => {
+            const option = document.createElement('option');
+            option.value = String(opt?.value ?? '');
+            option.textContent = opt?.label ?? opt?.text ?? option.value;
+            option.selected = String(value) === option.value;
+            control.appendChild(option);
+        });
+
+        return control;
+    } else if (sub.type === 'checkbox') {
+        control = document.createElement('input');
+        control.type = 'checkbox';
+        control.classList.add('form-check-input');
+        control.checked = value === true || value === 1 || value === '1' || value === 'true';
+
+        return control;
+    } else {
+        control = document.createElement('input');
+        control.type = ['number', 'email', 'date', 'datetime-local', 'time'].includes(sub.type) ? sub.type : 'text';
+        control.value = value;
+    }
+
+    control.classList.add('form-control', 'form-control-sm');
+    if (sub.required) control.required = true;
+    if (sub.maxLength) control.maxLength = sub.maxLength;
+    if (sub.placeholder) control.placeholder = sub.placeholder;
+
+    return control;
+}
+
+function renderRepeaterTable(field, rows) {
+    if (rows.length === 0) {
+        const empty = document.createElement('div');
+        empty.classList.add('lab-view-value', 'fw-medium');
+        empty.textContent = '—';
+        return empty;
+    }
+
+    const subs = repeaterSubFields(field);
+    const wrap = document.createElement('div');
+    wrap.classList.add('table-responsive');
+    const table = document.createElement('table');
+    table.classList.add('table', 'table-sm', 'mb-0');
+
+    const head = table.createTHead().insertRow();
+    subs.forEach(sub => {
+        const th = document.createElement('th');
+        th.classList.add('small', 'text-body-secondary', 'fw-normal');
+        th.textContent = sub.label || sub.id;
+        head.appendChild(th);
+    });
+
+    const body = table.createTBody();
+    rows.forEach(row => {
+        const tr = body.insertRow();
+        subs.forEach(sub => {
+            const td = tr.insertCell();
+            const value = repeaterCellValue(row, sub);
+            td.textContent = typeof getReadOnlyFieldDisplayValue === 'function'
+                ? String(getReadOnlyFieldDisplayValue({ ...sub, value }))
+                : (value === '' ? '—' : String(value));
+        });
+    });
+
+    wrap.appendChild(table);
+
+    return wrap;
+}
+
+/** The list sent on submit: [{uid?, field: value, meta: {}}]. */
+function collectRepeaterValue(form, field) {
+    const escaped = typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(field.id) : field.id;
+    const container = form.querySelector(`[data-repeater-for="${escaped}"]`);
+
+    if (!container) {
+        return [];
+    }
+
+    return Array.from(container.querySelectorAll('.lab-repeater-row')).map(rowEl => {
+        const row = {};
+        const meta = {};
+
+        if (rowEl.dataset.uid) row.uid = rowEl.dataset.uid;
+        else if (rowEl.dataset.id) row.id = rowEl.dataset.id;
+
+        rowEl.querySelectorAll('[data-repeater-field]').forEach(control => {
+            const value = control.type === 'checkbox' ? control.checked : control.value;
+            (control.dataset.repeaterMeta === 'true' ? meta : row)[control.dataset.repeaterField] = value;
+        });
+
+        if (Object.keys(meta).length > 0) {
+            row.meta = meta;
+        }
+
+        return row;
+    });
 }
 
 ;/* ---- js/form/validation/customValidationMessage.js ---- */
@@ -6926,71 +7373,25 @@ function showModal(modalContent = {}) {
     return renderBasicModal(modalContent)
 }
 
-function showModalSnackbar(message, type = 'info') {
-    const text = message || (type === 'error' ? 'Something went wrong.' : 'Action completed successfully.')
-
-    if (typeof window !== 'undefined' && typeof window.showSnackbar === 'function') {
-        window.showSnackbar(text, type, {
-            duration: type === 'error' ? 4500 : 3000,
-        })
-        return
-    }
-
-    if (typeof apiClient !== 'undefined' && typeof apiClient.showToast === 'function') {
-        apiClient.showToast(text, type, {
-            duration: type === 'error' ? 4500 : 3000,
-        })
-        return
-    }
-
-    if (typeof Toastify !== 'undefined') {
-        Toastify({
-            text,
-            duration: type === 'error' ? 4500 : 3000,
-            gravity: 'top',
-            position: 'right',
-            backgroundColor: type === 'error' ? '#dc3545' : '#198754',
-        }).showToast()
-        return
-    }
-
-    if (typeof toastr !== 'undefined') {
-        const toastrMethod = type === 'error' ? 'error' : 'success'
-        toastr[toastrMethod](text)
-        return
-    }
-
-    window.uiDebug?.(`[${type.toUpperCase()}] ${text}`)
-}
-
 function handleSchemaFormSubmitted(event) {
-    const { formId, message } = event.detail || {}
+    const { formId } = event.detail || {}
 
     if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
         return
     }
 
-    showModalSnackbar(message, 'success')
-
+    // No toast here: the form shows its own success message (notifyDynamicFormOutcome).
     if (activeSchemaFormModalState.closeOnSuccess) {
         bootstrap.Modal.getInstance(document.getElementById('labModal'))?.hide()
     }
 }
 
-function handleSchemaFormSubmitFailed(event) {
-    const { formId, message } = event.detail || {}
+// A failed submit needs nothing here: the form already shows the errors, under
+// each field, or as one toast for errors not tied to a field.
 
-    if (!activeSchemaFormModalState || formId !== activeSchemaFormModalState.formId) {
-        return
-    }
-
-    showModalSnackbar(message, 'error')
-}
-
+// Only the lab-form:* events: form.js also fires the old shoz-form:* names for
+// older listeners, and handling both showed every message twice.
 window.addEventListener('lab-form:submitted', handleSchemaFormSubmitted)
-window.addEventListener('shoz-form:submitted', handleSchemaFormSubmitted)
-window.addEventListener('lab-form:submit-failed', handleSchemaFormSubmitFailed)
-window.addEventListener('shoz-form:submit-failed', handleSchemaFormSubmitFailed)
 
 resetModalState()
 
@@ -7696,7 +8097,6 @@ const DETAIL_RENDER_MODE_FORM = 'form';
 const TABLE_COMPONENT_LAB_FORM = 'userinterface::components.lab-form';
 // Versioned API (see uiApiUrl in api-client.js); evaluated at load, so read the base directly.
 const TABLE_API_BASE = (window.UI_API_BASE || '/api/user-interface/v1');
-const TABLE_API_ENTITY_LIST_PREFIX = `${TABLE_API_BASE}/entity/list/`;
 const TABLE_API_COMPONENT_TEMPLATE_PREFIX = `${TABLE_API_BASE}/components/templates/`;
 
 const TABLE_SELECTOR_LAB_TABLE = '.lab-table';
@@ -7820,7 +8220,8 @@ const TABLE_EVENT_INBOX_DETAIL_LOADED = 'inboxDetailLoaded';
 const TABLE_EVENT_VIEW_MODE_CHANGED = 'viewModeChanged';
 const TABLE_EVENT_ROW_SELECTION_CHANGED = 'rowSelectionChanged';
 
-const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['summary_component', 'summary-component'];
+// The row's component in the split view's list; summary_component is the deprecated name.
+const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['row_component', 'row-component', 'summary_component', 'summary-component'];
 const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';
@@ -7954,9 +8355,70 @@ const TABLE_STYLE_BACKGROUND_INHERIT = 'inherit';
  * List page "Create" button (table schema "create": {"form", "label"}):
  * opens that form schema in create mode in a modal; after a successful save
  * the modal closes and the table reloads so the new record shows up.
+ *
+ * The URL follows: /list/{table}/create/{form} while the form is open (a
+ * reload or a shared link opens it again); closing it returns to the list.
  */
+let createFormOpenFromUrl = false;
+
+function openCreateForm(formId, { push = true } = {}) {
+    const button = document.getElementById('createRecordBtn');
+    if (!formId || typeof showModal !== 'function') {
+        return;
+    }
+
+    if (typeof setTableUrlRecord === 'function') {
+        setTableUrlRecord({ action: 'create', form: formId }, { push });
+    }
+    createFormOpenFromUrl = true;
+
+    showModal({
+        formId,
+        formMode: 'create',
+        title: button?.dataset.form === formId ? (button.dataset.label || 'Create') : 'Create',
+        submitLabel: 'Create',
+    });
+}
+
+/**
+ * Back / Forward or page load: open or close the create form as the URL says.
+ * The URL names the form by uid; the Create button's own form (by slug) is
+ * used when it is the same form, so its label and the reload after saving apply.
+ */
+async function applyCreateFormUrl(state) {
+    const modalElement = document.getElementById('labModal');
+
+    if (state?.action === 'create' && state.form) {
+        if (!modalElement?.classList.contains('show')) {
+            const buttonForm = document.getElementById('createRecordBtn')?.dataset.form;
+            const sameForm = buttonForm && typeof tableUrlFormUid === 'function'
+                && (await tableUrlFormUid(buttonForm)) === state.form;
+            openCreateForm(sameForm ? buttonForm : state.form, { push: false });
+        }
+        return;
+    }
+
+    if (createFormOpenFromUrl && modalElement?.classList.contains('show')) {
+        bootstrap.Modal.getInstance(modalElement)?.hide();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const button = document.getElementById('createRecordBtn');
+    const modalElement = document.getElementById('labModal');
+
+    // Closing the create form (Cancel, ×, Esc or after saving) leaves the create URL.
+    modalElement?.addEventListener('hidden.bs.modal', function () {
+        if (!createFormOpenFromUrl) {
+            return;
+        }
+        createFormOpenFromUrl = false;
+
+        if (typeof parseTableUrl === 'function' && parseTableUrl()?.action === 'create') {
+            setTableUrlRecord(null);
+        }
+    });
+
     if (!button || typeof showModal !== 'function') {
         return;
     }
@@ -7964,12 +8426,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const formId = button.dataset.form;
 
     button.addEventListener('click', function () {
-        showModal({
-            formId,
-            formMode: 'create',
-            title: button.dataset.label || 'Create',
-            submitLabel: 'Create',
-        });
+        openCreateForm(formId);
     });
 
     window.addEventListener('lab-form:submitted', function (event) {
@@ -8148,6 +8605,8 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
         responsive: false,
         autoWidth: false,
         pageLength: cache.pageSize,
+        // Search, page and page size from the URL (this list doesn't sort).
+        ...(typeof tableUrlDataTableOptions === 'function' ? tableUrlDataTableOptions(null, tableElement.__defaultPageLength) : {}),
         columns: resolvedColumns,
         columnDefs: [
             {
@@ -8187,6 +8646,11 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
     styleInboxRows(listTable);
     applyInboxStickyStyles(leftPanel);
     initializeInboxSummaryComponents(listTable);
+
+    // The URL follows search and paging.
+    if (typeof bindTableUrlSync === 'function') {
+        bindTableUrlSync(listTable, null, tableElement.__defaultPageLength);
+    }
 
     // Setup resizer
     setupResizer(resizer, leftPanel, rightPanelEle, container);
@@ -8440,8 +8904,16 @@ class ViewModeManager {
         
         window.uiDebug?.(TABLE_LOG_STORED_ORIGINAL_PARENT, this.originalParent?.className);
         
-        // Initialize view mode from local storage or use default
-        this.currentViewMode = this.getStoredViewMode() || this.defaultViewMode;
+        // View mode: the URL's ?mode, else the one stored for this table, else the default.
+        const urlState = typeof parseTableUrl === 'function' ? parseTableUrl() : null;
+        this.currentViewMode = (urlState && urlState.mode)
+            || this.getStoredViewMode()
+            || this.defaultViewMode;
+
+        // Table mode with a record open: the record shows full width in place
+        // of the table (split mode shows it in the right panel).
+        this.recordFull = this.currentViewMode === VIEW_MODE_TABLE && this.urlRecordUid(urlState) !== null;
+        this.openUid = null;
         
         // Setup toggle button
         this.setupToggleButton();
@@ -8495,7 +8967,22 @@ class ViewModeManager {
     }
     
     async toggleViewMode() {
-        await this.setViewMode(this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE);
+        const next = this.currentViewMode === VIEW_MODE_TABLE ? VIEW_MODE_INBOX : VIEW_MODE_TABLE;
+        // A history entry per switch: Back returns to the other mode.
+        this.writeModeToUrl(next, true);
+        await this.setViewMode(next);
+    }
+
+    /** The view mode in the URL (?mode=table|split), left out when it is the table's default. */
+    writeModeToUrl(mode, push = false) {
+        if (typeof setTableUrlMode === 'function') {
+            setTableUrlMode(mode, this.defaultViewMode, { push });
+        }
+    }
+
+    /** The record uid in the URL (view/edit), or null. */
+    urlRecordUid(state = (typeof parseTableUrl === 'function' ? parseTableUrl() : null)) {
+        return state && state.uid && (state.action === 'view' || state.action === 'edit') ? state.uid : null;
     }
 
     /** Switch to a view mode (stored per table) and re-render. No-op if already in it. */
@@ -8509,6 +8996,11 @@ class ViewModeManager {
 
         this.storeViewMode(newMode);
         this.currentViewMode = newMode;
+        this.writeModeToUrl(newMode);
+
+        // A record in the URL stays open: full width in table mode, the right panel in split mode.
+        const recordUid = this.urlRecordUid();
+        this.recordFull = newMode === VIEW_MODE_TABLE && recordUid !== null;
 
         const toggleBtn = document.getElementById('toggleViewBtn');
         if (toggleBtn) this.updateToggleButton(toggleBtn);
@@ -8519,6 +9011,11 @@ class ViewModeManager {
         }));
 
         await this.reRenderView();
+
+        if (recordUid) {
+            this.openUid = null;
+            await this.openRecordFromUrl();
+        }
     }
 
     /** The split view's container for this table (null in table mode). */
@@ -8528,11 +9025,15 @@ class ViewModeManager {
     }
 
     /**
-     * Table mode row click: switch to split view, show that record on the
-     * right and highlight its row (when it is on the visible page).
+     * Open a record: in split mode in the right panel (its row highlighted);
+     * in table mode full width in place of the table. The URL follows
+     * (loadDetailComponent writes /view|edit/{form}/{uid}).
      */
-    async openRowInSplit(rowData) {
-        await this.setViewMode(VIEW_MODE_INBOX);
+    async openRecord(rowData, { formMode = 'view' } = {}) {
+        if (this.currentViewMode === VIEW_MODE_TABLE && !this.recordFull) {
+            this.recordFull = true;
+            await this.reRenderView();
+        }
 
         const container = this.inboxContainer();
         const rightPanel = container?.__rightPanel;
@@ -8541,7 +9042,14 @@ class ViewModeManager {
             return;
         }
 
-        await loadDetailComponent(rightPanel, this.schema, rowData);
+        await loadDetailComponent(rightPanel, this.schema, rowData, {
+            formMode,
+            preferredMode: formMode === 'edit' ? DETAIL_RENDER_MODE_FORM : undefined,
+        });
+
+        if (this.recordFull) {
+            return;
+        }
 
         const uid = String(rowData?.uid || rowData?.id || '');
         const highlight = () => {
@@ -8557,6 +9065,116 @@ class ViewModeManager {
         // The list may still be loading its first page.
         if (!highlight() && listTable && typeof $ !== 'undefined') {
             $(listTable).one('draw.dt', () => setTimeout(highlight, 0));
+        }
+    }
+
+    /** Kept for callers of the old name. */
+    async openRowInSplit(rowData) {
+        return this.openRecord(rowData);
+    }
+
+    /** Open the record named in the URL (a reload, a shared link, Back/Forward). */
+    async openRecordFromUrl(state = parseTableUrl()) {
+        const uid = this.urlRecordUid(state);
+        if (!uid) {
+            return;
+        }
+
+        // The record's placeholder while it loads (the panel showed "Select an item").
+        if (this.currentViewMode === VIEW_MODE_TABLE && !this.recordFull) {
+            this.recordFull = true;
+            await this.reRenderView();
+        }
+        const panel = this.inboxContainer()?.__rightPanel;
+        if (panel && typeof renderRecordSkeleton === 'function') {
+            panel.innerHTML = renderRecordSkeleton();
+            setInboxDetailOpen(panel, true);
+        }
+
+        let row = { uid };
+        if (typeof fetchSessionJsonData === 'function' && typeof entityRecordUrl === 'function') {
+            const record = await fetchSessionJsonData(entityRecordUrl('show', this.entity, uid));
+            if (record && typeof record === 'object' && !Array.isArray(record)) {
+                row = { uid, ...record };
+            }
+        }
+
+        await this.openRecord(row, { formMode: state.action === 'edit' ? 'edit' : 'view' });
+    }
+
+    /**
+     * The record's close button: back to the list (a history entry). Table
+     * mode shows the table again; split mode returns to table view, as before.
+     */
+    async closeRecord() {
+        if (typeof setTableUrlRecord === 'function') {
+            setTableUrlRecord(null);
+        }
+        this.openUid = null;
+
+        if (this.recordFull) {
+            this.recordFull = false;
+            await this.reRenderView();
+            return;
+        }
+
+        await this.setViewMode(VIEW_MODE_TABLE);
+    }
+
+    /** The open record was deleted: drop it from the URL; a full width record returns to the table. */
+    async recordDeleted({ reloadList = true } = {}) {
+        if (typeof setTableUrlRecord === 'function') {
+            setTableUrlRecord(null, { push: false });
+        }
+        this.openUid = null;
+
+        if (typeof window.clearLabTableCache === 'function') {
+            window.clearLabTableCache(this.tableElement);
+        }
+
+        if (this.recordFull) {
+            this.recordFull = false;
+            await this.reRenderView();
+            return;
+        }
+
+        const listTable = this.inboxContainer()?.__listTable;
+        if (reloadList && listTable && $.fn.DataTable.isDataTable(listTable)) {
+            $(listTable).DataTable().ajax.reload(null, false);
+        }
+    }
+
+    /** Back / Forward: show what the URL says (mode, record, create form) without a reload. */
+    async applyUrl() {
+        const state = parseTableUrl();
+        if (!state) {
+            return;
+        }
+
+        const mode = state.mode || this.defaultViewMode;
+        const uid = this.urlRecordUid(state);
+        const full = mode === VIEW_MODE_TABLE && uid !== null;
+
+        if (mode !== this.currentViewMode || full !== this.recordFull) {
+            this.currentViewMode = mode;
+            this.storeViewMode(mode);
+            this.recordFull = full;
+            const toggleBtn = document.getElementById('toggleViewBtn');
+            if (toggleBtn) this.updateToggleButton(toggleBtn);
+            await this.reRenderView();
+            this.openUid = null;
+        }
+
+        if (uid && uid !== this.openUid) {
+            await this.openRecordFromUrl(state);
+        } else if (!uid && this.openUid && mode === VIEW_MODE_INBOX) {
+            // Split mode, record closed: the list with an empty panel.
+            await this.reRenderView();
+            this.openUid = null;
+        }
+
+        if (typeof applyCreateFormUrl === 'function') {
+            applyCreateFormUrl(state);
         }
     }
 
@@ -8623,17 +9241,18 @@ class ViewModeManager {
         
         window.uiDebug?.(`${TABLE_LOG_RENDERING_VIEW} ${this.currentViewMode}`);
         
-        // Re-render based on current view mode
-        if (this.currentViewMode === VIEW_MODE_INBOX) {
+        // Re-render based on current view mode (a full width record uses the split layout, list hidden)
+        if (this.currentViewMode === VIEW_MODE_INBOX || this.recordFull) {
             await ensureSummaryComponentTemplate(this.schema);
             renderInboxView(
-                this.tableElement, 
-                this.cache, 
-                this.dtConfig, 
-                this.entity, 
+                this.tableElement,
+                this.cache,
+                this.dtConfig,
+                this.entity,
                 this.schema,
                 targetParent  // Pass the correct parent
             );
+            this.markRecordFull();
         } else {
             // Make sure table is visible and in DOM for table mode
             this.tableElement.style.display = '';
@@ -8660,6 +9279,11 @@ class ViewModeManager {
         if (typeof setupBulkActions === 'function') {
             setupBulkActions(this.entity);
         }
+    }
+
+    /** Table mode record: the split layout shows only the record (CSS .inbox-record-full). */
+    markRecordFull() {
+        this.inboxContainer()?.classList.toggle('inbox-record-full', this.recordFull);
     }
 }
 
@@ -8718,13 +9342,26 @@ async function initLabTable(tableElement) {
     // Store manager instance on table element for debugging/access
     tableElement.__viewManager = viewManager;
 
+    tableElement.__defaultPageLength = entriesPerPage;
+
     removeTableSkeleton(tableElement);
-    // Render initial view based on stored preference
-    if (viewManager.currentViewMode === VIEW_MODE_INBOX) {
+    // Render the initial view (URL ?mode, stored preference or default)
+    if (viewManager.currentViewMode === VIEW_MODE_INBOX || viewManager.recordFull) {
         await ensureSummaryComponentTemplate(schema);
         renderInboxView(tableElement, cache, mergedConfig, entity, schema);
+        viewManager.markRecordFull();
     } else {
         renderLazyDataTable(tableElement, cache, mergedConfig, entity);
+    }
+
+    // The URL shows the mode in use (a stored preference too), then opens
+    // what it names: a record (reload, shared link) or the create form.
+    viewManager.writeModeToUrl(viewManager.currentViewMode);
+    const urlState = typeof parseTableUrl === 'function' ? parseTableUrl() : null;
+    if (viewManager.urlRecordUid(urlState)) {
+        await viewManager.openRecordFromUrl(urlState);
+    } else if (urlState?.action === 'create' && typeof applyCreateFormUrl === 'function') {
+        applyCreateFormUrl(urlState);
     }
 
     // Listen for view mode changes to clear selections
@@ -8755,6 +9392,14 @@ function removeTableSkeleton(tableElement) {
 }
 
 /**
+ * List URL for a table schema's "entity": an entity table ("customers"), or a
+ * business entity ("business-entity/{slug}", one record across several tables).
+ */
+function entityListUrl(entity) {
+    return entityRecordUrl('list', entity);
+}
+
+/**
  * @param {object} query optional { search, sort } list parameters (see buildListQuery)
  */
 async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
@@ -8762,7 +9407,7 @@ async function fetchEntityData(entity, offset = 0, length = 50, query = {}) {
     if (query.search) params.search = query.search;
     if (query.sort) params.sort = query.sort;
 
-    const response = await apiClient.get(`${TABLE_API_ENTITY_LIST_PREFIX}${entity}`, params);
+    const response = await apiClient.get(entityListUrl(entity), params);
 
     if (!response.success) {
         console.error(TABLE_MESSAGE_FAILED_FETCH_ENTITY, response.message);
@@ -9158,6 +9803,19 @@ function applyBindingTransform(value, transformName) {
     }
 }
 
+/**
+ * "prefix": put before a value that is only a name or a relative path
+ * (e.g. a stored file name: "/profile-picture/" + "abc.png"); full URLs,
+ * data: URIs and paths starting with "/" are left as they are.
+ */
+function applyBindingPrefix(value, prefix) {
+    if (!prefix || typeof value !== 'string' || value === '' || /^(https?:|data:|\/)/i.test(value)) {
+        return value;
+    }
+
+    return `${prefix}${value}`;
+}
+
 function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
     const rawValue = getFirstRowValue(
         row,
@@ -9166,7 +9824,7 @@ function resolveBindingFieldValue(row = {}, metaMap = {}, fieldConfig = {}) {
         fieldConfig.fallback ?? ''
     );
 
-    return applyBindingTransform(rawValue, fieldConfig.transform);
+    return applyBindingTransform(applyBindingPrefix(rawValue, fieldConfig.prefix), fieldConfig.transform);
 }
 
 function replaceTemplateTokens(template = '', values = {}) {
@@ -9219,12 +9877,35 @@ function renderKeyValueRowsBinding(binding = {}, row = {}, metaMap = {}) {
     return binding.fallback_template || '';
 }
 
+/**
+ * "type": "badges": a value or a list (e.g. a business entity's
+ * "labels.roles") as one badge per item, inserted as text.
+ *   {"type": "badges", "paths": ["labels.roles"], "class": "badge text-bg-light border",
+ *    "template": "<div>__BADGES__</div>", "fallback_template": ""}
+ */
+function renderBadgesBinding(binding = {}, row = {}, metaMap = {}) {
+    const value = getFirstRowValue(row, metaMap, binding.paths || [], null);
+    const items = (Array.isArray(value) ? value : [value])
+        .filter((item) => item !== null && item !== undefined && item !== '');
+
+    if (items.length === 0) {
+        return binding.fallback_template || '';
+    }
+
+    const className = escapeDetailHtml(binding.class || 'badge text-bg-light border me-1 mb-1');
+    const badges = items.map((item) => `<span class="${className}">${escapeDetailHtml(item)}</span>`).join('');
+
+    return (binding.template || '__BADGES__').replace('__BADGES__', badges);
+}
+
 function renderBindingValue(binding = {}, row = {}, metaMap = {}) {
     switch (binding.type) {
         case 'template':
             return renderTemplateBinding(binding, row, metaMap);
         case 'key_value_rows':
             return renderKeyValueRowsBinding(binding, row, metaMap);
+        case 'badges':
+            return renderBadgesBinding(binding, row, metaMap);
         case 'text':
         default:
             return escapeDetailHtml(getFirstRowValue(row, metaMap, binding.paths || [], binding.fallback ?? ''));
@@ -9380,6 +10061,130 @@ function renderFallbackDetailComponent(data = {}) {
     `;
 }
 
+/**
+ * Loading placeholder while a details component loads: the usual record
+ * layout (picture, title, subtitle, a few label/value rows), like the form
+ * skeleton does for forms.
+ */
+function renderComponentSkeleton() {
+    const row = () => `
+        <div class="d-flex flex-column flex-sm-row gap-1 gap-sm-3 py-1">
+            <span class="placeholder col-4 col-sm-3 rounded"></span>
+            <span class="placeholder col-7 col-sm-6 rounded"></span>
+        </div>`;
+
+    return `
+        <div class="component-skeleton placeholder-glow px-3 px-lg-4 pb-3" aria-hidden="true">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="placeholder rounded-circle flex-shrink-0" style="width: 72px; height: 72px;"></span>
+                <div class="flex-grow-1">
+                    <span class="placeholder col-6 rounded mb-2 d-block" style="height: 1.25rem;"></span>
+                    <span class="placeholder col-4 rounded d-block"></span>
+                </div>
+            </div>
+            ${row()}${row()}${row()}${row()}${row()}
+        </div>`;
+}
+
+/**
+ * Loading placeholder for a whole record panel (header, actions row,
+ * component), shown while the record itself loads, e.g. a record URL opened
+ * by a reload. Matches the record placeholder in ui/inc/list-skeleton.
+ */
+function renderRecordSkeleton() {
+    return `
+        <div class="placeholder-glow d-flex flex-column w-100" aria-hidden="true">
+            <div class="d-flex justify-content-between align-items-center pt-2 pb-1 px-3 border-bottom">
+                <div class="flex-grow-1">
+                    <span class="placeholder col-5 col-md-3 rounded d-block mb-1" style="height: 1rem;"></span>
+                    <span class="placeholder col-3 col-md-2 rounded d-block" style="height: 0.6rem;"></span>
+                </div>
+                <span class="placeholder rounded" style="width: 1rem; height: 1rem;"></span>
+            </div>
+            <div class="d-flex gap-2 px-3 py-2">
+                <span class="placeholder rounded" style="width: 3.5rem; height: 1.25rem;"></span>
+                <span class="placeholder rounded" style="width: 4rem; height: 1.25rem;"></span>
+            </div>
+            <div class="pt-2">${renderComponentSkeleton()}</div>
+        </div>`;
+}
+
+/**
+ * The record a details component shows: the table row plus the full record
+ * from the record source, so a component can show what the list doesn't
+ * load (e.g. a user's roles from a business entity: "labels.roles").
+ *
+ * Record source, in order:
+ * - table schema "details_source": an entity or "business-entity/{slug}";
+ * - the "dataEndpoint" of the table's form (form_schema_uid);
+ * - none: the row alone (as before).
+ * A failed fetch also falls back to the row.
+ */
+async function loadDetailRecord(schema = {}, detailConfig = {}, row = {}) {
+    const uid = row?.uid;
+
+    if (!uid) {
+        return row;
+    }
+
+    let url = null;
+    const source = getSchemaConfigValue(schema, ['details_source', 'details-source']);
+
+    if (source && typeof entityRecordUrl === 'function') {
+        url = entityRecordUrl('show', source, uid);
+    } else if (detailConfig.formSchemaUid && typeof getFormSchema === 'function') {
+        const formSchema = await getFormSchema(detailConfig.formSchemaUid);
+        const dataEndpoint = formSchema?.dataEndpoint ?? formSchema?.schema?.dataEndpoint ?? null;
+        url = dataEndpoint ? dataEndpoint.replace('{uid}', encodeURIComponent(uid)) : null;
+    }
+
+    if (!url || typeof fetchSessionJsonData !== 'function') {
+        return row;
+    }
+
+    const record = await fetchSessionJsonData(url);
+
+    return record && typeof record === 'object' && !Array.isArray(record) ? mergeDetailRecord(row, record) : row;
+}
+
+/**
+ * Row + record: the record's values win, but "meta" lists are combined, so
+ * the row's meta (e.g. a user's profile_picture) survives a record that has
+ * other meta, or none.
+ */
+function mergeDetailRecord(row = {}, record = {}) {
+    const merged = { ...row, ...record };
+    const rowMeta = Array.isArray(row.meta) ? row.meta : [];
+    const recordMeta = Array.isArray(record.meta) ? record.meta : [];
+
+    if (rowMeta.length > 0 || recordMeta.length > 0) {
+        const recordKeys = new Set(recordMeta.map((item) => item?.meta_key));
+        merged.meta = [...rowMeta.filter((item) => !recordKeys.has(item?.meta_key)), ...recordMeta];
+    }
+
+    return merged;
+}
+
+/**
+ * The component a form shows in view mode: form schema
+ * "modes": {"view": {"component": "user.details"}}. Null when none.
+ */
+async function resolveFormViewComponent(formSchemaUid) {
+    if (!formSchemaUid || typeof getFormSchema !== 'function') {
+        return null;
+    }
+
+    const formSchema = await getFormSchema(formSchemaUid);
+    const modes = formSchema?.modes ?? formSchema?.schema?.modes ?? {};
+
+    return modes?.view?.component || null;
+}
+
+/**
+ * Which form and components a table's records use. The record's component
+ * comes from its form (modes.view.component, set by loadDetailComponent);
+ * the table's own "details_component" is the deprecated fallback.
+ */
 function resolveDetailConfig(schema = {}) {
     const columns = schema?.["dt-options"]?.columns || [];
     const columnWithFormSchema = columns.find((column) => column?.["form-schema-uid"]);
@@ -9604,7 +10409,7 @@ async function handleHybridDetailDelete(detailContext) {
         return;
     }
 
-    const endpoint = uiApiUrl(`entity/delete/${entity}/${entityUid}`);
+    const endpoint = entityRecordUrl('delete', entity, entityUid);
     window.uiDebug?.(TABLE_LOG_DELETING_DETAIL_RECORD, {
         entity,
         entityUid,
@@ -9637,6 +10442,16 @@ async function handleHybridDetailDelete(detailContext) {
         const parentContainer = rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
         const listTable = parentContainer?.querySelector(TABLE_SELECTOR_INBOX_LIST);
         const rootTable = document.querySelector(TABLE_SELECTOR_LAB_TABLE);
+        // The record is gone: back to the list on small screens.
+        setInboxDetailOpen(rightPanelEle, false);
+
+        // Out of the URL; a full width record (table mode) returns to the table.
+        const deletedFromManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
+        if (deletedFromManager?.recordFull) {
+            await deletedFromManager.recordDeleted();
+            return;
+        }
+        deletedFromManager?.recordDeleted?.({ reloadList: false });
 
         if (rootTable && typeof window.clearLabTableCache === 'function') {
             window.clearLabTableCache(rootTable);
@@ -9742,7 +10557,15 @@ function getNestedDetailValue(source, paths = []) {
     return null;
 }
 
+/** Split view on small screens: show the record over the list, or the list again. */
+function setInboxDetailOpen(rightPanelEle, open) {
+    rightPanelEle?.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.classList.toggle('inbox-detail-open', open);
+}
+
 async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
+    // Phones/tablets: the record covers the list (CSS .inbox-detail-open).
+    setInboxDetailOpen(rightPanelEle, true);
+
     window.uiDebug?.(TABLE_LOG_LOADING_DETAIL_PANEL, {
         entity: schema?.entity,
         uid: data?.uid || data?.id || null,
@@ -9816,11 +10639,12 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     closeButton.onclick = (e) => {
         e.stopPropagation();
 
-        // Closing the details returns to the full table view.
+        // Closing the details returns to the table (and the list URL).
         const parentContainer = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER);
+        setInboxDetailOpen(rightPanelEle, false);
         const viewManager = parentContainer?.__listTable?.__sourceTable?.__viewManager;
-        if (viewManager && typeof VIEW_MODE_TABLE !== 'undefined') {
-            viewManager.setViewMode(VIEW_MODE_TABLE);
+        if (viewManager?.closeRecord) {
+            viewManager.closeRecord();
             return;
         }
 
@@ -9897,6 +10721,23 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
     
     try {
         const detailConfig = resolveDetailConfig(schema);
+        // The form's view mode component wins over the table's deprecated details_component.
+        detailConfig.detailsComponent = (await resolveFormViewComponent(detailConfig.formSchemaUid))
+            || detailConfig.detailsComponent;
+
+        // On the list page, the URL names the open record: /list/{table}/{view|edit}/{form}/{uid}.
+        const viewManager = rightPanelEle.closest(TABLE_SELECTOR_INBOX_VIEW_CONTAINER)?.__listTable?.__sourceTable?.__viewManager;
+        if (viewManager && data?.uid && detailConfig.formSchemaUid) {
+            viewManager.openUid = String(data.uid);
+            if (typeof setTableUrlRecord === 'function') {
+                setTableUrlRecord({
+                    action: options.formMode === 'edit' ? 'edit' : 'view',
+                    form: detailConfig.formSchemaUid,
+                    uid: data.uid,
+                });
+            }
+        }
+
         const preferredMode = resolvePreferredDetailRenderMode(detailConfig, options.preferredMode);
         const detailContext = createDetailContext(
             rightPanelEle,
@@ -9909,10 +10750,21 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
         );
         const detailAttempts = buildDetailAttempts(detailConfig, preferredMode);
 
+        // A component renders first: a record-shaped skeleton, not a form's.
+        const componentFirst = detailAttempts[0]?.type === DETAIL_RENDER_MODE_COMPONENT;
+        if (componentFirst) {
+            contentContainer.innerHTML = renderComponentSkeleton();
+            // The Edit/Delete row goes above the component: add it now, so the
+            // skeleton sits where the component will (no jump when it renders).
+            appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+        }
+
         // Shape the skeleton like the form that will render: use the cached
         // schema now, or fetch it in parallel with the template (setupForm
         // then gets it from the same cache / pending request).
-        const skeletonSchemaId = detailAttempts.find((attempt) => attempt.schemaId)?.schemaId;
+        const skeletonSchemaId = componentFirst
+            ? null
+            : detailAttempts.find((attempt) => attempt.type === DETAIL_RENDER_MODE_FORM)?.schemaId;
         if (skeletonSchemaId) {
             const cachedSchema = getCachedFormSchema(skeletonSchemaId);
             if (cachedSchema) {
@@ -9953,12 +10805,15 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             let result = null;
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
-                const template = await fetchComponentTemplate(attempt.componentName, attempt.schemaId);
+                const [template, record] = await Promise.all([
+                    fetchComponentTemplate(attempt.componentName, attempt.schemaId),
+                    loadDetailRecord(schema, detailConfig, data),
+                ]);
 
                 result = template.success
                     ? {
                         success: true,
-                        html: hydrateComponentTemplate(template.html, template.bindings || {}, data),
+                        html: hydrateComponentTemplate(template.html, template.bindings || {}, record),
                     }
                     : template;
             } else {
@@ -9989,6 +10844,8 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
             if (form && typeof setupForm === 'function') {
                 form.dataset.formData = JSON.stringify(data);
                 form.__entityDataCache = data;
+                // The list row: a form with its own dataEndpoint loads its record instead.
+                form.dataset.recordSource = 'table-row';
                 form.dataset.formMode = attempt.type === DETAIL_RENDER_MODE_FORM
                     ? detailContext.requestedFormMode
                     : 'view';
@@ -10002,6 +10859,9 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
 
             if (attempt.type === DETAIL_RENDER_MODE_COMPONENT) {
                 appendHybridDetailActions(rightPanelEle, contentContainer, detailContext);
+            } else {
+                // A form has its own actions: drop the row added for the component.
+                rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             }
 
             if (typeof setupCoreFormElement === 'function') {
@@ -10021,10 +10881,11 @@ async function loadDetailComponent(rightPanelEle, schema, data, options = {}) {
                 uid: data?.uid || data?.id || null,
                 preferredMode,
             });
+            rightPanelEle.querySelector('.inbox-detail-actions')?.remove();
             contentContainer.innerHTML = renderFallbackDetailComponent(data);
             initializeDetailViewScripts(contentContainer);
         }
-        
+
     } catch (error) {
         console.error(TABLE_LOG_DETAIL_COMPONENT_ERROR, {
             entity: schema?.entity,
@@ -10216,6 +11077,8 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         ...dtConfig,
         pageLength: cache.pageSize,
         order: [],
+        // Search, sort, page and page size from the URL (?q, sort/dir, page, per_page).
+        ...(typeof tableUrlDataTableOptions === 'function' ? tableUrlDataTableOptions(tableElement.__sortFields, tableElement.__defaultPageLength) : {}),
         columns: resolvedColumns,
         columnDefs: [
             {
@@ -10245,12 +11108,17 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
 
     applyTableModeLayout(tableElement);
 
+    // The URL follows search, sort and paging.
+    if (typeof bindTableUrlSync === 'function') {
+        bindTableUrlSync(tableElement, tableElement.__sortFields, tableElement.__defaultPageLength);
+    }
+
     // Setup checkbox handlers
     setupCheckboxHandlers(tableElement, false);
 
-    // Row click: open the record in split view (table on the left, details on
-    // the right). Checkboxes and controls keep their own behaviour, and
-    // Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
+    // Row click: open the record full width in place of the table (URL
+    // /list/{table}/view/{form}/{uid}). Checkboxes and controls keep their own
+    // behaviour, and Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
     $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
         if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
             return;
@@ -10266,7 +11134,7 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
         }
 
         event.preventDefault();
-        manager.openRowInSplit(data);
+        manager.openRecord(data);
     });
 
     window.uiDebug?.(`${TABLE_LOG_DATATABLE_READY} ${entityName}`);
@@ -10435,33 +11303,44 @@ async function prefetchNextBatch(cache, entityName, currentStart, currentLength,
 // ---------------------------
 // 🌀 UI HELPERS
 // ---------------------------
+/**
+ * While a page of rows loads: placeholder rows shaped like the rows that
+ * will come (no spinner). Table view: one bar per column; split view's
+ * list: a picture and two lines, like a row component.
+ */
 function showTableLoader(tableElement) {
     const tbody = tableElement.querySelector(TABLE_SELECTOR_TBODY);
     if (!tbody) return;
 
+    const pageLength = typeof $ !== 'undefined' && $.fn.DataTable?.isDataTable(tableElement)
+        ? $(tableElement).DataTable().page.len()
+        : 10;
+    const rowCount = Math.min(Math.max(pageLength, 1), 10);
+
     if (tableElement.classList.contains(TABLE_SELECTOR_INBOX_LIST.slice(1))) {
-        tbody.innerHTML = `
-            <tr class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_2} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
-                <td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)} ${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}"></td>
-                <td class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}">
-                    <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED} py-4">
-                        <div class="spinner-border spinner-border-sm" role="status"></div>
-                        <span>${TABLE_MESSAGE_LOADING}</span>
+        const row = `
+            <tr class="${TABLE_CLASS_BORDER_BOTTOM} ${TABLE_CLASS_BORDER_LIGHT_SUBTLE}" aria-hidden="true">
+                <td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)}"><span class="placeholder rounded d-inline-block" style="width: 1rem; height: 1rem;"></span></td>
+                <td>
+                    <div class="${TABLE_CLASS_D_FLEX} ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} placeholder-glow py-1">
+                        <span class="placeholder rounded-circle flex-shrink-0" style="width: 2.25rem; height: 2.25rem;"></span>
+                        <div class="flex-grow-1">
+                            <span class="placeholder col-7 rounded d-block mb-1"></span>
+                            <span class="placeholder col-5 rounded d-block" style="height: 0.6rem;"></span>
+                        </div>
                     </div>
                 </td>
             </tr>`;
+        tbody.innerHTML = row.repeat(rowCount);
         return;
     }
 
-    tbody.innerHTML = `
-        <tr>
-            <td colspan="100%" class="${TABLE_CLASS_TEXT_CENTER} py-4">
-                <div class="${TABLE_CLASS_D_FLEX} justify-content-center ${TABLE_CLASS_ALIGN_ITEMS_CENTER} ${TABLE_CLASS_GAP_2} ${TABLE_CLASS_TEXT_MUTED}">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <span>${TABLE_MESSAGE_LOADING}</span>
-                </div>
-            </td>
-        </tr>`;
+    const columnCount = Math.max(tableElement.querySelectorAll('thead th').length, 1);
+    const cells = Array.from({ length: columnCount }, (_, index) => index === 0
+        ? `<td class="${TABLE_SELECTOR_CHECKBOX_COLUMN.slice(1)}"><span class="placeholder rounded d-inline-block" style="width: 1rem; height: 1rem;"></span></td>`
+        : `<td><span class="placeholder rounded d-block" style="width: ${50 + ((index * 17) % 40)}%;"></span></td>`
+    ).join('');
+    tbody.innerHTML = `<tr class="placeholder-glow" aria-hidden="true">${cells}</tr>`.repeat(rowCount);
 }
 
 function showAuthWarning() {
@@ -10551,6 +11430,219 @@ function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`);
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
+
+;/* ---- js/table/table-url-state.js ---- */
+/**
+ * List page URL state: the address bar follows the list without reloading
+ * the page (history.pushState / replaceState), and a reload or a shared link
+ * opens the same state.
+ *
+ * The path says which record and what is done with it (the form mode); the
+ * query says how the page is laid out and filtered:
+ *
+ *   /list/{table}                                   the list
+ *   /list/{table}/view/form/{form}/data/{uid}       a record in view mode
+ *   /list/{table}/edit/form/{form}/data/{uid}       a record in edit mode
+ *   /list/{table}/create/form/{form}                the create form
+ *                                                   ({form}: the form schema's uid)
+ *   ?mode=table|split                               the view mode: "split" shows a record
+ *                                                   in the right panel, "table" full width
+ *                                                   in place of the table (left out when it
+ *                                                   is the table's default)
+ *   ?q=term  &sort=field&dir=asc|desc  &page=2  &per_page=25
+ *
+ * Opening, closing or switching a record or the view mode adds a history
+ * entry (Back undoes it); search, sort and paging replace the current one.
+ */
+
+const TABLE_URL_ACTIONS = ['view', 'edit', 'create'];
+
+/** True while the page applies a URL (Back/Forward): nothing writes the URL meanwhile. */
+let tableUrlRestoring = false;
+
+function tableUrlModeToParam(mode) {
+    return mode === VIEW_MODE_INBOX ? 'split' : 'table';
+}
+
+function tableUrlParamToMode(param) {
+    if (param === 'split' || param === 'inbox') return VIEW_MODE_INBOX;
+    if (param === 'table') return VIEW_MODE_TABLE;
+    return null;
+}
+
+/** The list URL's parts, or null when this isn't a /list/{table} page. */
+function parseTableUrl(href = window.location.href) {
+    const url = new URL(href, window.location.origin);
+    const match = url.pathname.match(
+        /^(.*?\/list\/[^/]+)(?:\/(view|edit|create)\/form\/([^/]+)(?:\/data\/([^/]+))?)?\/?$/
+    );
+
+    if (!match) {
+        return null;
+    }
+
+    return {
+        base: match[1],
+        action: match[2] || null,
+        form: match[3] ? decodeURIComponent(match[3]) : null,
+        uid: match[4] ? decodeURIComponent(match[4]) : null,
+        mode: tableUrlParamToMode(url.searchParams.get('mode')),
+        query: url.searchParams,
+    };
+}
+
+/** The URL for an open record (or none) with these query parameters. */
+function buildTableUrl(state, record, query) {
+    let path = state.base;
+    const hasRecord = record && TABLE_URL_ACTIONS.includes(record.action) && record.form
+        && (record.action === 'create' || record.uid);
+
+    if (hasRecord) {
+        path += `/${record.action}/form/${encodeURIComponent(record.form)}`;
+        if (record.action !== 'create') {
+            path += `/data/${encodeURIComponent(record.uid)}`;
+        }
+    }
+
+    const search = query.toString();
+
+    return path + (search ? `?${search}` : '') + window.location.hash;
+}
+
+function currentTableUrlRecord(state) {
+    return state.action ? { action: state.action, form: state.form, uid: state.uid } : null;
+}
+
+function writeTableUrl(url, push) {
+    if (tableUrlRestoring || url === window.location.pathname + window.location.search + window.location.hash) {
+        return;
+    }
+
+    history[push ? 'pushState' : 'replaceState']({ labTable: true }, '', url);
+}
+
+/**
+ * A form's uid for the URL. Schemas and pages name forms by slug; the form
+ * API returns the form's uid with its schema ("schemaUid", cached), and
+ * accepts either, so a URL's uid loads the form too.
+ */
+async function tableUrlFormUid(formId) {
+    if (!formId || typeof getFormSchema !== 'function') {
+        return formId;
+    }
+
+    const schema = await getFormSchema(formId);
+
+    return schema?.schemaUid || formId;
+}
+
+/**
+ * Show a record (or the create form) in the URL, its form by uid; null shows
+ * the list. Adds a history entry.
+ */
+async function setTableUrlRecord(record, { push = true } = {}) {
+    if (!parseTableUrl()) return;
+
+    if (record?.form) {
+        record = { ...record, form: await tableUrlFormUid(record.form) };
+    }
+
+    // Read the URL after the (usually cached) lookup: it may have changed meanwhile.
+    const state = parseTableUrl();
+    writeTableUrl(buildTableUrl(state, record, new URLSearchParams(state.query)), push);
+}
+
+/** Show the view mode in the URL (?mode, left out for the table's default), keeping the open record. */
+function setTableUrlMode(mode, defaultMode, { push = false } = {}) {
+    setTableUrlQuery({ mode: mode === defaultMode ? null : tableUrlModeToParam(mode) }, { push });
+}
+
+/** Set (or with null / '', remove) query parameters, keeping the path. */
+function setTableUrlQuery(values = {}, { push = false } = {}) {
+    const state = parseTableUrl();
+    if (!state) return;
+
+    const query = new URLSearchParams(state.query);
+    Object.entries(values).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') {
+            query.delete(key);
+        } else {
+            query.set(key, String(value));
+        }
+    });
+
+    writeTableUrl(buildTableUrl(state, currentTableUrlRecord(state), query), push);
+}
+
+/**
+ * DataTables options from the URL: search term, page size, first row and
+ * (sortFields given) the sorted column. sortFields: server field per column index.
+ */
+function tableUrlDataTableOptions(sortFields = [], defaultLength = 10) {
+    const state = parseTableUrl();
+    if (!state) return {};
+
+    const options = {};
+    const q = state.query.get('q');
+    const perPage = parseInt(state.query.get('per_page') || '', 10);
+    const page = parseInt(state.query.get('page') || '', 10);
+    const sort = state.query.get('sort');
+
+    if (q) options.search = { search: q };
+    if (perPage > 0) options.pageLength = perPage;
+    if (page > 1) options.displayStart = (page - 1) * (perPage > 0 ? perPage : (defaultLength || 10));
+
+    const sortIndex = sort && Array.isArray(sortFields) ? sortFields.indexOf(sort) : -1;
+    if (sortIndex > 0) {
+        options.order = [[sortIndex, state.query.get('dir') === 'desc' ? 'desc' : 'asc']];
+    }
+
+    return options;
+}
+
+/**
+ * Keep the URL's search, sort and paging in step with a DataTable (replace,
+ * no history entry). sortFields null: this list doesn't sort (split view's
+ * list), so the URL's sort is left as it is.
+ */
+function bindTableUrlSync(listTable, sortFields = null, defaultLength = 10) {
+    if (typeof $ === 'undefined' || !parseTableUrl()) return;
+
+    $(listTable).on('draw.dt', function () {
+        if (!$.fn.DataTable.isDataTable(listTable)) return;
+
+        const dt = $(listTable).DataTable();
+        const info = dt.page.info();
+        const values = {
+            q: dt.search() || null,
+            page: info.page > 0 ? info.page + 1 : null,
+            per_page: info.length && info.length !== (defaultLength || 10) ? info.length : null,
+        };
+
+        if (Array.isArray(sortFields)) {
+            const [order] = dt.order() || [];
+            const field = order ? sortFields[order[0]] : null;
+            values.sort = field || null;
+            values.dir = field && order[1] === 'desc' ? 'desc' : null;
+        }
+
+        setTableUrlQuery(values);
+    });
+}
+
+/** Back / Forward: apply the URL to every list on the page without a reload. */
+window.addEventListener('popstate', async () => {
+    if (!parseTableUrl()) return;
+
+    tableUrlRestoring = true;
+    try {
+        for (const table of document.querySelectorAll('.lab-table')) {
+            await table.__viewManager?.applyUrl?.();
+        }
+    } finally {
+        tableUrlRestoring = false;
+    }
+});
 
 ;/* ---- js/table/table.js ---- */
 /**

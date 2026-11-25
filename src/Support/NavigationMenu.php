@@ -44,6 +44,18 @@ class NavigationMenu
     }
 
     /**
+     * Where a click on the module goes: its dashboard, wherever the admin
+     * moved it in the sidebar; else (no dashboard) the first sidebar item.
+     */
+    public function homeUrl(Module $module): string
+    {
+        $menu = $this->menu($module);
+        $dashboard = $menu->first(fn ($entry) => ($entry['kind'] ?? null) === 'dashboard');
+
+        return ($dashboard ?? $menu->first())['url'] ?? '#';
+    }
+
+    /**
      * The module and menu item matching the current URL:
      * ['index' => int|null, 'module' => Module|null, 'url' => string|null].
      * An exact URL match wins; otherwise the longest item path the current
@@ -94,6 +106,12 @@ class NavigationMenu
 
     private function buildMenu(Module $module): Collection
     {
+        // Navigation items (foundation): sidebar items with their tabs as children.
+        if ($items = $this->itemsMenu($module)) {
+            return $items;
+        }
+
+        // Older foundation / not synced yet: the module's declared menu.
         $submenuItems = json_decode($module->getMeta('module_sidebar_menu') ?? '[]', true);
 
         if (! is_array($submenuItems) || empty($submenuItems)) {
@@ -137,15 +155,62 @@ class NavigationMenu
                     'icon' => $item['icon'] ?? null,
                     'label' => $item['label'] ?? null,
                     'url' => ! empty($item['route']) && Route::has($item['route']) ? route($item['route'], $params) : '#',
+                    'children' => [],
                 ];
             })
             ->filter()
             ->values();
     }
 
+    /**
+     * The module's sidebar from navigation_items: active top-level items the
+     * user may see, each with its visible tabs ("children"). Null when the
+     * module has no items (older foundation, or not synced yet).
+     */
+    private function itemsMenu(Module $module): ?Collection
+    {
+        $model = 'Iquesters\Foundation\Models\NavigationItem';
+
+        if (! class_exists($model) || ! Schema::hasTable('navigation_items')) {
+            return null;
+        }
+
+        $items = $model::with(['children' => fn ($q) => $q->where('status', 'active')])
+            ->where('ref_module', $module->id)
+            ->whereNull('ref_parent')
+            ->where('status', 'active')
+            ->orderBy('sort')->orderBy('id')
+            ->get();
+
+        if ($items->isEmpty() && ! $model::where('ref_module', $module->id)->exists()) {
+            return null;
+        }
+
+        $user = Auth::user();
+        // kind: "dashboard" (the module's fixed first item), "self" (the tab
+        // standing for its sidebar item's own page) or null.
+        $entry = fn ($item) => [
+            'key' => $item->key,
+            'icon' => $item->displayIcon(),
+            'label' => $item->displayLabel(),
+            'url' => $item->href(),
+            'kind' => $item->isDashboard() ? 'dashboard' : ($item->isSelfTab() ? 'self' : null),
+        ];
+
+        return $items
+            ->filter(fn ($item) => $item->visibleTo($user))
+            ->map(fn ($item) => $entry($item) + [
+                'children' => $item->children
+                    ->filter(fn ($child) => $child->visibleTo($user))
+                    ->each(fn ($child) => $child->setRelation('parent', $item))
+                    ->map($entry)->values()->all(),
+            ])
+            ->values();
+    }
+
     private function resolveActive(): array
     {
-        $none = ['index' => null, 'module' => null, 'url' => null];
+        $none = ['index' => null, 'module' => null, 'url' => null, 'item' => null, 'child' => null];
         $request = request();
 
         if (! $request) {
@@ -159,26 +224,32 @@ class NavigationMenu
         $bestScore = -1;
 
         foreach ($this->modules() as $index => $module) {
-            foreach ($this->menu($module) as $item) {
-                if (empty($item['url']) || $item['url'] === '#') {
-                    continue;
-                }
+            foreach ($this->menu($module) as $top) {
+                foreach (array_merge([[$top, null]], array_map(fn ($c) => [$top, $c], $top['children'] ?? [])) as [$parent, $child]) {
+                    $item = $child ?? $parent;
 
-                $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
+                    if (empty($item['url']) || $item['url'] === '#') {
+                        continue;
+                    }
 
-                if (rtrim($item['url'], '/') === $fullUrl) {
-                    $score = PHP_INT_MAX; // exact, query string included
-                } elseif ($itemPath === $currentPath) {
-                    $score = PHP_INT_MAX - 1;
-                } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
-                    $score = strlen($itemPath);
-                } else {
-                    continue;
-                }
+                    $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
 
-                if ($score > $bestScore) {
-                    $bestScore = $score;
-                    $best = ['index' => $index, 'module' => $module, 'url' => $item['url']];
+                    if (rtrim($item['url'], '/') === $fullUrl) {
+                        $score = PHP_INT_MAX; // exact, query string included
+                    } elseif ($itemPath === $currentPath) {
+                        $score = PHP_INT_MAX - 1;
+                    } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
+                        $score = strlen($itemPath);
+                    } else {
+                        continue;
+                    }
+
+                    // A tab wins a tie with its sidebar item (same page, more precise).
+                    if ($score > $bestScore || ($score === $bestScore && $child !== null)) {
+                        $bestScore = $score;
+                        // url: the sidebar item to highlight; item/child: for tabs and breadcrumbs.
+                        $best = ['index' => $index, 'module' => $module, 'url' => $parent['url'], 'item' => $parent, 'child' => $child];
+                    }
                 }
             }
         }

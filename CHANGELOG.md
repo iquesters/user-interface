@@ -6,11 +6,51 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 ## [Unreleased]
 
 ### Added
+- **Breadcrumbs on every page**, built from navigation: `Module › Item › Tab › page`. A page adds its last crumb with `@section('breadcrumb', …)`. On phones they show as a "‹ back" link. Diglactic definitions still win where they exist.
+  - The module crumb links to the module's dashboard; on the dashboard it is the only crumb.
+- **Tabs from navigation:** a page shows the tabs (child items) of its sidebar item, so no `$tabs` array is needed. The sidebar reads `navigation_items` when foundation has them, and falls back to the old menu JSON.
+  - A sidebar item's own page is shown where its "own page" tab sits in the order, not always first.
+  - Clicking a module opens its dashboard, wherever the dashboard is in the sidebar order (it opened the first item).
+
+- **List page URLs** (`docs/record-components.md`): the address bar follows the list without reloading the page.
+  - `/list/{table}/view|edit/form/{form}/data/{uid}` opens a record, and `/list/{table}/create/form/{form}` the create form.
+  - `{form}` is the form schema's uid. The form API now finds a form by slug or uid, and returns its `schemaUid` and `schemaSlug` with the schema.
+  - `?mode=table|split` sets the view mode, and `?q`, `sort`/`dir`, `page`, `per_page` set the search, sort and paging.
+  - Back and Forward work, and a reload or shared link opens the same state (`public/js/table/table-url-state.js`).
+- **Table view:** a row click opens the record **full width in place of the table**; it used to switch to split view. Its close button brings the table back, and split view still opens records in the right panel.
+- **List page loading placeholders for each view mode:**
+  - the page-load skeleton matches what will show: the table in table view, or the list and the record panel in split view, with the record full width or on the right when the URL names one (one panel at a time on small screens);
+  - the mode comes from `?mode`, the browser's saved mode or the default;
+  - rows that load show placeholder rows (columns, or a picture and two lines in split view) instead of a "Loading…" spinner;
+  - a record opened from the URL shows its placeholder instead of "Select an item".
+- **Form schema `modes.view.component`:** the component a form shows in view mode, in the table's right panel, the full width record and the standalone `/view/{form}/{uid}` page. Edit shows the fields.
+
+### Changed
+- **Tabs:**
+  - one scrollable line on phones, with icon and label side by side and the active tab in view;
+  - labels are printed as text (they were raw HTML);
+  - the placeholder "history" tab is removed;
+  - a view's own `$tabs` array is deprecated;
+  - the list page no longer repeats its title as a tab.
+- **Business entities in tables and forms:** a schema `"entity": "business-entity/{slug}"` lists, loads, saves and deletes its records through foundation's business entity API.
+- JS: `entityApiUrl(path)` and `entityRecordUrl(action, entity, uid)` in `api-client.js` build entity and business entity API URLs (base `window.ENTITY_API_BASE`, default `/api/foundation/v1`).
+- **Record components by key** (`Support\RecordComponents`, `docs/record-components.md`):
+  - table schemas name their list and right-panel components by key, e.g. `"details_component": "user.details"`;
+  - modules keep them in `resources/views/records/{type}/` and register them in their provider;
+  - `Contracts\RecordComponentSource` (tag `record-component-sources`) lets stored components override files later.
+- **Right panel components read the full record:** the row merged with the record from `details_source` or, by default, the table's form's `dataEndpoint`.
+- New binding type `badges`, e.g. a user's roles from `labels.roles`.
+- Bindings: `"prefix"` puts a path before a bare stored file name, e.g. a profile picture's `/profile-picture/`. Full URLs are left as they are.
+- **The right panel shows a record-shaped skeleton** (picture, title, rows) while a component loads. It used to show the form's skeleton.
+- **Form fields: `"type": "repeater"`**, a repeatable group of rows with the same `fields` (`public/js/form/repeater-field.js`):
+  - the value is the whole list `[{uid?, field, meta: {}}]`;
+  - edit mode shows a card per row with remove and add buttons; view mode shows a small table.
+  - Business entity forms use it for has-many parts.
+- Form fields: `"optionsFrom": {"url": …, "empty": "…"}` adds a first "nothing" option. In view mode, a checkbox group shows the labels of the picked options, not their values.
 - **Tables:** in table view, clicking a row switches to split view with that record's details on the right and the row selected; the details' close button returns to table view (Ctrl/Cmd/Shift-click on the name link still opens it in a new tab).
 - **Tables:** table schema `"create": {"form": "<form schema>", "label": "Create user"}` adds a Create button to the list page's action row; it opens that form in create mode in a modal and reloads the table after saving. `showModal({formId, formMode: 'create'})` renders a schema's create mode.
 - Form fields: `"requiredIn": ["create"]` (required only in those modes). Modal forms use the same responsive field widths as page forms.
 - **Help, Privacy policy and Terms pages** (`/help`, `/privacy-policy`, `/terms-conditions`, public). Editable templates are published to the app (`resources/views/vendor/userinterface/pages`) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until `$isTemplate = false`. Settings `help_url`, `privacy_url`, `terms_url` link external pages instead. The user menu links point here (they were `#`).
-esources/views/vendor/userinterface/pages) on install and never overwritten. A "template page" note shows to developers (APP_DEBUG) and super-admins until ` = false`. Settings help_url, privacy_url, 	erms_url link external pages instead. The user menu links point here (they were #).
 - Form schema: a field can load its options with `"optionsFrom": {"master_data": "theme", "exclude": [...], "empty": "..."}` (filled in when the schema is served) or `"optionsFrom": {"url": "/..."}` (fetched by the browser with the user's session).
 - Form schema: `"dataEndpoint"` (with `{uid}`) loads the record from the schema's own endpoint instead of the generic entity API.
 - Form fields: `"readonly": true` shows a value in edit mode without letting it change.
@@ -23,12 +63,37 @@ esources/views/vendor/userinterface/pages) on install and never overwritten. A "
 - `"defaultFieldSize": "auto"`: one column on phones; from tablet width, short inputs sit two per row and wide content (textarea, file, image, option groups) keeps the full width. Used by the profile, settings and admin forms. The server-rendered skeleton now uses the same responsive column classes as the form (it used one fixed width).
 
 ### Changed
+- **The entity data API moved to iquesters/foundation**: the controller, `Services\Entity\*`, `DynamicEntityListQuery`, `EntityListParams` and `EntityScopeResolver`. This module now keeps presentation only. Requires iquesters/foundation `^2.1`.
+  - The JS uses `/api/foundation/v1/entity/...` (see foundation `docs/developer/entity-api.md`).
+  - **Deprecated, removed in 3.0:**
+    - table schema `summary_component` (now `row_component`), `details_component` (now the form's `modes.view.component`) and `details_source` (the form's `dataEndpoint`); still read;
+    - component names given as view paths (`userinterface::components.lab-user-*`): use registered keys. The `lab-user-*` views moved to user-management (`user.summary`, `user.details`);
+    - `/api/user-interface/v1/entity/...` and `/api/entity/...` (now served by foundation's controller);
+    - the old `Iquesters\UserInterface\Services\Entity\*`, `Http\Controllers\DynamicEntityController`, `Http\Query\DynamicEntityListQuery`, `Constants\EntityListParams` and `Contracts\EntityScopeResolver` class names, which resolve to foundation's classes (`src/deprecated-aliases.php`).
 - Flash messages in the app layout show as toasts (same as the auth pages), once.
 - View mode shows a select's option label instead of its stored value; empty values show "—".
 - Picture changer: script moved to `public/js/image-changer.js`; "Remove image" only when there is an uploaded picture; Save without pressing Crop crops the current selection (it uploaded a blank image); the default crop is the largest centred square.
 - Phones: page content and toasts stay above the bottom module bar; upload buttons show their labels; the auth card uses less padding.
 
 ### Fixed
+- Merged Track B (user-interface#55): its updated entity API test expectations apply to the copies in foundation (`tests/Feature/EntityApiTest.php`, `EntityPermissionTest.php`), which moved there with the entity API.
+- **Form errors in a modal showed up to three times** (e.g. "The given data was invalid." twice plus the field message). The modal repeated the form's messages, once for `lab-form:*` and again for the old `shoz-form:*` alias. Now the form alone shows them: under each field, or one toast for errors not tied to a field. The modal only closes on success.
+- **Errors for meta fields** (sent by the entity API as `meta.batch`) now show under the field instead of in a toast.
+- **Form buttons above the fields** (e.g. "Continue" above "Email address" on `/auth/unified`): the fields wait for the record and remote options, but the form added its default buttons without waiting for them. The buttons now come after the fields.
+- **Table split view with a form that has its own `dataEndpoint`** (e.g. Users with roles): the panel showed "—" for most fields.
+  - **Cause:** the table passed its list row to the form, and the form used that row as its record, but its fields have other keys (`user__name`).
+  - **Fix:** such a form now loads its record from `dataEndpoint`; switching between view and edit reuses that record.
+  - Forms without `dataEndpoint`, and the right panel's order (component → form in view mode → default row component), are unchanged.
+- **Phones:** a table's page-size select and search box share one row, with the search on the right.
+- **List page actions:** the **Create** button is outlined and sits on the right, before the table/split view switch.
+- **List page skeleton:** keeps the same gap below the actions bar as the loaded table, so nothing moves when the table appears.
+- **Right panel, no jump:** the Edit/Delete row of a component-backed record is added before loading, so the skeleton sits where the component will render.
+- **Phones and tablets, split view:** one panel at a time.
+  - The list fills the width; an opened record covers it, and its close button returns to the list. Deleting the record does the same.
+  - The resizer is hidden; desktop is unchanged.
+- **Phones and tablets:** after scrolling, page content (breadcrumb, headings) showed through a gap at the top of the open sidebar.
+  - The sidebar now starts at the header's bottom edge, kept in place on scroll and resize (`--ui-sidebar-top`, `public/js/app.js`).
+  - It fills the rest of the screen and scrolls its own menu; its last items stay above the bottom module bar.
 - The user menu avatar used a relative path that broke on nested URLs.
 
 ## [2.0.0] – 2026-11-17

@@ -51,12 +51,12 @@
                     <div class="row row-cols-1 p-1 g-2">
                         <div class="col col-md-12">
                             <div class="position-sticky p-2 bg-white ps-3 breadcrumbs">
-                            @if(Breadcrumbs::exists())
-                            {{ Breadcrumbs::render() }}
-                            @endif
+                            {{-- Module › item › tab › page; a page adds its last crumb with @section('breadcrumb', …) --}}
+                            @include('userinterface::layouts.common.breadcrumbs')
                         </div>
                             {{-- Tabs (optional) --}}
-                            @includeWhen(isset($tabs) && is_array($tabs), 'userinterface::layouts.common.tabs')
+                            {{-- Tabs of the current sidebar item (Admin → Navigation), or a view's own $tabs (deprecated) --}}
+                            @include('userinterface::layouts.common.tabs')
 
                             {{-- @stack('content') --}}
                             @yield('content')

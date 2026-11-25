@@ -37,6 +37,24 @@ class FormController extends Controller
     }
 
     /**
+     * The form's own uid and slug, alongside its schema ("schemaUid",
+     * "schemaSlug"): list page URLs name the form by uid
+     * (/list/{table}/view/form/{form uid}/data/{uid}).
+     */
+    private function withIdentity(mixed $schema, FormSchema $form): mixed
+    {
+        if (is_object($schema)) {
+            $schema->schemaUid = $form->uid;
+            $schema->schemaSlug = $form->slug;
+        } elseif (is_array($schema)) {
+            $schema['schemaUid'] = $form->uid;
+            $schema['schemaSlug'] = $form->slug;
+        }
+
+        return $schema;
+    }
+
+    /**
      * Get form schema without authentication
      */
     public function getNoAuthFormSchema($slug)
@@ -69,7 +87,11 @@ class FormController extends Controller
                 throw new \Exception('Form schema slug not found');
             }
 
-            $form = FormSchema::where(['slug' => $slug, 'status' => EntityStatus::ACTIVE])->first();
+            // By slug (how schemas and pages name forms), or by uid (list page URLs).
+            $form = FormSchema::where('status', EntityStatus::ACTIVE)
+                ->where(fn ($query) => $query->where('slug', $slug)->orWhere('uid', $slug))
+                ->orderByRaw('slug = ? desc', [$slug])
+                ->first();
             static::logDebug($form ? "Form schema found: {$slug}" : "Form schema not found: {$slug}", $form ? ['uid' => $form->uid] : []);
 
             if (! $form) {
@@ -77,7 +99,7 @@ class FormController extends Controller
             }
 
             return ApiResponse::success(
-                $this->normalizeSchema($form->schema),
+                $this->withIdentity($this->normalizeSchema($form->schema), $form),
                 'Form schema found'
             );
         } catch (\Throwable $e) {

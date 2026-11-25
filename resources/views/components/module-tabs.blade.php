@@ -98,7 +98,7 @@
                 $isFeatured = ($viewMode === 'mobile' && $featuredTabName && $index === $featuredIndex);
             @endphp
 
-            <a href="{{ $menu[0]['url'] ?? '#' }}" 
+            <a href="{{ $navigationMenu->homeUrl($module) }}" 
                class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} {{ $module->id === $activeModuleId ? 'active-module' : '' }} d-flex flex-column align-items-center justify-content-center text-decoration-none text-primary"
                data-view-mode="{{ $viewMode }}"
                data-menu='@json($menu)'
@@ -138,7 +138,7 @@
                         <li>
                             <a class="dropdown-item d-flex align-items-center text-truncate {{ $module->id === $activeModuleId ? 'active' : '' }}"
                                data-view-mode="{{ $viewMode }}"
-                               href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($menu[0]['url'] ?? '#') }}"
+                               href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($navigationMenu->homeUrl($module)) }}"
                                data-menu='@json($menu)'
                                data-name="{{ ucfirst($module->name) }}"
                                data-index="{{ $maxVisible + $idx }}"

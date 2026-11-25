@@ -28,7 +28,7 @@
   "require": {
     "php": "^8.3",
     "laravel/framework": "^12.0|^13.0",
-    "iquesters/foundation": "^2.0",
+    "iquesters/foundation": "^2.1",
     "diglactic/laravel-breadcrumbs": "^10.0"
   },
   "suggest": {
@@ -58,7 +58,10 @@
     "psr-4": {
       "Iquesters\\UserInterface\\": "src/",
       "Iquesters\\UserInterface\\Database\\Seeders\\": "database/seeders/"
-    }
+    },
+    "files": [
+      "src/deprecated-aliases.php"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
