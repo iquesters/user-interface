@@ -78,10 +78,11 @@ async function setupFormBlock(formCol, formMeta) {
             form.__entityDataCache = entityData;
         }
 
-        await loadRemoteFieldOptions(formMeta);
+        await loadRemoteFieldOptions(formMeta, form.dataset.entityUid || null);
 
-        // add fields to form
+        // add fields to form (a section's fields go inside its panel)
         if (formMeta.fields && formMeta.fields.length > 0) {
+            let target = form;
             formMeta.fields.forEach((field, index) => {
                 if (!isFieldShownInMode(field, formMeta.formMode)) {
                     return;
@@ -91,7 +92,11 @@ async function setupFormBlock(formCol, formMeta) {
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
                 field.value = resolveFieldValue(field.id, formData, entityData);
-                addField(field, form, formMeta);
+                if (isSectionField(field)) {
+                    target = renderFormSection(field, form);
+                    return;
+                }
+                addField(field, target, formMeta);
             });
         } else {
             if (APP_ENV === 'dev') {
@@ -115,6 +120,7 @@ async function addField(field, addTo,formMeta) {
         renderFormSpacer(field, addTo);
         return;
     }
+
 
     if (field.type === INPUT_TYPE.HIDDEN) {
         const input = document.createElement(HTML_TAG.INPUT);
@@ -143,7 +149,7 @@ async function addField(field, addTo,formMeta) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         if (Array.isArray(field.options)) {
@@ -161,7 +167,7 @@ async function addField(field, addTo,formMeta) {
         
         // ✅ Label (same as radio & checkbox)
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         // ✅ Create select element
@@ -192,7 +198,7 @@ async function addField(field, addTo,formMeta) {
         
         if (Array.isArray(field.options)) {
             if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
             }
             field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.CHECKBOX)));
         } else {
@@ -362,6 +368,54 @@ async function addField(field, addTo,formMeta) {
 
 function isSpacerField(field = {}) {
     return field?.type === INPUT_TYPE.SPACER || field?.type === CONSTANT.FORM_LAYOUT_SPACER_TYPE;
+}
+
+/**
+ * A section starts a group of fields: {"id": "when", "type": "section",
+ * "label": "When and where", "description": "Date, time and venue"}.
+ * It carries no value (like a spacer).
+ */
+function isSectionField(field = {}) {
+    return field?.type === 'section';
+}
+
+/** Fields that only shape the layout: never submitted, never validated. */
+function isLayoutField(field = {}) {
+    return isSpacerField(field) || isSectionField(field);
+}
+
+/**
+ * A section: a soft panel with its title and description, and a grid for the
+ * fields that follow it (until the next section). Returns that grid.
+ */
+function renderFormSection(field, addTo) {
+    const section = document.createElement(HTML_TAG.DIV);
+    section.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
+    section.className = 'col-12 lab-form-section';
+    section.dataset.layoutType = 'section';
+
+    const header = document.createElement(HTML_TAG.DIV);
+    header.className = 'lab-form-section-header';
+    if (field.label) {
+        const title = document.createElement('h6');
+        title.className = 'lab-form-section-title';
+        title.textContent = field.label;
+        header.appendChild(title);
+    }
+    if (field.description) {
+        const description = document.createElement('p');
+        description.className = 'lab-form-section-description';
+        description.textContent = field.description;
+        header.appendChild(description);
+    }
+    section.appendChild(header);
+
+    const grid = document.createElement(HTML_TAG.DIV);
+    grid.className = 'row row-cols-1 g-3 lab-form-section-body';
+    section.appendChild(grid);
+
+    addTo.appendChild(section);
+    return grid;
 }
 
 function renderFormSpacer(field, addTo) {
@@ -705,9 +759,7 @@ function createHelperText(field, container) {
         helper.classList.add(STYLE_CLASS.FORM_TEXT, STYLE_CLASS.SMALL, STYLE_CLASS.TEXT_MUTED);
         helper.style.fontSize = STYLE_CLASS.HELPER_TEXT_FONT_SIZE;
         helper.style.display = 'block';
-        helper.style.overflow = 'hidden';
-        helper.style.textOverflow = 'ellipsis';
-        helper.style.whiteSpace = 'nowrap';
+        helper.classList.add('lab-form-help');
         helper.id = `${getFieldDomId(field)}${SUFFIX.HELP}`;
         helper.textContent = helperText;
         helper.title = helperText;
@@ -742,6 +794,7 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
     label.setAttribute(ATTR_CONS.FOR, fieldDomId);
     label.classList.add(STYLE_CLASS.FORM_LABEL);
     label.textContent = field.label;
+    if (field.required) markLabelRequired(label);
 
     // ✅ Create input or textarea
     const inputElement = document.createElement(inputTag);
@@ -789,12 +842,25 @@ function appendFieldInfoAndFeedback(field, formContainer) {
 
 
 // ✅ Create <label> element
-function createLabel(text, forId = null, classList = []) {
+function createLabel(text, forId = null, classList = [], required = false) {
     const label = document.createElement(HTML_TAG.LABEL);
     label.textContent = text;
     if (forId) label.setAttribute(ATTR_CONS.FOR, forId);
     if (classList.length) label.classList.add(...classList);
+    if (required) markLabelRequired(label);
     return label;
+}
+
+/** A red "*" after a required field's label (screen readers hear "required" from the input itself). */
+function markLabelRequired(label) {
+    if (!label || label.querySelector('.ui-required-mark')) {
+        return;
+    }
+    const star = document.createElement('span');
+    star.className = 'ui-required-mark text-danger ms-1';
+    star.setAttribute('aria-hidden', 'true');
+    star.textContent = '*';
+    label.appendChild(star);
 }
 
 
@@ -817,8 +883,33 @@ function createOptionInput(field, opt, type) {
         input.checked = true;
     }
 
-    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL]);
+    // A single checkbox (e.g. "I agree to the terms") is the field itself: its label carries the "*".
+    const single = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (single && field.required) {
+        input.required = true;
+    }
+    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL], single && Boolean(field.required));
     div.append(input, label);
+
+    // "links": [{"label": "Terms", "url": "/terms-conditions"}, …] after a single
+    // checkbox's label (e.g. the pages someone agrees to); they open in a new tab.
+    if (single && Array.isArray(field.links) && field.links.length) {
+        const links = document.createElement('div');
+        links.className = 'small ms-1 mt-1 d-flex flex-wrap gap-2';
+        field.links.forEach(link => {
+            const url = String(link?.url || '');
+            if (!/^(https?:\/\/|\/)/i.test(url)) {
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = link.label || url;
+            links.appendChild(a);
+        });
+        div.appendChild(links);
+    }
     return div;
 }
 

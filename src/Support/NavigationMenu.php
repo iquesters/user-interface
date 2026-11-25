@@ -234,10 +234,21 @@ class NavigationMenu
 
                     $itemPath = '/'.trim((string) parse_url($item['url'], PHP_URL_PATH), '/');
 
+                    $itemQuery = (string) parse_url($item['url'], PHP_URL_QUERY);
+
                     if (rtrim($item['url'], '/') === $fullUrl) {
                         $score = PHP_INT_MAX; // exact, query string included
-                    } elseif ($itemPath === $currentPath) {
+                    } elseif ($itemQuery !== '') {
+                        // A filter tab (e.g. ?status=approved) is active when the page has its
+                        // values (other parameters, e.g. ?mode=table, may be there too);
+                        // otherwise every tab of the page would match its path.
+                        parse_str($itemQuery, $wanted);
+                        if ($itemPath !== $currentPath || array_diff_assoc(array_map('strval', $wanted), array_map('strval', $request->query())) !== []) {
+                            continue;
+                        }
                         $score = PHP_INT_MAX - 1;
+                    } elseif ($itemPath === $currentPath) {
+                        $score = PHP_INT_MAX - 2;
                     } elseif ($itemPath !== '/' && str_starts_with($currentPath, $itemPath.'/')) {
                         $score = strlen($itemPath);
                     } else {

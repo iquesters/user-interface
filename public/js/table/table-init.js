@@ -203,7 +203,10 @@ class ViewModeManager {
 
         let row = { uid };
         if (typeof fetchSessionJsonData === 'function' && typeof entityRecordUrl === 'function') {
-            const record = await fetchSessionJsonData(entityRecordUrl('show', this.entity, uid));
+            const record = await fetchSessionJsonData(
+                (typeof tableRecordDataUrl === 'function' && tableRecordDataUrl(this.schema, uid))
+                    || entityRecordUrl('show', this.entity, uid)
+            );
             if (record && typeof record === 'object' && !Array.isArray(record)) {
                 row = { uid, ...record };
             }

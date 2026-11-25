@@ -47,6 +47,9 @@
         }
     }
     
+    // A module's name as people read it: its "module_label" meta, else "user-interface" → "User Interface".
+    $moduleLabel = fn ($module) => (string) ($module->getMeta('module_label') ?: \Illuminate\Support\Str::headline($module->name));
+
     // Menus are built once per request (NavigationMenu), not per include.
     $navigationMenu = app(\Iquesters\UserInterface\Support\NavigationMenu::class);
     $generateMenu = fn ($module) => $navigationMenu->menu($module);
@@ -62,8 +65,8 @@
             'dropdownIcon' => 'fa-caret-down',
         ],
         'vertical' => [
-            'container' => 'd-none d-lg-flex flex-column align-items-center',
-            'inner' => 'd-flex flex-grow-1 flex-column align-items-center overflow-hidden',
+            'container' => 'd-none d-lg-flex flex-column align-items-center w-100',
+            'inner' => 'd-flex flex-grow-1 flex-column align-items-center overflow-hidden w-100',
             'innerStyle' => '',
             'placement' => 'bottom',
             'dropdownIcon' => 'fa-caret-right',
@@ -102,18 +105,18 @@
                class="module-tab module-tab-{{ $viewMode }} {{ $isFeatured ? 'module-tab-featured' : '' }} {{ $module->id === $activeModuleId ? 'active-module' : '' }} d-flex flex-column align-items-center justify-content-center text-decoration-none text-primary"
                data-view-mode="{{ $viewMode }}"
                data-menu='@json($menu)'
-               data-name="{{ ucfirst($module->name) }}"
+               data-name="{{ $moduleLabel($module) }}"
                data-index="{{ $index }}"
                data-bs-toggle="tooltip"
                data-bs-placement="{{ $config['placement'] }}"
-               title="{{ ucfirst($module->name) }}">
+               title="{{ $moduleLabel($module) }}">
                 
                 <div class="module-tab-icon-wrapper {{ $isFeatured ? 'module-tab-icon-featured' : '' }}">
                     <i class="fa-fw {{ $module->getMeta('module_icon') ?: 'fas fa-cubes' }} module-tab-icon"></i>
                 </div>
                 
                 <small class="module-tab-label {{ $isFeatured ? 'module-tab-label-featured' : '' }}">
-                    {{ ucfirst($module->name) }}
+                    {{ $moduleLabel($module) }}
                 </small>
             </a>
         @endforeach
@@ -140,12 +143,12 @@
                                data-view-mode="{{ $viewMode }}"
                                href="{{ $viewMode === 'desktop' || $viewMode === 'vertical' ? 'javascript:void(0);' : ($navigationMenu->homeUrl($module)) }}"
                                data-menu='@json($menu)'
-                               data-name="{{ ucfirst($module->name) }}"
+                               data-name="{{ $moduleLabel($module) }}"
                                data-index="{{ $maxVisible + $idx }}"
                                @if($viewMode === 'mobile') data-mobile-navigate="true" @endif>
                                 <i class="{{ $module->getMeta('module_icon') }} me-2"></i>
                                 <span class="text-truncate" style="max-width: calc(100% - 20px);">
-                                    {{ ucfirst($module->name) }}
+                                    {{ $moduleLabel($module) }}
                                 </span>
                             </a>
                         </li>

@@ -99,8 +99,11 @@ class UserInterfaceSeeder extends BaseSeeder
         |-------------------------------------------------
         */
             [
+                // The order of the modules (the "navigations" table). Not foundation's
+                // Navigation editor (sidebar items): named apart so the two aren't confused.
+                'key' => 'navigation',
                 'icon' => 'fas fa-bars-staggered',
-                'label' => 'Navigation',
+                'label' => 'Module order',
                 'route' => 'ui.list',
                 'table_schema' => [
                     'slug' => 'navigation-table',
@@ -134,16 +137,8 @@ class UserInterfaceSeeder extends BaseSeeder
                     ],
                 ],
             ],
-            /*
-        |-------------------------------------------------
-        | Others (no table schema)
-        |-------------------------------------------------
-        */
-            [
-                'icon' => 'fas fa-building-columns',
-                'label' => 'All Organisations',
-                'route' => 'organisations.index',
-            ],
+            // "All Organisations" belongs to the organisation module's menu (it made the
+            // Organisations page open user-interface's sidebar); a re-seed hides the old item.
         ],
     ];
 

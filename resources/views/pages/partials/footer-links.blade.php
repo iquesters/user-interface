@@ -3,5 +3,5 @@
     @foreach (['help' => 'Help', 'privacy' => 'Privacy Policy', 'terms' => 'Terms & Conditions'] as $page => $label)
         <a class="link-secondary" href="{{ InfoPages::url($page) }}" @if (InfoPages::isExternal($page)) target="_blank" rel="noopener" @endif>{{ $label }}</a>
     @endforeach
-    <span>&copy; {{ date('Y') }} {{ $appName ?? config('app.name') }}</span>
+    <span>&copy; {{ date('Y') }} {{ $appName ?? \Iquesters\UserInterface\Support\Assets::appName() }}</span>
 </div>

@@ -14,7 +14,7 @@
     $sidebarActiveClasses = 'active bg-primary-subtle text-primary fw-semibold';
 @endphp
 
-<aside class="sidebar ui-sidebar bg-light {{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
+<aside class="sidebar ui-sidebar {{ ConfProvider::from(Module::USER_INFE)->large_screen_nav_style === 'minibar' ? 'has-minibar' : 'no-minibar' }}" id="appSidebar">
     <div class="sidebar-body">
         <div class="list-group list-group-flush" id="sidebarMenu"
              data-server-active="{{ $navActive['module'] ? '1' : '0' }}"

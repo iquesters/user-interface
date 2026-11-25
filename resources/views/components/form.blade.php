@@ -46,7 +46,7 @@
 
             $skeletonMode = $form_mode ?: 'edit';
             $skeletonFieldWidths = collect($decodedSchema['fields'] ?? [])
-                ->filter(fn ($field) => ($field['type'] ?? null) !== 'hidden')
+                ->filter(fn ($field) => ! in_array($field['type'] ?? null, ['hidden', 'section'], true))
                 // "showIn": the field only exists in those modes (see isFieldShownInMode in form.js).
                 ->filter(fn ($field) => ! is_array($field['showIn'] ?? null) || in_array($skeletonMode, $field['showIn'], true))
                 ->map(function ($field) use ($defaultFieldSize) {
@@ -276,10 +276,5 @@
 </form>
 {{-- <p class="alert alert-info">Form Rendered by Form Schema</p> --}}
 
-@if(config('app.debug'))
-<div class="small p-1 d-flex justify-content-end align-items-center">
-    <div class="small">
-        Form Rendered by Form Schema
-    </div>
-</div>
-@endif
+{{-- While debugging, the form engine adds "Form Rendered by Form Schema: slug" under the form
+     (appendFormSchemaLabel in form.js), so modal and record-section forms get it too. --}}

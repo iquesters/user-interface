@@ -577,13 +577,13 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         // Get entity name from the page
         const entityElement = document.querySelector('h5.fs-6');
-        const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+        const entityName = entityElement ? (entityElement.dataset.entity || entityElement.textContent.replace('List view of ', '').trim()) : null;
         bulkActionsManager.init(entityName);
     });
 } else {
     // DOM already loaded
     const entityElement = document.querySelector('h5.fs-6');
-    const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+    const entityName = entityElement ? (entityElement.dataset.entity || entityElement.textContent.replace('List view of ', '').trim()) : null;
     bulkActionsManager.init(entityName);
 }
 

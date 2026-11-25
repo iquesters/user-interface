@@ -19,6 +19,11 @@ final class Assets extends ModuleAssets
 {
     use Loggable;
 
+    /** Defaults of the conf (UserInterfaceConf): "not set by setup yet". */
+    public const DEFAULT_APP_NAME = 'Iquesters';
+
+    public const DEFAULT_LOGO = 'img/logo.png';
+
     protected static function slug(): string
     {
         return 'userinterface';
@@ -28,6 +33,47 @@ final class Assets extends ModuleAssets
     public static function logoUrl(): string
     {
         return self::resolveUrl((string) ConfProvider::from(Module::USER_INFE)->logo);
+    }
+
+    /**
+     * The application's name: the one entered at setup (user-interface conf
+     * app_name), else APP_NAME. The browser tab and footers use it.
+     */
+    public static function appName(): string
+    {
+        try {
+            $name = trim((string) ConfProvider::from(Module::USER_INFE)->app_name);
+        } catch (\Throwable $e) {
+            $name = '';
+        }
+
+        return $name !== '' && $name !== self::DEFAULT_APP_NAME ? $name : (string) config('app.name', self::DEFAULT_APP_NAME);
+    }
+
+    /**
+     * The browser tab icon: the conf "favicon" when set (setup or settings),
+     * else the app's own logo (once setup replaced the default), else the
+     * module's default icon.
+     */
+    public static function faviconUrl(): string
+    {
+        try {
+            $conf = ConfProvider::from(Module::USER_INFE);
+            $favicon = trim((string) $conf->favicon);
+            $logo = trim((string) $conf->logo);
+        } catch (\Throwable $e) {
+            $favicon = $logo = '';
+        }
+
+        if ($favicon !== '') {
+            return self::resolveUrl($favicon);
+        }
+
+        if ($logo !== '' && $logo !== self::DEFAULT_LOGO) {
+            return self::resolveUrl($logo);
+        }
+
+        return self::url('img/favicon.png');
     }
 
     /**
