@@ -17,6 +17,9 @@ class UserInterfaceConf extends BaseConf
 
     protected string $app_name;
 
+    /** Browser tab icon (path in the app's public/ or a URL). Empty: the logo, else the default icon. */
+    protected string $favicon;
+
     protected string $app_description;
 
     protected string $large_screen_nav_style;
@@ -52,6 +55,7 @@ class UserInterfaceConf extends BaseConf
         $default_values->app_layout = 'userinterface::layouts.app';
         $default_values->logo = 'img/logo.png';
         $default_values->app_name = 'Iquesters';
+        $default_values->favicon = '';
         $default_values->app_description = 'Iquesters Application';
         $default_values->large_screen_nav_style = 'minibar';
         $default_values->large_screen_module_tabs = 7;
@@ -75,6 +79,7 @@ class UserInterfaceConf extends BaseConf
             'small_screen_bottom_tabs' => 'integer|between:1,6',
             'small_screen_featured_position' => 'in:center,left,right',
             'vendor_assets' => 'in:local,cdn',
+            'favicon' => 'nullable|string|max:2048',
             'help_url' => 'nullable|url:http,https|max:2048',
             'privacy_url' => 'nullable|url:http,https|max:2048',
             'terms_url' => 'nullable|url:http,https|max:2048',

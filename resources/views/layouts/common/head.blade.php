@@ -25,9 +25,9 @@
     <meta name="description" content="@yield('meta-description', \Iquesters\Foundation\Helpers\MetaHelper::description())">
 
     <!-- Title -->
-    <title>@yield('page-title', config('app.name', 'Iquesters'))</title>
+    <title>@yield('page-title', \Iquesters\UserInterface\Support\Assets::appName())</title>
 
-    <link rel="icon" type="image/x-icon" href="{{ \Iquesters\UserInterface\UserInterfaceServiceProvider::getJsUrl('img/favicon.png') }}">
+    <link rel="icon" href="{{ \Iquesters\UserInterface\Support\Assets::faviconUrl() }}">
 
     {{-- ✅ Only load reCAPTCHA when on auth layout --}}
     @if (!empty($isAuth) && class_exists(\Iquesters\UserManagement\UserManagementServiceProvider::class))

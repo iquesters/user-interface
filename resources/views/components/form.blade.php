@@ -276,10 +276,5 @@
 </form>
 {{-- <p class="alert alert-info">Form Rendered by Form Schema</p> --}}
 
-@if(config('app.debug'))
-<div class="small p-1 d-flex justify-content-end align-items-center">
-    <div class="small">
-        Form Rendered by Form Schema
-    </div>
-</div>
-@endif
+{{-- While debugging, the form engine adds "Form Rendered by Form Schema: slug" under the form
+     (appendFormSchemaLabel in form.js), so modal and record-section forms get it too. --}}

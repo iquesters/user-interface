@@ -95,15 +95,22 @@ async function renderRecordSections(contentContainer, schema, row, options = {})
         wrapper.appendChild(body);
         contentContainer.appendChild(wrapper);
 
-        if (section.html) {
-            await renderSectionHtml(body, section, record);
-        } else if (section.component) {
-            await renderSectionComponent(body, section, record);
-        } else if (section.form) {
-            await renderSectionForm(body, section, record, () => {
-                renderRecordSections(contentContainer, schema, record, options);
-                refreshSectionTable(contentContainer);
-            });
+        // One section failing doesn't hide the others (the panel would fall back to
+        // the raw "Record Information" list); the console names the section.
+        try {
+            if (section.html) {
+                await renderSectionHtml(body, section, record);
+            } else if (section.component) {
+                await renderSectionComponent(body, section, record);
+            } else if (section.form) {
+                await renderSectionForm(body, section, record, () => {
+                    renderRecordSections(contentContainer, schema, record, options);
+                    refreshSectionTable(contentContainer);
+                });
+            }
+        } catch (error) {
+            console.error('Record section failed.', section, error);
+            body.innerHTML = '<p class="small text-danger mb-0">This part could not be shown. Reload the page; if it stays, tell the administrator.</p>';
         }
     }
 

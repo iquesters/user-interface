@@ -205,6 +205,32 @@ function applyModeOverrides(formMeta = {}) {
     return formMeta;
 }
 
+/**
+ * What this user may do with this record, from the record itself: a module's
+ * data endpoint adds "_can": {"edit": bool, "delete": bool} to a row, and the
+ * Edit / Delete buttons follow it (the endpoints still check).
+ */
+function applyRecordPermissions(formMeta, formElement) {
+    let record = formElement.__entityDataCache || null;
+    if (!record && formElement.dataset.formData) {
+        try {
+            record = JSON.parse(formElement.dataset.formData);
+        } catch (error) {
+            record = null;
+        }
+    }
+    const can = record && typeof record === 'object' ? record._can : null;
+    if (!can || typeof can !== 'object') {
+        return;
+    }
+    if (can.edit === false) {
+        formMeta.allowEdit = false;
+    }
+    if (can.delete === false) {
+        formMeta.allowDelete = false;
+    }
+}
+
 function buildFormRoute(formId, entityUid, mode = 'view') {
     if (!formId || !entityUid) {
         return null;
@@ -661,6 +687,7 @@ async function setupForm(formElement) {
     formMeta.formMode = resolveFormMode(formElement, formMeta);
     formElement.dataset.formMode = formMeta.formMode;
     applyModeOverrides(formMeta);
+    applyRecordPermissions(formMeta, formElement);
 
     // ✅ Access check
     const hasAccess = checkFormAccess(formMeta,formElement);
@@ -681,6 +708,7 @@ async function setupForm(formElement) {
     if (renderMode === 'modal') {
         await renderFormForModal(formElement, formMeta);
         bindDynamicFormSubmit(formElement, formMeta);
+        appendFormSchemaLabel(formElement, formMeta);
         return formMeta;
     }
 
@@ -688,7 +716,12 @@ async function setupForm(formElement) {
     formElement.before(cardProvider.getCard());
 
     const resolvedHeader = resolveFormHeaderConfig(formMeta);
-    if (resolvedHeader.text) {
+    // A read-only record needs the header row for its Edit / Delete buttons even
+    // when the schema has no heading (e.g. a record section of a table).
+    const readOnlyWithActions = isFormReadOnly(formMeta)
+        && Boolean(formElement.dataset.entityUid)
+        && (formMeta.allowEdit || formMeta.allowDelete);
+    if (resolvedHeader.text || readOnlyWithActions) {
         const cardHeader = cardProvider.getCardHeader();
         setupFormHeader(cardHeader, formMeta, formElement);
     }
@@ -712,7 +745,9 @@ async function setupForm(formElement) {
             // buttons below must come after them (else "Continue" sits above the input).
             await setupFormBody(cardBody, formMeta);
         }
-        if (formMeta.actions && !isFormReadOnly(formMeta)) {
+        // Only real actions: an empty list ([] is truthy) would add a second footer
+        // with just a Cancel under the default Cancel / Submit row.
+        if (Array.isArray(formMeta.actions) && formMeta.actions.length > 0 && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
             cardFooter.classList.add('lab-form-actions');
             setupFormFooter(cardFooter, formMeta, formElement);
@@ -865,7 +900,33 @@ async function setupForm(formElement) {
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 
     bindDynamicFormSubmit(formElement, formMeta);
+    appendFormSchemaLabel(formElement, formMeta);
     return formMeta;
+}
+
+/**
+ * While debugging (APP_DEBUG): a line under every form the engine draws, pages,
+ * modals and record sections alike, naming its form schema. A form without it
+ * is hand-written.
+ */
+function appendFormSchemaLabel(formElement, formMeta) {
+    if (!window.USER_INTERFACE_CONFIG?.debug || !formElement?.parentNode) {
+        return;
+    }
+    const next = formElement.nextElementSibling;
+    if (next?.classList?.contains('ui-form-schema-label')) {
+        return;
+    }
+    const slug = String(formMeta?.slug || formElement.id || '');
+    const label = document.createElement('div');
+    label.className = 'ui-form-schema-label small text-muted text-end p-1';
+    label.append('Form Rendered by Form Schema' + (slug ? ': ' : ''));
+    if (slug) {
+        const code = document.createElement('code');
+        code.textContent = slug;
+        label.appendChild(code);
+    }
+    formElement.after(label);
 }
 
 /**

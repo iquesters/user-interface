@@ -149,7 +149,7 @@ async function addField(field, addTo,formMeta) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         if (Array.isArray(field.options)) {
@@ -167,7 +167,7 @@ async function addField(field, addTo,formMeta) {
         
         // ✅ Label (same as radio & checkbox)
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         // ✅ Create select element
@@ -198,7 +198,7 @@ async function addField(field, addTo,formMeta) {
         
         if (Array.isArray(field.options)) {
             if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
             }
             field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.CHECKBOX)));
         } else {
@@ -794,6 +794,7 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
     label.setAttribute(ATTR_CONS.FOR, fieldDomId);
     label.classList.add(STYLE_CLASS.FORM_LABEL);
     label.textContent = field.label;
+    if (field.required) markLabelRequired(label);
 
     // ✅ Create input or textarea
     const inputElement = document.createElement(inputTag);
@@ -841,12 +842,25 @@ function appendFieldInfoAndFeedback(field, formContainer) {
 
 
 // ✅ Create <label> element
-function createLabel(text, forId = null, classList = []) {
+function createLabel(text, forId = null, classList = [], required = false) {
     const label = document.createElement(HTML_TAG.LABEL);
     label.textContent = text;
     if (forId) label.setAttribute(ATTR_CONS.FOR, forId);
     if (classList.length) label.classList.add(...classList);
+    if (required) markLabelRequired(label);
     return label;
+}
+
+/** A red "*" after a required field's label (screen readers hear "required" from the input itself). */
+function markLabelRequired(label) {
+    if (!label || label.querySelector('.ui-required-mark')) {
+        return;
+    }
+    const star = document.createElement('span');
+    star.className = 'ui-required-mark text-danger ms-1';
+    star.setAttribute('aria-hidden', 'true');
+    star.textContent = '*';
+    label.appendChild(star);
 }
 
 
@@ -869,8 +883,33 @@ function createOptionInput(field, opt, type) {
         input.checked = true;
     }
 
-    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL]);
+    // A single checkbox (e.g. "I agree to the terms") is the field itself: its label carries the "*".
+    const single = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (single && field.required) {
+        input.required = true;
+    }
+    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL], single && Boolean(field.required));
     div.append(input, label);
+
+    // "links": [{"label": "Terms", "url": "/terms-conditions"}, …] after a single
+    // checkbox's label (e.g. the pages someone agrees to); they open in a new tab.
+    if (single && Array.isArray(field.links) && field.links.length) {
+        const links = document.createElement('div');
+        links.className = 'small ms-1 mt-1 d-flex flex-wrap gap-2';
+        field.links.forEach(link => {
+            const url = String(link?.url || '');
+            if (!/^(https?:\/\/|\/)/i.test(url)) {
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = link.label || url;
+            links.appendChild(a);
+        });
+        div.appendChild(links);
+    }
     return div;
 }
 

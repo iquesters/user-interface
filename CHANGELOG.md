@@ -5,6 +5,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Fixed (test round 2)
+- **Create in a modal did nothing when the same form was open in the record panel** (e.g. New organisation while an organisation was open): the footer button found its form by id and got the read-only one. It now submits its own form.
+- **Two Cancel rows** under some forms: an empty `actions` list also built a second footer.
+- **Edit on a record:** a read-only form without a heading had no header row, so no Edit / Delete. The row is drawn whenever the record can be edited or deleted.
+- **One failing record section no longer replaces the whole panel** with the raw "Record Information" list; the console names the section.
+- **"Form Rendered by Form Schema: slug"** (debug) is added by the form engine, so forms in modals and record sections show it too.
+- **List pages show the table's name and description** ("People and roles") instead of "List view of {entity}". Bulk actions read the entity from `data-entity`.
+
+### Added
+- **Per-record Edit / Delete:** a row's `_can: {edit, delete}` hides the buttons for records the user may not change (the endpoints still check).
+
+### Fixed (test round 1)
+- **The browser tab shows the app's name** (entered at setup, conf `app_name`) instead of `APP_NAME` from `.env` ("Laravel"). `Assets::appName()`; footers too.
+- **Browser tab icon:** new conf `favicon` (path in the app's `public/` or a URL). Empty: the app's logo (once setup set one), else the default icon. `Assets::faviconUrl()`.
+- **Minibar labels stay on one line** and end with "…"; the full name is the tab's tooltip (was: wrapped onto two lines).
+
+### Added
+- **Required fields show a red `*`** after their label in schema forms (text, select, radio and checkbox groups, floating labels, and a single required checkbox such as "I agree…", which is now also required in the browser).
+- **A single checkbox can carry links** (`"links": [{"label", "url"}]`), shown after its label and opened in a new tab (e.g. the Terms someone agrees to).
+- **Table "create" can name a `permission`:** the Create button shows only to users who have it (the endpoint still checks).
+- While debugging, the line under every schema form names its form schema: "Form Rendered by Form Schema: `slug`" (a form without it is hand-written).
+- Rebuild the bundle (`npm run build`) for installs that run with `APP_DEBUG` off.
+
 ### Fixed
 - **Sidebar and minibar looked different (and broken) for some users:** sidebar items showed as white boxes on the tinted sidebar. Items now sit on the sidebar background as rounded rows (tinted on hover, filled for the current page), and the minibar tabs are rounded tiles with only the current module filled. The minibar's unclosed `<div>` and its white border line are gone. One set of styles for every user and role.
 

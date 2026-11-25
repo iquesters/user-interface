@@ -199,6 +199,24 @@ async function showSchemaFormModal(config = {}) {
         },
     })
 
+    // The footer button submits THIS form. Its form="{slug}" attribute would pick
+    // the first element with that id, which can be the same form shown read-only
+    // in the record panel behind the modal (e.g. "New organisation" while an
+    // organisation is open): then nothing was sent.
+    const submitButton = document.getElementById(`${formId}-submit-btn`)
+    if (submitButton) {
+        submitButton.removeAttribute('form')
+        submitButton.type = 'button'
+        submitButton.addEventListener('click', (event) => {
+            event.preventDefault()
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit()
+            } else {
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
+            }
+        })
+    }
+
     await new Promise(resolve => requestAnimationFrame(resolve))
 
     // Swap the generic skeleton for one shaped like this form once its schema arrives.
