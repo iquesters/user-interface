@@ -1936,13 +1936,13 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         // Get entity name from the page
         const entityElement = document.querySelector('h5.fs-6');
-        const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+        const entityName = entityElement ? (entityElement.dataset.entity || entityElement.textContent.replace('List view of ', '').trim()) : null;
         bulkActionsManager.init(entityName);
     });
 } else {
     // DOM already loaded
     const entityElement = document.querySelector('h5.fs-6');
-    const entityName = entityElement ? entityElement.textContent.replace('List view of ', '').trim() : null;
+    const entityName = entityElement ? (entityElement.dataset.entity || entityElement.textContent.replace('List view of ', '').trim()) : null;
     bulkActionsManager.init(entityName);
 }
 
@@ -2694,7 +2694,7 @@ async function addField(field, addTo,formMeta) {
         const fragment = createFieldFragment(field, addTo, [STYLE_CLASS.COLL_12, STYLE_CLASS.FORM_CHECK_GROUP]);
 
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         if (Array.isArray(field.options)) {
@@ -2712,7 +2712,7 @@ async function addField(field, addTo,formMeta) {
         
         // ✅ Label (same as radio & checkbox)
         if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
         }
 
         // ✅ Create select element
@@ -2743,7 +2743,7 @@ async function addField(field, addTo,formMeta) {
         
         if (Array.isArray(field.options)) {
             if (field.label) {
-            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL]));
+            fragment.appendChild(createLabel(field.label, null, [STYLE_CLASS.FORM_LABEL], Boolean(field.required)));
             }
             field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.CHECKBOX)));
         } else {
@@ -3339,6 +3339,7 @@ function createFormFieldContainer(field, useFloatingLabel, inputTag = HTML_TAG.I
     label.setAttribute(ATTR_CONS.FOR, fieldDomId);
     label.classList.add(STYLE_CLASS.FORM_LABEL);
     label.textContent = field.label;
+    if (field.required) markLabelRequired(label);
 
     // ✅ Create input or textarea
     const inputElement = document.createElement(inputTag);
@@ -3386,12 +3387,25 @@ function appendFieldInfoAndFeedback(field, formContainer) {
 
 
 // ✅ Create <label> element
-function createLabel(text, forId = null, classList = []) {
+function createLabel(text, forId = null, classList = [], required = false) {
     const label = document.createElement(HTML_TAG.LABEL);
     label.textContent = text;
     if (forId) label.setAttribute(ATTR_CONS.FOR, forId);
     if (classList.length) label.classList.add(...classList);
+    if (required) markLabelRequired(label);
     return label;
+}
+
+/** A red "*" after a required field's label (screen readers hear "required" from the input itself). */
+function markLabelRequired(label) {
+    if (!label || label.querySelector('.ui-required-mark')) {
+        return;
+    }
+    const star = document.createElement('span');
+    star.className = 'ui-required-mark text-danger ms-1';
+    star.setAttribute('aria-hidden', 'true');
+    star.textContent = '*';
+    label.appendChild(star);
 }
 
 
@@ -3414,8 +3428,33 @@ function createOptionInput(field, opt, type) {
         input.checked = true;
     }
 
-    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL]);
+    // A single checkbox (e.g. "I agree to the terms") is the field itself: its label carries the "*".
+    const single = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (single && field.required) {
+        input.required = true;
+    }
+    const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL], single && Boolean(field.required));
     div.append(input, label);
+
+    // "links": [{"label": "Terms", "url": "/terms-conditions"}, …] after a single
+    // checkbox's label (e.g. the pages someone agrees to); they open in a new tab.
+    if (single && Array.isArray(field.links) && field.links.length) {
+        const links = document.createElement('div');
+        links.className = 'small ms-1 mt-1 d-flex flex-wrap gap-2';
+        field.links.forEach(link => {
+            const url = String(link?.url || '');
+            if (!/^(https?:\/\/|\/)/i.test(url)) {
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = link.label || url;
+            links.appendChild(a);
+        });
+        div.appendChild(links);
+    }
     return div;
 }
 
@@ -3968,6 +4007,32 @@ function applyModeOverrides(formMeta = {}) {
     return formMeta;
 }
 
+/**
+ * What this user may do with this record, from the record itself: a module's
+ * data endpoint adds "_can": {"edit": bool, "delete": bool} to a row, and the
+ * Edit / Delete buttons follow it (the endpoints still check).
+ */
+function applyRecordPermissions(formMeta, formElement) {
+    let record = formElement.__entityDataCache || null;
+    if (!record && formElement.dataset.formData) {
+        try {
+            record = JSON.parse(formElement.dataset.formData);
+        } catch (error) {
+            record = null;
+        }
+    }
+    const can = record && typeof record === 'object' ? record._can : null;
+    if (!can || typeof can !== 'object') {
+        return;
+    }
+    if (can.edit === false) {
+        formMeta.allowEdit = false;
+    }
+    if (can.delete === false) {
+        formMeta.allowDelete = false;
+    }
+}
+
 function buildFormRoute(formId, entityUid, mode = 'view') {
     if (!formId || !entityUid) {
         return null;
@@ -4424,6 +4489,7 @@ async function setupForm(formElement) {
     formMeta.formMode = resolveFormMode(formElement, formMeta);
     formElement.dataset.formMode = formMeta.formMode;
     applyModeOverrides(formMeta);
+    applyRecordPermissions(formMeta, formElement);
 
     // ✅ Access check
     const hasAccess = checkFormAccess(formMeta,formElement);
@@ -4444,6 +4510,7 @@ async function setupForm(formElement) {
     if (renderMode === 'modal') {
         await renderFormForModal(formElement, formMeta);
         bindDynamicFormSubmit(formElement, formMeta);
+        appendFormSchemaLabel(formElement, formMeta);
         return formMeta;
     }
 
@@ -4451,7 +4518,12 @@ async function setupForm(formElement) {
     formElement.before(cardProvider.getCard());
 
     const resolvedHeader = resolveFormHeaderConfig(formMeta);
-    if (resolvedHeader.text) {
+    // A read-only record needs the header row for its Edit / Delete buttons even
+    // when the schema has no heading (e.g. a record section of a table).
+    const readOnlyWithActions = isFormReadOnly(formMeta)
+        && Boolean(formElement.dataset.entityUid)
+        && (formMeta.allowEdit || formMeta.allowDelete);
+    if (resolvedHeader.text || readOnlyWithActions) {
         const cardHeader = cardProvider.getCardHeader();
         setupFormHeader(cardHeader, formMeta, formElement);
     }
@@ -4475,7 +4547,9 @@ async function setupForm(formElement) {
             // buttons below must come after them (else "Continue" sits above the input).
             await setupFormBody(cardBody, formMeta);
         }
-        if (formMeta.actions && !isFormReadOnly(formMeta)) {
+        // Only real actions: an empty list ([] is truthy) would add a second footer
+        // with just a Cancel under the default Cancel / Submit row.
+        if (Array.isArray(formMeta.actions) && formMeta.actions.length > 0 && !isFormReadOnly(formMeta)) {
             const cardFooter = cardProvider.getCardFooter();
             cardFooter.classList.add('lab-form-actions');
             setupFormFooter(cardFooter, formMeta, formElement);
@@ -4628,7 +4702,33 @@ async function setupForm(formElement) {
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 
     bindDynamicFormSubmit(formElement, formMeta);
+    appendFormSchemaLabel(formElement, formMeta);
     return formMeta;
+}
+
+/**
+ * While debugging (APP_DEBUG): a line under every form the engine draws, pages,
+ * modals and record sections alike, naming its form schema. A form without it
+ * is hand-written.
+ */
+function appendFormSchemaLabel(formElement, formMeta) {
+    if (!window.USER_INTERFACE_CONFIG?.debug || !formElement?.parentNode) {
+        return;
+    }
+    const next = formElement.nextElementSibling;
+    if (next?.classList?.contains('ui-form-schema-label')) {
+        return;
+    }
+    const slug = String(formMeta?.slug || formElement.id || '');
+    const label = document.createElement('div');
+    label.className = 'ui-form-schema-label small text-muted text-end p-1';
+    label.append('Form Rendered by Form Schema' + (slug ? ': ' : ''));
+    if (slug) {
+        const code = document.createElement('code');
+        code.textContent = slug;
+        label.appendChild(code);
+    }
+    formElement.after(label);
 }
 
 /**
@@ -7392,6 +7492,24 @@ async function showSchemaFormModal(config = {}) {
         },
     })
 
+    // The footer button submits THIS form. Its form="{slug}" attribute would pick
+    // the first element with that id, which can be the same form shown read-only
+    // in the record panel behind the modal (e.g. "New organisation" while an
+    // organisation is open): then nothing was sent.
+    const submitButton = document.getElementById(`${formId}-submit-btn`)
+    if (submitButton) {
+        submitButton.removeAttribute('form')
+        submitButton.type = 'button'
+        submitButton.addEventListener('click', (event) => {
+            event.preventDefault()
+            if (typeof form.requestSubmit === 'function') {
+                form.requestSubmit()
+            } else {
+                form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
+            }
+        })
+    }
+
     await new Promise(resolve => requestAnimationFrame(resolve))
 
     // Swap the generic skeleton for one shaped like this form once its schema arrives.
@@ -9785,15 +9903,22 @@ async function renderRecordSections(contentContainer, schema, row, options = {})
         wrapper.appendChild(body);
         contentContainer.appendChild(wrapper);
 
-        if (section.html) {
-            await renderSectionHtml(body, section, record);
-        } else if (section.component) {
-            await renderSectionComponent(body, section, record);
-        } else if (section.form) {
-            await renderSectionForm(body, section, record, () => {
-                renderRecordSections(contentContainer, schema, record, options);
-                refreshSectionTable(contentContainer);
-            });
+        // One section failing doesn't hide the others (the panel would fall back to
+        // the raw "Record Information" list); the console names the section.
+        try {
+            if (section.html) {
+                await renderSectionHtml(body, section, record);
+            } else if (section.component) {
+                await renderSectionComponent(body, section, record);
+            } else if (section.form) {
+                await renderSectionForm(body, section, record, () => {
+                    renderRecordSections(contentContainer, schema, record, options);
+                    refreshSectionTable(contentContainer);
+                });
+            }
+        } catch (error) {
+            console.error('Record section failed.', section, error);
+            body.innerHTML = '<p class="small text-danger mb-0">This part could not be shown. Reload the page; if it stays, tell the administrator.</p>';
         }
     }
 
