@@ -3422,9 +3422,16 @@ function createOptionInput(field, opt, type) {
     input.value = opt.value;
     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
 
-    if (type === INPUT_TYPE.RADIO && field.value === opt.value) {
+    // Compared as text: a saved 1 matches the option "1".
+    const sameValue = (a, b) => a !== null && a !== undefined && String(a) === String(b);
+    const isSingleCheckbox = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (type === INPUT_TYPE.RADIO && sameValue(field.value, opt.value)) {
         input.checked = true;
-    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.includes(opt.value)) {
+    } else if (isSingleCheckbox) {
+        // A single checkbox (e.g. "Registration open"): ticked when its saved value is true.
+        // It was left unticked in edit mode, so saving the form switched the setting off.
+        input.checked = field.value === true || field.value === 1 || field.value === '1' || field.value === 'true' || field.value === 'on';
+    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.some(v => sameValue(v, opt.value))) {
         input.checked = true;
     }
 
@@ -5365,20 +5372,28 @@ function setDynamicFormSubmitting(form, isSubmitting) {
     // plain form.querySelector() only ever finds the older auto-generated
     // inline submit button (a true descendant), so it silently found
     // nothing once a schema started defining explicit actions.
-    const submitBtn = form.querySelector('button[type="submit"]')
+    // A modal's footer button submits its form through form.__submitButton (modal.js).
+    const submitBtn = form.__submitButton
+        || form.querySelector('button[type="submit"]')
         || document.querySelector(`button[type="submit"][form="${form.id}"]`);
     if (!submitBtn) {
         return;
     }
 
     if (isSubmitting) {
+        if (submitBtn.disabled && submitBtn.dataset.originalHtml !== undefined) {
+            return; // already submitting
+        }
         ensureLoadingDotsStyle();
         submitBtn.dataset.originalHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Verifying<span class="lab-form-loading-dots">'
+        submitBtn.setAttribute('aria-busy', 'true');
+        submitBtn.innerHTML = 'Submitting<span class="lab-form-loading-dots">'
             + '<span>.</span><span>.</span><span>.</span></span>';
         return;
     }
+
+    submitBtn.removeAttribute('aria-busy');
 
     submitBtn.disabled = false;
     if (submitBtn.dataset.originalHtml !== undefined) {
@@ -5553,7 +5568,9 @@ function appendToFormData(formData, key, value) {
     } else if (typeof File !== 'undefined' && value instanceof File) {
         formData.append(key, value, value.name);
     } else if (Array.isArray(value)) {
-        value.forEach(item => appendToFormData(formData, `${key}[]`, item));
+        // Indexed (key[0][level], key[0][year], key[1][...]): with "key[]" PHP starts a
+        // new row at every field, so a repeater's rows arrived split one field per row.
+        value.forEach((item, index) => appendToFormData(formData, `${key}[${index}]`, item));
     } else if (typeof value === 'object') {
         Object.entries(value).forEach(([subKey, subValue]) => appendToFormData(formData, `${key}[${subKey}]`, subValue));
     } else if (typeof value === 'boolean') {
@@ -6635,6 +6652,20 @@ function renderRepeaterRow(field, row) {
     return card;
 }
 
+const repeaterOptionsCache = new Map();
+
+/** A select's options from a module endpoint ({"data": [{value, label}]}), once per URL. */
+function loadRepeaterOptions(url) {
+    if (!repeaterOptionsCache.has(url)) {
+        repeaterOptionsCache.set(url, fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(response => (response.ok ? response.json() : {}))
+            .then(json => (Array.isArray(json?.data) ? json.data : (json?.response_schema?.data || [])))
+            .catch(() => []));
+    }
+
+    return repeaterOptionsCache.get(url);
+}
+
 function repeaterControl(sub, value) {
     let control;
 
@@ -6649,13 +6680,23 @@ function repeaterControl(sub, value) {
         empty.value = '';
         empty.textContent = '—';
         control.appendChild(empty);
-        (sub.options || []).forEach(opt => {
+        const addOptions = (options) => (options || []).forEach(opt => {
+            if (opt?.value === '' || opt?.value === null || opt?.value === undefined) {
+                return; // the empty choice is already there
+            }
             const option = document.createElement('option');
             option.value = String(opt?.value ?? '');
             option.textContent = opt?.label ?? opt?.text ?? option.value;
             option.selected = String(value) === option.value;
             control.appendChild(option);
         });
+        addOptions(sub.options);
+        if (sub.required) control.required = true;
+
+        // "optionsFrom": {"url"}: loaded once per address, shared by every row.
+        if (sub.optionsFrom?.url) {
+            loadRepeaterOptions(sub.optionsFrom.url).then(addOptions);
+        }
 
         return control;
     } else if (sub.type === 'checkbox') {
@@ -7498,6 +7539,8 @@ async function showSchemaFormModal(config = {}) {
     // organisation is open): then nothing was sent.
     const submitButton = document.getElementById(`${formId}-submit-btn`)
     if (submitButton) {
+        // The form engine shows "Submitting…" on it and keeps it disabled meanwhile.
+        form.__submitButton = submitButton
         submitButton.removeAttribute('form')
         submitButton.type = 'button'
         submitButton.addEventListener('click', (event) => {

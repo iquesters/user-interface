@@ -156,6 +156,20 @@ function renderRepeaterRow(field, row) {
     return card;
 }
 
+const repeaterOptionsCache = new Map();
+
+/** A select's options from a module endpoint ({"data": [{value, label}]}), once per URL. */
+function loadRepeaterOptions(url) {
+    if (!repeaterOptionsCache.has(url)) {
+        repeaterOptionsCache.set(url, fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(response => (response.ok ? response.json() : {}))
+            .then(json => (Array.isArray(json?.data) ? json.data : (json?.response_schema?.data || [])))
+            .catch(() => []));
+    }
+
+    return repeaterOptionsCache.get(url);
+}
+
 function repeaterControl(sub, value) {
     let control;
 
@@ -170,13 +184,23 @@ function repeaterControl(sub, value) {
         empty.value = '';
         empty.textContent = '—';
         control.appendChild(empty);
-        (sub.options || []).forEach(opt => {
+        const addOptions = (options) => (options || []).forEach(opt => {
+            if (opt?.value === '' || opt?.value === null || opt?.value === undefined) {
+                return; // the empty choice is already there
+            }
             const option = document.createElement('option');
             option.value = String(opt?.value ?? '');
             option.textContent = opt?.label ?? opt?.text ?? option.value;
             option.selected = String(value) === option.value;
             control.appendChild(option);
         });
+        addOptions(sub.options);
+        if (sub.required) control.required = true;
+
+        // "optionsFrom": {"url"}: loaded once per address, shared by every row.
+        if (sub.optionsFrom?.url) {
+            loadRepeaterOptions(sub.optionsFrom.url).then(addOptions);
+        }
 
         return control;
     } else if (sub.type === 'checkbox') {

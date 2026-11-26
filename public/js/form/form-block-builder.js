@@ -877,9 +877,16 @@ function createOptionInput(field, opt, type) {
     input.value = opt.value;
     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
 
-    if (type === INPUT_TYPE.RADIO && field.value === opt.value) {
+    // Compared as text: a saved 1 matches the option "1".
+    const sameValue = (a, b) => a !== null && a !== undefined && String(a) === String(b);
+    const isSingleCheckbox = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (type === INPUT_TYPE.RADIO && sameValue(field.value, opt.value)) {
         input.checked = true;
-    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.includes(opt.value)) {
+    } else if (isSingleCheckbox) {
+        // A single checkbox (e.g. "Registration open"): ticked when its saved value is true.
+        // It was left unticked in edit mode, so saving the form switched the setting off.
+        input.checked = field.value === true || field.value === 1 || field.value === '1' || field.value === 'true' || field.value === 'on';
+    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.some(v => sameValue(v, opt.value))) {
         input.checked = true;
     }
 

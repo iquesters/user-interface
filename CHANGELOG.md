@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (repeaters)
+- **A repeater's select can load its options from a module endpoint** (`"optionsFrom": {"url"}`, loaded once per address and shared by every row), e.g. the products of a bundle. Required selects in a repeater are now required in the browser too.
+
+### Fixed
+- **Submit buttons in modals showed no "Submitting…"** and could be pressed twice (the form engine didn't find the modal's button), so forms looked like they did nothing. The button now shows **Submitting…** and stays disabled until the answer (and the redirect) comes. Rebuild the bundle.
+- **A single checkbox lost its value in edit mode**: it was drawn unticked although the record had it on (it is named `{id}[]` with the id `{id}-1`, so filling the form never found it), and saving switched the setting off (e.g. an event's "Registration open"). It is now ticked from its value (true / 1 / "1" / "true"); checkbox and radio groups compare values as text. Rebuild the bundle.
+- **Lists of rows sent with a file were split one field per row** (e.g. the membership application with a proof file: "Choose what you completed…" for every row). Multipart arrays are now indexed (`rows[0][level]`), not `rows[][level]`. Rebuild the bundle.
+- **The form component accepts `formData` / `meta` as arrays** (JSON-encodes them) instead of crashing with "htmlspecialchars(): Argument #1 must be of type string, array given" when an including view passes or leaks an array.
+
 ### Fixed (test round 2)
 - **Create in a modal did nothing when the same form was open in the record panel** (e.g. New organisation while an organisation was open): the footer button found its form by id and got the read-only one. It now submits its own form.
 - **Two Cancel rows** under some forms: an empty `actions` list also built a second footer.

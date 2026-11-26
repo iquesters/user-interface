@@ -205,6 +205,8 @@ async function showSchemaFormModal(config = {}) {
     // organisation is open): then nothing was sent.
     const submitButton = document.getElementById(`${formId}-submit-btn`)
     if (submitButton) {
+        // The form engine shows "Submitting…" on it and keeps it disabled meanwhile.
+        form.__submitButton = submitButton
         submitButton.removeAttribute('form')
         submitButton.type = 'button'
         submitButton.addEventListener('click', (event) => {

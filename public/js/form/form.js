@@ -1563,20 +1563,28 @@ function setDynamicFormSubmitting(form, isSubmitting) {
     // plain form.querySelector() only ever finds the older auto-generated
     // inline submit button (a true descendant), so it silently found
     // nothing once a schema started defining explicit actions.
-    const submitBtn = form.querySelector('button[type="submit"]')
+    // A modal's footer button submits its form through form.__submitButton (modal.js).
+    const submitBtn = form.__submitButton
+        || form.querySelector('button[type="submit"]')
         || document.querySelector(`button[type="submit"][form="${form.id}"]`);
     if (!submitBtn) {
         return;
     }
 
     if (isSubmitting) {
+        if (submitBtn.disabled && submitBtn.dataset.originalHtml !== undefined) {
+            return; // already submitting
+        }
         ensureLoadingDotsStyle();
         submitBtn.dataset.originalHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Verifying<span class="lab-form-loading-dots">'
+        submitBtn.setAttribute('aria-busy', 'true');
+        submitBtn.innerHTML = 'Submitting<span class="lab-form-loading-dots">'
             + '<span>.</span><span>.</span><span>.</span></span>';
         return;
     }
+
+    submitBtn.removeAttribute('aria-busy');
 
     submitBtn.disabled = false;
     if (submitBtn.dataset.originalHtml !== undefined) {
@@ -1751,7 +1759,9 @@ function appendToFormData(formData, key, value) {
     } else if (typeof File !== 'undefined' && value instanceof File) {
         formData.append(key, value, value.name);
     } else if (Array.isArray(value)) {
-        value.forEach(item => appendToFormData(formData, `${key}[]`, item));
+        // Indexed (key[0][level], key[0][year], key[1][...]): with "key[]" PHP starts a
+        // new row at every field, so a repeater's rows arrived split one field per row.
+        value.forEach((item, index) => appendToFormData(formData, `${key}[${index}]`, item));
     } else if (typeof value === 'object') {
         Object.entries(value).forEach(([subKey, subValue]) => appendToFormData(formData, `${key}[${subKey}]`, subValue));
     } else if (typeof value === 'boolean') {
