@@ -13,6 +13,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 - **A number field that can't go below 0 blocks the minus sign** (and `e`); a pasted negative becomes positive.
 
 ### Fixed (saving in a table's side panel)
+- **Row clicks only open rows of the list itself**: a click inside an open record or form (an edit form's field, a table inside a record or cell) no longer reaches the list's row handler, which opened the record again in view mode (table mode: an edit switched to the split view).
 - **The side panel's title** uses a record's `reference` (or `label`) before its uid: a payment or an order shows *ORD-0001*, not its id.
 - **Editing a record in a list's side panel** (e.g. a product): after *Save*, the panel stayed in edit mode. It now shows the saved record (read-only) and updates its row in the list.
 
