@@ -15,6 +15,17 @@
 ])
 
 @php
+    // formData / meta may arrive as arrays (e.g. inherited from the including
+    // view through @include): the attributes need JSON text.
+    if (! is_string($formData ?? '')) {
+        $formData = json_encode($formData, JSON_UNESCAPED_UNICODE) ?: '';
+    }
+    if (! is_string($meta ?? '')) {
+        $meta = json_encode($meta, JSON_UNESCAPED_UNICODE) ?: '';
+    }
+@endphp
+
+@php
     // The real field count/widths are only known once the schema is fetched
     // client-side (async), and by then the real fields are ready to render
     // anyway — so there's no point building an intermediate skeleton in JS.

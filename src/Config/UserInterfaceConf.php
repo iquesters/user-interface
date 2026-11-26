@@ -49,6 +49,15 @@ class UserInterfaceConf extends BaseConf
 
     protected string $terms_url;
 
+    /**
+     * The line "Form Rendered by Form Schema: slug" under forms:
+     * debug (only with APP_DEBUG) | always | never.
+     */
+    protected string $form_schema_label;
+
+    /** Roles that see that line, comma separated; empty: everyone signed in. */
+    protected string $form_schema_label_roles;
+
     protected function prepareDefault(BaseConf $default_values)
     {
         $default_values->auth_layout = 'userinterface::layouts.auth';
@@ -67,6 +76,8 @@ class UserInterfaceConf extends BaseConf
         $default_values->help_url = '';
         $default_values->privacy_url = '';
         $default_values->terms_url = '';
+        $default_values->form_schema_label = 'debug';
+        $default_values->form_schema_label_roles = 'super-admin';
     }
 
     protected function rules(): array
@@ -83,6 +94,8 @@ class UserInterfaceConf extends BaseConf
             'help_url' => 'nullable|url:http,https|max:2048',
             'privacy_url' => 'nullable|url:http,https|max:2048',
             'terms_url' => 'nullable|url:http,https|max:2048',
+            'form_schema_label' => 'in:debug,always,never',
+            'form_schema_label_roles' => 'nullable|string|max:500',
         ];
     }
 }

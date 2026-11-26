@@ -164,7 +164,8 @@ const TABLE_EVENT_ROW_SELECTION_CHANGED = 'rowSelectionChanged';
 
 // The row's component in the split view's list; summary_component is the deprecated name.
 const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['row_component', 'row-component', 'summary_component', 'summary-component'];
-const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
+// The side panel's title: the first of these the record has (an order or payment: its reference, e.g. ORD-0001).
+const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'reference', 'label', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';
 const TABLE_MESSAGE_EMPTY_DETAIL = 'Select an item to view details';

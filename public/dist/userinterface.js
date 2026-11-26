@@ -2636,7 +2636,7 @@ async function setupFormBlock(formCol, formMeta) {
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
-                field.value = resolveFieldValue(field.id, formData, entityData);
+                field.value = withFieldDefault(field, resolveFieldValue(field.id, formData, entityData), formMeta);
                 if (isSectionField(field)) {
                     target = renderFormSection(field, form);
                     return;
@@ -2644,11 +2644,16 @@ async function setupFormBlock(formCol, formMeta) {
                 addField(field, target, formMeta);
             });
         } else {
-            if (APP_ENV === 'dev') {
+            // A form of only a button (e.g. "Cancel my registration") has no fields: fine.
+            // APP_ENV exists only on the form builder page; elsewhere it isn't defined
+            // and reading it threw, so the button was never set up.
+            if (typeof APP_ENV !== 'undefined' && APP_ENV === 'dev') {
                 const errorMessageContainer = document.getElementById("form-error-message");
                 console.warn("No fields defined in formMeta for form:", formMeta.id);
-                errorMessageContainer.classList.add('alert', 'alert-warning');
-                errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
+                errorMessageContainer?.classList.add('alert', 'alert-warning');
+                if (errorMessageContainer) {
+                    errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
+                }
             }
         }
 
@@ -2698,7 +2703,13 @@ async function addField(field, addTo,formMeta) {
         }
 
         if (Array.isArray(field.options)) {
-            field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.RADIO)));
+            // Short choices (e.g. Veg / Non-veg) sit on one row; "inline": true/false decides it.
+            const inline = field.inline ?? (field.options.length <= 3 && field.options.every(opt => String(opt?.label ?? opt?.text ?? '').length <= 24));
+            field.options.forEach(opt => {
+                const option = createOptionInput(field, opt, INPUT_TYPE.RADIO);
+                if (inline) option.classList.add('form-check-inline');
+                fragment.appendChild(option);
+            });
         }
         // ✅ Add helper text below radio group
         createHelperText(field, fragment);
@@ -2938,6 +2949,8 @@ function renderFormSection(field, addTo) {
     section.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
     section.className = 'col-12 lab-form-section';
     section.dataset.layoutType = 'section';
+    // Found by its schema id (e.g. a page fills the "summary" section): [data-section-id="summary"].
+    section.dataset.sectionId = field.id;
 
     const header = document.createElement(HTML_TAG.DIV);
     header.className = 'lab-form-section-header';
@@ -3422,15 +3435,23 @@ function createOptionInput(field, opt, type) {
     input.value = opt.value;
     input.classList.add(STYLE_CLASS.FORM_CHECK_INPUT);
 
-    if (type === INPUT_TYPE.RADIO && field.value === opt.value) {
+    // Compared as text: a saved 1 matches the option "1".
+    const sameValue = (a, b) => a !== null && a !== undefined && String(a) === String(b);
+    const isSingleCheckbox = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
+    if (type === INPUT_TYPE.RADIO && sameValue(field.value, opt.value)) {
         input.checked = true;
-    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.includes(opt.value)) {
+    } else if (isSingleCheckbox) {
+        // A single checkbox (e.g. "Registration open"): ticked when its saved value is true.
+        // It was left unticked in edit mode, so saving the form switched the setting off.
+        input.checked = field.value === true || field.value === 1 || field.value === '1' || field.value === 'true' || field.value === 'on';
+    } else if (type === INPUT_TYPE.CHECKBOX && Array.isArray(field.value) && field.value.some(v => sameValue(v, opt.value))) {
         input.checked = true;
     }
 
     // A single checkbox (e.g. "I agree to the terms") is the field itself: its label carries the "*".
     const single = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
-    if (single && field.required) {
+    // A required radio group: one of its options must be chosen (the browser checks the group).
+    if ((single || type === INPUT_TYPE.RADIO) && field.required) {
         input.required = true;
     }
     const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL], single && Boolean(field.required));
@@ -3731,6 +3752,19 @@ function readOnlyDisplayText(form, fieldId, value) {
     const fieldDef = (form.__formMeta?.fields || []).find(f => f?.id === fieldId);
 
     return String(getReadOnlyFieldDisplayValue({ ...(fieldDef || {}), value }));
+}
+
+/**
+ * A field with no value (no record value, nothing from the page) starts at its
+ * schema "default" while filling in (create / edit), e.g. Where: In person.
+ */
+function withFieldDefault(field, value, formMeta) {
+    const empty = value === undefined || value === null || value === '';
+    if (!empty || field?.default === undefined || formMeta?.formMode === 'view') {
+        return value;
+    }
+
+    return field.default;
 }
 
 ;/* ---- js/form/form-constant.js ---- */
@@ -4189,6 +4223,148 @@ async function returnToPreferredInboxDetail(detailContext, overrides = {}) {
     return true;
 }
 
+/**
+ * Fields shown only while another field has a value:
+ *   {"id": "pass_price", ..., "showWhen": {"field": "is_paid", "equals": true}}
+ * A checkbox compares its ticked state (true / false), other fields their value
+ * ("equals" may be a list: any of them). Edit / create follow the input as it
+ * changes; view mode uses the record's value. Hidden fields keep their value.
+ */
+function applyFieldVisibility(formElement, formMeta) {
+    const rules = (formMeta?.fields || []).filter((field) => field?.showWhen?.field && field._domId);
+    if (!rules.length) {
+        return;
+    }
+    const scope = formElement.__formCard?.isConnected ? formElement.__formCard : formElement;
+    const record = formElement.__entityDataCache || (() => {
+        try {
+            return JSON.parse(formElement.__pageFormData || '{}');
+        } catch (e) {
+            return {};
+        }
+    })();
+
+    const currentValue = (name) => {
+        const inputs = [...scope.querySelectorAll(`[name="${name}"], [name="${name}[]"]`)]
+            .filter((el) => el.type !== 'hidden');
+        if (!inputs.length) {
+            return record?.[name];
+        }
+        if (inputs[0].type === 'checkbox' && inputs.length === 1) {
+            return inputs[0].checked;
+        }
+        if (inputs[0].type === 'radio' || inputs[0].type === 'checkbox') {
+            return inputs.find((el) => el.checked)?.value ?? null;
+        }
+        return inputs[0].value;
+    };
+    const matches = (value, expected) => {
+        const list = Array.isArray(expected) ? expected : [expected];
+        return list.some((want) => (typeof want === 'boolean'
+            ? Boolean(value === true || value === 1 || value === '1' || value === 'true') === want
+            : String(value ?? '') === String(want)));
+    };
+    // A field shows when its condition holds and the field it depends on shows too
+    // (e.g. "Valid from" needs "Valid", which is hidden for a physical item).
+    const ruleById = new Map(rules.map((field) => [field.id, field]));
+    const isShown = (field, seen = new Set()) => {
+        if (seen.has(field.id)) {
+            return true; // a loop in the schema: don't hang
+        }
+        seen.add(field.id);
+        if (!matches(currentValue(field.showWhen.field), field.showWhen.equals ?? true)) {
+            return false;
+        }
+        const parent = ruleById.get(field.showWhen.field);
+
+        return parent ? isShown(parent, seen) : true;
+    };
+    const update = (animate = true) => {
+        rules.forEach((field) => {
+            // Every field has its column "{domId}-field" (checkboxes and selects have no "-container").
+            const find = (id) => scope.querySelector(`[id="${id}"]`) || document.getElementById(id);
+            const container = find(field._domId + SUFFIX.CONTAINER);
+            const show = isShown(field);
+            const target = find(field._domId + SUFFIX.FIELD)
+                || container?.closest('.col, [class*="col-"]')
+                || container;
+            if (!target) {
+                return;
+            }
+            const wasHidden = target.style.display === 'none';
+            target.style.display = show ? '' : 'none';
+            // A hidden field isn't asked for: its "required" waits until it shows again.
+            if (show) {
+                target.querySelectorAll('[data-show-when-required]').forEach((el) => {
+                    el.required = true;
+                    delete el.dataset.showWhenRequired;
+                });
+            } else {
+                target.querySelectorAll('[required]').forEach((el) => {
+                    el.required = false;
+                    el.dataset.showWhenRequired = '1';
+                });
+            }
+            // Appearing fields fade in.
+            if (show && wasHidden && animate) {
+                target.style.transition = 'opacity .2s ease';
+                target.style.opacity = '0';
+                requestAnimationFrame(() => { target.style.opacity = '1'; });
+            }
+        });
+    };
+
+    update(false);
+    const triggers = new Set(rules.map((field) => field.showWhen.field));
+    triggers.forEach((name) => {
+        scope.querySelectorAll(`[name="${name}"], [name="${name}[]"]`).forEach((el) => {
+            el.addEventListener('change', update);
+            el.addEventListener('input', update);
+        });
+    });
+}
+
+/**
+ * Show a page's form again in another mode (view ↔ edit) with the values the
+ * page gave it: a fresh <form> with the same id, record and values replaces
+ * the old one and its card (and the schema label), then it is set up again.
+ */
+async function switchFormModeInPlace(formElement, nextMode) {
+    const fresh = document.createElement('form');
+    ['id', 'method', 'enctype'].forEach((name) => {
+        const value = formElement.getAttribute(name);
+        if (value) {
+            fresh.setAttribute(name, value);
+        }
+    });
+    fresh.className = 'lab-form';
+    fresh.dataset.entityUid = formElement.dataset.entityUid || '';
+    fresh.dataset.formMode = nextMode;
+    fresh.dataset.formData = formElement.__pageFormData;
+    fresh.__pageFormData = formElement.__pageFormData;
+    // Cancel in edit goes back to view (not back in history) once switched here.
+    fresh.__switchedInPlace = nextMode === 'edit';
+    if (formElement.dataset.recaptchaAction) {
+        fresh.dataset.recaptchaAction = formElement.dataset.recaptchaAction;
+    }
+    const token = formElement.querySelector('input[name="_token"]');
+    if (token) {
+        fresh.appendChild(token.cloneNode());
+    }
+
+    // The new form goes where the old card was; the card (with the old form,
+    // its header and buttons) and the schema label go.
+    const card = formElement.__formCard?.isConnected ? formElement.__formCard : null;
+    const label = formElement.nextElementSibling?.classList?.contains('ui-form-schema-label')
+        ? formElement.nextElementSibling
+        : null;
+    (card || formElement).before(fresh);
+    label?.remove();
+    (card || formElement).remove();
+
+    await setupForm(fresh);
+}
+
 async function switchFormMode(formElement, nextMode, formMeta) {
     const entityUid = formElement.dataset.entityUid;
     const route = buildFormRoute(formMeta.id, entityUid, nextMode);
@@ -4203,6 +4379,13 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     })();
 
     if (!detailContainer || !entityUid) {
+        // A form on its own page with the page's values (e.g. Payment settings):
+        // switch here. The generic /edit page would load the record from the
+        // entity API, which such forms don't have, and open empty.
+        if (formElement.__pageFormData) {
+            await switchFormModeInPlace(formElement, nextMode);
+            return;
+        }
         if (route) {
             window.location.href = route;
         }
@@ -4349,6 +4532,12 @@ async function handleFormCancelAction(formElement, formMeta) {
         return;
     }
 
+    // Opened with Edit on this page: Cancel shows the values again (read-only).
+    if (formElement.__switchedInPlace && formMeta.formMode === 'edit') {
+        await switchFormModeInPlace(formElement, 'view');
+        return;
+    }
+
     if (window.history.length > 1) {
         window.history.back();
         return;
@@ -4444,6 +4633,12 @@ async function setupForm(formElement) {
     window.uiDebug?.("setuping lab-form...")
     window.uiDebug?.("formId = " + formElement.id)
 
+    // The values the page gave (data-form-data, used up while rendering): kept so
+    // Edit / Cancel can show the form again in the other mode with the same values.
+    if (formElement.dataset.formData && formElement.__pageFormData === undefined) {
+        formElement.__pageFormData = formElement.dataset.formData;
+    }
+
     // The server renders a generic skeleton when it can't resolve the schema
     // (e.g. reusable form templates in the table split view). If the schema
     // is already cached, swap in the exact shape before the first paint.
@@ -4509,6 +4704,7 @@ async function setupForm(formElement) {
 
     if (renderMode === 'modal') {
         await renderFormForModal(formElement, formMeta);
+        applyFieldVisibility(formElement, formMeta);
         bindDynamicFormSubmit(formElement, formMeta);
         appendFormSchemaLabel(formElement, formMeta);
         return formMeta;
@@ -4516,6 +4712,8 @@ async function setupForm(formElement) {
 
     const cardProvider = new CardProvider(formMeta.placeholder);
     formElement.before(cardProvider.getCard());
+    // The form's own card (the form ends up inside it): switchFormModeInPlace replaces it whole.
+    formElement.__formCard = cardProvider.getCard();
 
     const resolvedHeader = resolveFormHeaderConfig(formMeta);
     // A read-only record needs the header row for its Edit / Delete buttons even
@@ -4701,6 +4899,7 @@ async function setupForm(formElement) {
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 
+    applyFieldVisibility(formElement, formMeta);
     bindDynamicFormSubmit(formElement, formMeta);
     appendFormSchemaLabel(formElement, formMeta);
     return formMeta;
@@ -4712,7 +4911,8 @@ async function setupForm(formElement) {
  * is hand-written.
  */
 function appendFormSchemaLabel(formElement, formMeta) {
-    if (!window.USER_INTERFACE_CONFIG?.debug || !formElement?.parentNode) {
+    // Super-admins only (set by the layout: debug and the super-admin role).
+    if (!window.USER_INTERFACE_CONFIG?.showFormSchemaLabel || !formElement?.parentNode) {
         return;
     }
     const next = formElement.nextElementSibling;
@@ -4816,6 +5016,9 @@ async function renderFormForModal(formElement, formMeta) {
     await loadRemoteFieldOptions(formMeta, formElement.dataset.entityUid || null);
 
     if (Array.isArray(formMeta.fields)) {
+        // As on a page (setupFormBlock): a section is a heading panel, and the
+        // fields after it go inside it. Before, a modal drew it as a text box.
+        let target = formElement;
         formMeta.fields.forEach((field, index) => {
             if (!isFieldShownInMode(field, formMeta.formMode)) {
                 return;
@@ -4825,8 +5028,12 @@ async function renderFormForModal(formElement, formMeta) {
             field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
-            field.value = resolveFieldValue(field.id, formData, entityData);
-            addField(field, formElement, formMeta);
+            field.value = withFieldDefault(field, resolveFieldValue(field.id, formData, entityData), formMeta);
+            if (isSectionField(field)) {
+                target = renderFormSection(field, formElement);
+                return;
+            }
+            addField(field, target, formMeta);
         });
     }
 
@@ -5192,6 +5399,11 @@ async function handleDynamicFormSubmit(event, formMeta) {
     event.preventDefault();
     event.stopPropagation();
 
+    // Already sending (e.g. Enter pressed again): one submit at a time.
+    if (form.__submitting) {
+        return;
+    }
+
     const method = resolveDynamicFormMethod(formMeta, form);
     const endpoint = resolveDynamicFormEndpoint(formMeta, form, method);
 
@@ -5200,22 +5412,24 @@ async function handleDynamicFormSubmit(event, formMeta) {
         return;
     }
 
-    if (typeof waitForImageCrops === 'function') {
-        await waitForImageCrops(form);
-    }
-    const payload = serializeDynamicFormPayload(form, formMeta);
-
-    const recaptchaAction = form.dataset.recaptchaAction;
-    if (recaptchaAction) {
-        const recaptchaToken = await getDynamicFormRecaptchaToken(recaptchaAction);
-        if (recaptchaToken) {
-            payload.recaptcha_token = recaptchaToken;
-        }
-    }
-
-    setDynamicFormSubmitting(form, true);
+    // Busy at once (before image crops and reCAPTCHA), with a word for what is happening.
+    setDynamicFormSubmitting(form, true, resolveSubmittingLabel(formMeta, form, method));
     let isRedirecting = false;
+    let payload = {};
     try {
+        if (typeof waitForImageCrops === 'function') {
+            await waitForImageCrops(form);
+        }
+        payload = serializeDynamicFormPayload(form, formMeta);
+
+        const recaptchaAction = form.dataset.recaptchaAction;
+        if (recaptchaAction) {
+            const recaptchaToken = await getDynamicFormRecaptchaToken(recaptchaAction);
+            if (recaptchaToken) {
+                payload.recaptcha_token = recaptchaToken;
+            }
+        }
+
         const result = await submitDynamicFormRequest(endpoint, method, payload, form);
         const errors = result?.errors || result?.response_schema?.errors || null;
         const detailContext = resolveInboxDetailContext(form);
@@ -5265,18 +5479,25 @@ async function handleDynamicFormSubmit(event, formMeta) {
             response: result,
             message: successMessage,
         });
-        notifyDynamicFormOutcome(formMeta, 'success', successMessage);
-
         // A server that returns a redirect_url (auth forms, or any other
         // fixed-endpoint form) is explicitly telling the client where to go
         // next — honor it before falling back to inbox/detail-view handling,
         // which only applies to entity-backed forms rendered inside a modal.
-        const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url;
+        const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url
+            || resolveSuccessRedirect(formMeta, form, detailContext);
         if (redirectUrl) {
             isRedirecting = true;
-            window.location.href = redirectUrl;
+            // The message shows on the next page (the snackbar would vanish with this one).
+            // The button keeps its busy word (e.g. Saving…) until the next page opens.
+            rememberDynamicFormFlash(formMeta, successMessage);
+            if (redirectUrl === 'reload') {
+                window.location.reload();
+            } else {
+                window.location.href = redirectUrl;
+            }
             return;
         }
+        notifyDynamicFormOutcome(formMeta, 'success', successMessage);
 
         if (detailContext?.componentBackedEdit && method !== 'DELETE') {
             const nextDetailData = mergeSubmittedDetailData(
@@ -5299,6 +5520,17 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 preferredMode: 'component',
                 formMode: 'view',
             });
+        } else if (detailContext && method !== 'DELETE' && form.dataset.entityUid && form.closest('.inbox-detail-content')) {
+            // A record edited in the table's side panel (e.g. a product): show it again, saved and
+            // read-only, and update its row. Before, the panel stayed in edit mode after saving.
+            const nextDetailData = mergeSubmittedDetailData(form.__entityDataCache || detailContext.data || null, payload, result);
+            detailContext.data = nextDetailData;
+            form.__entityDataCache = nextDetailData;
+            form.dataset.formData = JSON.stringify(nextDetailData);
+            if (typeof window.syncInboxSummaryRow === 'function') {
+                window.syncInboxSummaryRow(detailContext, nextDetailData);
+            }
+            await switchFormMode(form, 'view', formMeta);
         }
     } catch (error) {
         console.error('Dynamic form submit error.', error);
@@ -5358,14 +5590,124 @@ function ensureLoadingDotsStyle() {
  * afterward. No-op if the form has no submit button (e.g. read-only view
  * mode).
  */
-function setDynamicFormSubmitting(form, isSubmitting) {
+/**
+ * The word on the busy button: the schema's (or its mode's) "submittingLabel",
+ * else from the button's text (Log in / Verify → Verifying, Save → Saving,
+ * Delete → Deleting, Upload → Uploading, Send → Sending, Register →
+ * Registering, pay → Processing), else from the method (PUT → Saving,
+ * DELETE → Deleting, POST → Submitting).
+ */
+function resolveSubmittingLabel(formMeta, form, method) {
+    const mode = form?.dataset?.formMode;
+    const own = formMeta?.modes?.[mode]?.submittingLabel || formMeta?.submittingLabel;
+    if (own) {
+        return own;
+    }
+    const button = form?.__submitButton
+        || form?.querySelector('button[type="submit"]')
+        || document.querySelector(`button[type="submit"][form="${form?.id}"]`);
+    const text = String(button?.textContent || formMeta?.submitButtonLabel || '').toLowerCase();
+    // First match wins (e.g. "Save payment settings" is Saving, not Processing).
+    const byText = [
+        [/log ?in|sign ?in|verif|otp/, 'Verifying'],
+        [/record/, 'Recording'],
+        [/save|update/, 'Saving'],
+        [/delete/, 'Deleting'],
+        [/cancel/, 'Cancelling'],
+        [/remove/, 'Removing'],
+        [/upload/, 'Uploading'],
+        [/send/, 'Sending'],
+        [/register|sign ?up|join|apply/, 'Registering'],
+        [/pay/, 'Processing'],
+        [/set |create|add|change/, 'Saving'],
+    ].find(([pattern]) => pattern.test(text));
+    if (byText) {
+        return byText[1];
+    }
+
+    return { PUT: 'Saving', PATCH: 'Saving', DELETE: 'Deleting' }[method] || 'Submitting';
+}
+
+/**
+ * Where to go after a successful submit when the server sent no redirect_url:
+ * the schema's "successRedirect" ("reload", "none", or a URL with {uid}), else,
+ * for a form standing on its own page (not in a modal, a table record or an
+ * inbox detail, which refresh themselves), a reload of the page, so it shows
+ * the saved state.
+ */
+function resolveSuccessRedirect(formMeta, form, detailContext) {
+    const mode = form?.dataset?.formMode;
+    const setting = formMeta?.modes?.[mode]?.successRedirect ?? formMeta?.successRedirect;
+    if (setting === 'none' || setting === false) {
+        return null;
+    }
+    if (typeof setting === 'string' && setting !== '') {
+        return setting === 'reload' ? 'reload' : setting.replace('{uid}', encodeURIComponent(form?.dataset?.entityUid || ''));
+    }
+    const standalone = !form?.closest('.modal')
+        && form?.dataset?.recordSource !== 'record-section'
+        && !detailContext;
+
+    return standalone ? 'reload' : null;
+}
+
+const DYNAMIC_FORM_FLASH_KEY = 'lab-form:flash';
+
+/** Keep the success message for the next page (unless the schema has no snackbar). */
+function rememberDynamicFormFlash(formMeta, message) {
+    if (formMeta?.disableSnackbar || !message) {
+        return;
+    }
+    try {
+        sessionStorage.setItem(DYNAMIC_FORM_FLASH_KEY, JSON.stringify({ message, type: 'success', at: Date.now() }));
+    } catch (e) {
+        // Storage blocked: the message is just not shown.
+    }
+}
+
+/** On load: the message a form left before redirecting (at most a minute old). */
+function showDynamicFormFlash() {
+    let flash = null;
+    try {
+        flash = JSON.parse(sessionStorage.getItem(DYNAMIC_FORM_FLASH_KEY) || 'null');
+        sessionStorage.removeItem(DYNAMIC_FORM_FLASH_KEY);
+    } catch (e) {
+        return;
+    }
+    if (!flash?.message || Date.now() - (flash.at || 0) > 60000) {
+        return;
+    }
+    // Shown once: now if the snackbar script is ready, else when the page has loaded.
+    // (showSnackbar returns nothing, so success can't be read from its result.)
+    const show = () => {
+        if (typeof window.showSnackbar !== 'function') {
+            return false;
+        }
+        window.showSnackbar(flash.message, flash.type || 'success');
+        return true;
+    };
+    if (!show()) {
+        window.addEventListener('load', show, { once: true });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showDynamicFormFlash, { once: true });
+} else {
+    showDynamicFormFlash();
+}
+
+function setDynamicFormSubmitting(form, isSubmitting, label = 'Submitting') {
     // Buttons rendered via the footer's actions array (setupFormFooter)
     // live in the card, a DOM sibling of <form>, not a descendant — they
     // associate back to it via the HTML5 form="..." attribute instead. A
     // plain form.querySelector() only ever finds the older auto-generated
     // inline submit button (a true descendant), so it silently found
     // nothing once a schema started defining explicit actions.
-    const submitBtn = form.querySelector('button[type="submit"]')
+    // A modal's footer button submits its form through form.__submitButton (modal.js).
+    form.__submitting = isSubmitting;
+    const submitBtn = form.__submitButton
+        || form.querySelector('button[type="submit"]')
         || document.querySelector(`button[type="submit"][form="${form.id}"]`);
     if (!submitBtn) {
         return;
@@ -5373,12 +5715,20 @@ function setDynamicFormSubmitting(form, isSubmitting) {
 
     if (isSubmitting) {
         ensureLoadingDotsStyle();
-        submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        if (submitBtn.dataset.originalHtml === undefined) {
+            submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        }
         submitBtn.disabled = true;
-        submitBtn.innerHTML = 'Verifying<span class="lab-form-loading-dots">'
+        submitBtn.setAttribute('aria-busy', 'true');
+        // Keeps the original label to restore (set only once).
+        const word = document.createElement('span');
+        word.textContent = label;
+        submitBtn.innerHTML = word.innerHTML + '<span class="lab-form-loading-dots">'
             + '<span>.</span><span>.</span><span>.</span></span>';
         return;
     }
+
+    submitBtn.removeAttribute('aria-busy');
 
     submitBtn.disabled = false;
     if (submitBtn.dataset.originalHtml !== undefined) {
@@ -5553,7 +5903,9 @@ function appendToFormData(formData, key, value) {
     } else if (typeof File !== 'undefined' && value instanceof File) {
         formData.append(key, value, value.name);
     } else if (Array.isArray(value)) {
-        value.forEach(item => appendToFormData(formData, `${key}[]`, item));
+        // Indexed (key[0][level], key[0][year], key[1][...]): with "key[]" PHP starts a
+        // new row at every field, so a repeater's rows arrived split one field per row.
+        value.forEach((item, index) => appendToFormData(formData, `${key}[${index}]`, item));
     } else if (typeof value === 'object') {
         Object.entries(value).forEach(([subKey, subValue]) => appendToFormData(formData, `${key}[${subKey}]`, subValue));
     } else if (typeof value === 'boolean') {
@@ -6522,8 +6874,12 @@ function repeaterSubFields(field) {
 function repeaterCellValue(row, sub) {
     const source = sub.meta === true ? (row?.meta || {}) : (row || {});
     const value = source[sub.id];
+    if (value === null || value === undefined) {
+        // A new row starts with the field's "default" (e.g. Adult, +91).
+        return sub.default ?? '';
+    }
 
-    return value === null || value === undefined ? '' : value;
+    return value;
 }
 
 /** Edit mode: a list of row cards with an add button; view mode: a small table. */
@@ -6560,6 +6916,7 @@ function renderRepeaterField(field, addTo, readOnly) {
     container.appendChild(list);
 
     rows.forEach(row => list.appendChild(renderRepeaterRow(field, row)));
+    numberRepeaterRows(field, list);
 
     const add = document.createElement('button');
     add.type = 'button';
@@ -6573,7 +6930,9 @@ function renderRepeaterField(field, addTo, readOnly) {
     add.addEventListener('click', () => {
         const row = renderRepeaterRow(field, {});
         list.appendChild(row);
-        row.querySelector('input, select, textarea')?.focus();
+        numberRepeaterRows(field, list);
+        row.querySelector('input:not([type=hidden]), select, textarea')?.focus();
+        list.dispatchEvent(new Event('change', { bubbles: true }));
     });
     container.appendChild(add);
 
@@ -6582,57 +6941,250 @@ function renderRepeaterField(field, addTo, readOnly) {
     }
 }
 
+/**
+ * "rowLabel": "Guest" shows each row as a titled card ("Guest 1", "Guest 2")
+ * with its fields in a wrapping grid and a Remove link; without it, a compact
+ * single-line row.
+ */
 function renderRepeaterRow(field, row) {
+    const asCard = Boolean(field.rowLabel);
     const card = document.createElement('div');
-    card.classList.add('lab-repeater-row', 'border', 'rounded', 'p-2');
+    card.classList.add('lab-repeater-row', 'border', 'rounded', asCard ? 'p-3' : 'p-2');
+    if (asCard) card.classList.add('lab-repeater-card');
     card.dataset.uid = row?.uid || '';
     card.dataset.id = row?.uid ? '' : (row?.id ?? '');
 
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.title = 'Remove';
+    remove.setAttribute('aria-label', 'Remove');
+    const icon = document.createElement('i');
+    icon.className = asCard ? 'fa-regular fa-fw fa-trash-can' : 'fas fa-fw fa-trash';
+    remove.appendChild(icon);
+    remove.addEventListener('click', () => {
+        const list = card.parentElement;
+        card.remove();
+        if (list) {
+            numberRepeaterRows(field, list);
+            list.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+
+    if (asCard) {
+        const header = document.createElement('div');
+        header.classList.add('d-flex', 'align-items-center', 'justify-content-between', 'mb-2');
+        const title = document.createElement('div');
+        title.classList.add('lab-repeater-card-title', 'fw-semibold');
+        title.dataset.repeaterTitle = 'true';
+        title.textContent = field.rowLabel;
+        remove.classList.add('btn', 'btn-sm', 'btn-link', 'text-danger', 'text-decoration-none', 'p-0');
+        const text = document.createElement('span');
+        text.classList.add('ms-1', 'small');
+        text.textContent = 'Remove';
+        remove.appendChild(text);
+        header.append(title, remove);
+        card.appendChild(header);
+    } else {
+        remove.classList.add('btn', 'btn-sm', 'btn-outline-danger');
+    }
+
     const grid = document.createElement('div');
     grid.classList.add('row', 'g-2', 'align-items-end');
+    if (asCard) grid.classList.add('row-gap-3');
 
     repeaterSubFields(field).forEach(sub => {
+        // Hidden (e.g. the row's record id): kept and sent, not shown.
+        if (sub.type === 'hidden') {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.value = repeaterCellValue(row, sub);
+            hidden.dataset.repeaterField = sub.id;
+            hidden.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
+            card.appendChild(hidden);
+            return;
+        }
         const col = document.createElement('div');
-        col.classList.add('col-12', 'col-md');
         const id = `rep-${Math.random().toString(36).slice(2)}`;
+        const control = repeaterControl(sub, repeaterCellValue(row, sub));
+        control.id = id;
+        control.dataset.repeaterField = sub.id;
+        control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
 
         const label = document.createElement('label');
-        label.classList.add('form-label', 'small', 'mb-1');
         label.htmlFor = id;
         label.textContent = sub.label || sub.id;
+
+        if (asCard && sub.type === 'checkbox') {
+            // A yes/no question on its own line: the question, then Yes / No buttons
+            // (the checkbox stays, hidden, as the value).
+            col.classList.add('col-12');
+            control.classList.add('d-none');
+            const question = document.createElement('div');
+            question.classList.add('form-label', 'small', 'mb-1', 'fw-semibold');
+            question.textContent = sub.label || sub.id;
+            const group = document.createElement('div');
+            group.classList.add('btn-group', 'btn-group-sm', 'lab-yes-no');
+            group.setAttribute('role', 'group');
+            group.setAttribute('aria-label', sub.label || sub.id);
+            const choice = (text, yes) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.classList.add('btn');
+                b.textContent = text;
+                b.dataset.yes = yes ? 'true' : 'false';
+                b.addEventListener('click', () => {
+                    if (control.checked === yes) return;
+                    control.checked = yes;
+                    control.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                return b;
+            };
+            const yesButton = choice('Yes', true);
+            const noButton = choice('No', false);
+            const paint = () => {
+                yesButton.classList.toggle('btn-primary', control.checked);
+                yesButton.classList.toggle('btn-outline-secondary', !control.checked);
+                noButton.classList.toggle('btn-secondary', !control.checked);
+                noButton.classList.toggle('btn-outline-secondary', control.checked);
+                yesButton.setAttribute('aria-pressed', String(control.checked));
+                noButton.setAttribute('aria-pressed', String(!control.checked));
+            };
+            control.addEventListener('change', paint);
+            paint();
+            group.append(yesButton, noButton);
+            col.append(question, group, control);
+            if (sub.helperText) {
+                const help = document.createElement('div');
+                help.classList.add('form-text', 'mt-1');
+                help.textContent = sub.helperText;
+                col.appendChild(help);
+            }
+            grid.appendChild(col);
+            return;
+        }
+
+        col.classList.add(...(asCard ? ['col-12', 'col-sm-6', 'col-lg-4'] : ['col-12', 'col-md']));
+        label.classList.add('form-label', 'small', 'mb-1');
         if (sub.required) {
             const star = document.createElement('span');
             star.classList.add('text-danger', 'ms-1');
             star.textContent = '*';
             label.appendChild(star);
         }
-
-        const control = repeaterControl(sub, repeaterCellValue(row, sub));
-        control.id = id;
-        control.dataset.repeaterField = sub.id;
-        control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
-
         col.append(label, control);
         grid.appendChild(col);
     });
 
-    const actions = document.createElement('div');
-    actions.classList.add('col-auto');
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.classList.add('btn', 'btn-sm', 'btn-outline-danger');
-    remove.title = 'Remove row';
-    remove.setAttribute('aria-label', 'Remove row');
-    const icon = document.createElement('i');
-    icon.className = 'fas fa-fw fa-trash';
-    remove.appendChild(icon);
-    remove.addEventListener('click', () => card.remove());
-    actions.appendChild(remove);
-    grid.appendChild(actions);
+    if (!asCard) {
+        const actions = document.createElement('div');
+        actions.classList.add('col-auto');
+        actions.appendChild(remove);
+        grid.appendChild(actions);
+    }
 
     card.appendChild(grid);
+    applyRepeaterRowVisibility(field, card);
 
     return card;
+}
+
+/** Card rows are numbered: "Guest 1", "Guest 2"… (again after one is removed). */
+function numberRepeaterRows(field, list) {
+    if (!field.rowLabel) {
+        return;
+    }
+    list.querySelectorAll(':scope > .lab-repeater-row').forEach((card, index) => {
+        const title = card.querySelector('[data-repeater-title]');
+        if (title) title.textContent = `${field.rowLabel} ${index + 1}`;
+    });
+}
+
+/**
+ * Within a row, a sub-field with "showWhen": {"field": "alumnus", "equals": true}
+ * shows only while that sibling has the value (a checkbox: ticked or not). A
+ * hidden one isn't required and its value isn't sent.
+ */
+function applyRepeaterRowVisibility(field, card) {
+    const rules = repeaterSubFields(field).filter(sub => sub.showWhen?.field);
+    // A select's option with "showWhen" (e.g. "Child" only while "Joining as a member?" is No).
+    const optionRules = repeaterSubFields(field).filter(sub => Array.isArray(sub.options) && sub.options.some(opt => opt?.showWhen?.field));
+    if (!rules.length && !optionRules.length) {
+        return;
+    }
+    const control = (id) => card.querySelector(`[data-repeater-field="${id}"]`);
+    const valueOf = (el) => (el?.type === 'checkbox' ? el.checked : (el?.value ?? ''));
+    const matches = (value, expected) => (Array.isArray(expected) ? expected : [expected]).some(want => (typeof want === 'boolean'
+        ? Boolean(value === true || value === '1' || value === 'true') === want
+        : String(value ?? '') === String(want)));
+
+    const updateOptions = () => optionRules.forEach(sub => {
+        const el = control(sub.id);
+        if (!el || el.tagName !== 'SELECT') {
+            return;
+        }
+        sub.options.filter(opt => opt?.showWhen?.field).forEach(opt => {
+            const option = [...el.options].find(o => o.value === String(opt.value));
+            if (!option) {
+                return;
+            }
+            const parent = control(opt.showWhen.field);
+            // A hidden field counts as unanswered (empty / No).
+            const value = parent && !parent.disabled ? valueOf(parent) : (parent?.type === 'checkbox' ? false : '');
+            const show = matches(value, opt.showWhen.equals ?? true);
+            option.hidden = !show;
+            option.disabled = !show;
+            if (!show && option.selected) {
+                // The chosen option went away: the first one still offered.
+                const first = [...el.options].find(o => o.value !== '' && !o.disabled);
+                el.value = first ? first.value : '';
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    });
+
+    const updateFields = () => rules.forEach(sub => {
+        const el = control(sub.id);
+        const col = el?.closest('[class*="col-"]');
+        if (!el || !col) {
+            return;
+        }
+        const parent = control(sub.showWhen.field);
+        // Hidden when the field it depends on is hidden too (e.g. "Class left after" needs "Completed at").
+        const show = !parent?.disabled && matches(valueOf(parent), sub.showWhen.equals ?? true);
+        col.style.display = show ? '' : 'none';
+        el.disabled = !show; // not sent, not checked
+        if (sub.required) {
+            el.required = show;
+        }
+    });
+
+    const update = () => {
+        updateOptions();
+        updateFields();
+    };
+
+    update();
+    new Set([
+        ...rules.map(sub => sub.showWhen.field),
+        ...optionRules.flatMap(sub => sub.options.filter(opt => opt?.showWhen?.field).map(opt => opt.showWhen.field)),
+    ]).forEach(id => {
+        control(id)?.addEventListener('change', update);
+        control(id)?.addEventListener('input', update);
+    });
+}
+
+const repeaterOptionsCache = new Map();
+
+/** A select's options from a module endpoint ({"data": [{value, label}]}), once per URL. */
+function loadRepeaterOptions(url) {
+    if (!repeaterOptionsCache.has(url)) {
+        repeaterOptionsCache.set(url, fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(response => (response.ok ? response.json() : {}))
+            .then(json => (Array.isArray(json?.data) ? json.data : (json?.response_schema?.data || [])))
+            .catch(() => []));
+    }
+
+    return repeaterOptionsCache.get(url);
 }
 
 function repeaterControl(sub, value) {
@@ -6649,13 +7201,23 @@ function repeaterControl(sub, value) {
         empty.value = '';
         empty.textContent = '—';
         control.appendChild(empty);
-        (sub.options || []).forEach(opt => {
+        const addOptions = (options) => (options || []).forEach(opt => {
+            if (opt?.value === '' || opt?.value === null || opt?.value === undefined) {
+                return; // the empty choice is already there
+            }
             const option = document.createElement('option');
             option.value = String(opt?.value ?? '');
             option.textContent = opt?.label ?? opt?.text ?? option.value;
             option.selected = String(value) === option.value;
             control.appendChild(option);
         });
+        addOptions(sub.options);
+        if (sub.required) control.required = true;
+
+        // "optionsFrom": {"url"}: loaded once per address, shared by every row.
+        if (sub.optionsFrom?.url) {
+            loadRepeaterOptions(sub.optionsFrom.url).then(addOptions);
+        }
 
         return control;
     } else if (sub.type === 'checkbox') {
@@ -6674,6 +7236,11 @@ function repeaterControl(sub, value) {
     control.classList.add('form-control', 'form-control-sm');
     if (sub.required) control.required = true;
     if (sub.maxLength) control.maxLength = sub.maxLength;
+    // Number limits (0 included), e.g. a year between 1900 and next year.
+    ['min', 'max', 'step'].forEach(key => {
+        if (sub[key] !== undefined && sub[key] !== null && sub[key] !== '') control.setAttribute(key, sub[key]);
+    });
+    if (typeof blockNegativeNumberKeys === 'function') blockNegativeNumberKeys(sub, control);
     if (sub.placeholder) control.placeholder = sub.placeholder;
 
     return control;
@@ -6687,7 +7254,8 @@ function renderRepeaterTable(field, rows) {
         return empty;
     }
 
-    const subs = repeaterSubFields(field);
+    // Hidden fields have no column.
+    const subs = repeaterSubFields(field).filter(sub => sub.type !== 'hidden');
     const wrap = document.createElement('div');
     wrap.classList.add('table-responsive');
     const table = document.createElement('table');
@@ -6710,6 +7278,15 @@ function renderRepeaterTable(field, rows) {
             td.textContent = typeof getReadOnlyFieldDisplayValue === 'function'
                 ? String(getReadOnlyFieldDisplayValue({ ...sub, value }))
                 : (value === '' ? '—' : String(value));
+            // A select with options from an address: show the option's label, not its value.
+            if (sub.optionsFrom?.url && value !== '') {
+                loadRepeaterOptions(sub.optionsFrom.url).then(options => {
+                    const match = (options || []).find(opt => String(opt?.value) === String(value));
+                    if (match) {
+                        td.textContent = match.label ?? match.text ?? String(value);
+                    }
+                });
+            }
         });
     });
 
@@ -6735,6 +7312,9 @@ function collectRepeaterValue(form, field) {
         else if (rowEl.dataset.id) row.id = rowEl.dataset.id;
 
         rowEl.querySelectorAll('[data-repeater-field]').forEach(control => {
+            if (control.disabled) {
+                return; // hidden by its row's showWhen: not sent
+            }
             const value = control.type === 'checkbox' ? control.checked : control.value;
             (control.dataset.repeaterMeta === 'true' ? meta : row)[control.dataset.repeaterField] = value;
         });
@@ -6935,9 +7515,12 @@ window.applyFieldValidation = function (field, input) {
   if (field.minLength) input.setAttribute(VALIDATION_KEYS.MIN_LENGTH, field.minLength);
   if (field.maxLength) input.setAttribute(VALIDATION_KEYS.MAX_LENGTH, field.maxLength);
   if (field.pattern) input.setAttribute(VALIDATION_KEYS.PATTERN, field.pattern);
-  if (field.min) input.setAttribute(VALIDATION_KEYS.MIN, field.min);
-  if (field.max) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
-  if (field.step) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
+  // 0 is a real limit (e.g. "min": 0 for amounts): only a missing value is skipped.
+  const given = (v) => v !== undefined && v !== null && v !== '';
+  if (given(field.min)) input.setAttribute(VALIDATION_KEYS.MIN, field.min);
+  if (given(field.max)) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
+  if (given(field.step)) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
+  if (typeof blockNegativeNumberKeys === 'function') blockNegativeNumberKeys(field, input);
 
 
   // input type file
@@ -7138,6 +7721,27 @@ function applyFieldDependencies(field, input) {
       depInput.addEventListener("change", checkHideCondition);
     });
   }, 0);
+}
+
+
+
+
+/**
+ * A number field that can't go below 0 (e.g. an amount): the minus sign and
+ * the exponent ("e") can't be typed or pasted in, so a negative number never
+ * shows. The browser still checks "min" on submit.
+ */
+function blockNegativeNumberKeys(field, input) {
+  const min = Number(field?.min);
+  if (input?.type !== 'number' || field?.min === undefined || field?.min === null || field?.min === '' || !(min >= 0)) {
+    return;
+  }
+  input.addEventListener('keydown', (e) => {
+    if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+  });
+  input.addEventListener('input', () => {
+    if (input.value !== '' && Number(input.value) < 0) input.value = String(Math.abs(Number(input.value)));
+  });
 }
 
 ;/* ---- js/form/validation/select-validation.js ---- */
@@ -7498,6 +8102,8 @@ async function showSchemaFormModal(config = {}) {
     // organisation is open): then nothing was sent.
     const submitButton = document.getElementById(`${formId}-submit-btn`)
     if (submitButton) {
+        // The form engine shows "Submitting…" on it and keeps it disabled meanwhile.
+        form.__submitButton = submitButton
         submitButton.removeAttribute('form')
         submitButton.type = 'button'
         submitButton.addEventListener('click', (event) => {
@@ -8395,7 +9001,8 @@ const TABLE_EVENT_ROW_SELECTION_CHANGED = 'rowSelectionChanged';
 
 // The row's component in the split view's list; summary_component is the deprecated name.
 const TABLE_SCHEMA_KEY_SUMMARY_COMPONENT = ['row_component', 'row-component', 'summary_component', 'summary-component'];
-const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'uid', 'id'];
+// The side panel's title: the first of these the record has (an order or payment: its reference, e.g. ORD-0001).
+const TABLE_DETAIL_TITLE_FIELDS = ['title', 'name', 'subject', 'reference', 'label', 'uid', 'id'];
 
 const TABLE_MESSAGE_LOADING = 'Loading...';
 const TABLE_MESSAGE_EMPTY_DETAIL = 'Select an item to view details';
@@ -8835,6 +9442,11 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
 
     // Handle row selection
     $(listTable).on('click', TABLE_SELECTOR_INBOX_ROW, function(e) {
+        // Only the list's own rows, never a click inside an open record or form.
+        if ((typeof isOwnListRow === 'function' && !isOwnListRow(this, listTable, e))
+            || (typeof isClickInsideRecord === 'function' && isClickInsideRecord(e))) {
+            return;
+        }
         // Don't trigger if clicking checkbox
         if ($(e.target).hasClass(TABLE_SELECTOR_ROW_CHECKBOX.slice(1)) || $(e.target).closest(TABLE_SELECTOR_CHECKBOX_COLUMN).length) {
             return;
@@ -9484,6 +10096,11 @@ async function initLabTable(tableElement) {
     }
 
     const schema = schemaResponse.data;
+    // A page can show a table's rows from its own address (e.g. one event's attendees):
+    // <table class="lab-table" data-data-url="/events/manage/{uid}/attendees/data">.
+    if (tableElement.dataset.dataUrl) {
+        schema.data_url = tableElement.dataset.dataUrl;
+    }
     const entity = schema.entity;
     const dtSchemaConfig = schema["dt-options"] || {};
     const entriesPerPage = schema.entries_per_page || 10;
@@ -11498,7 +12115,12 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // /list/{table}/view/{form}/{uid}). Checkboxes and controls keep their own
     // behaviour, and Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
     $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
-        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
+        // Only the list's own rows, never a click inside an open record or form (an edit
+        // form's field, a table inside a record): that switched an edit to split view.
+        if (!isOwnListRow(this, tableElement, event) || isClickInsideRecord(event)) {
+            return;
+        }
+        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, textarea, label, .dropdown`).length) {
             return;
         }
         if (event.target.closest('a') && (event.ctrlKey || event.metaKey || event.shiftKey)) {
@@ -11809,6 +12431,26 @@ function updateSelectionCount(tableElement) {
 function getSelectedRows(tableElement) {
     const checkedBoxes = tableElement.querySelectorAll(`${TABLE_SELECTOR_ROW_CHECKBOX}:checked`);
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
+}
+
+
+
+/**
+ * A click on a row of this list's own body: not on a row of a table nested inside a
+ * cell or a record (its click bubbles up to the outer row too).
+ */
+function isOwnListRow(row, tableElement, event = null) {
+    if (!row || !tableElement || row.closest('table') !== tableElement) {
+        return false;
+    }
+    const clickedRow = event?.target?.closest?.('tr');
+    return !clickedRow || clickedRow === row;
+}
+
+/** A click inside an open record or a form (fields, sections, panels) is not a row click. */
+function isClickInsideRecord(event) {
+    const target = event?.target;
+    return Boolean(target?.closest?.('form, .inbox-detail-content, .ui-record-section, [contenteditable="true"]'));
 }
 
 ;/* ---- js/table/table-url-state.js ---- */

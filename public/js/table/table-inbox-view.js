@@ -220,6 +220,11 @@ function renderInboxView(tableElement, cache, dtConfig, entityName, schema, targ
 
     // Handle row selection
     $(listTable).on('click', TABLE_SELECTOR_INBOX_ROW, function(e) {
+        // Only the list's own rows, never a click inside an open record or form.
+        if ((typeof isOwnListRow === 'function' && !isOwnListRow(this, listTable, e))
+            || (typeof isClickInsideRecord === 'function' && isClickInsideRecord(e))) {
+            return;
+        }
         // Don't trigger if clicking checkbox
         if ($(e.target).hasClass(TABLE_SELECTOR_ROW_CHECKBOX.slice(1)) || $(e.target).closest(TABLE_SELECTOR_CHECKBOX_COLUMN).length) {
             return;

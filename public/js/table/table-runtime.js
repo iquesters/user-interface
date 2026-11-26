@@ -176,7 +176,12 @@ function renderLazyDataTable(tableElement, cache, dtConfig, entityName) {
     // /list/{table}/view/{form}/{uid}). Checkboxes and controls keep their own
     // behaviour, and Ctrl/Cmd/Shift-click on the link still opens it in a new tab.
     $(tableElement).off('click.splitOpen').on('click.splitOpen', 'tbody tr', function (event) {
-        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, label, .dropdown`).length) {
+        // Only the list's own rows, never a click inside an open record or form (an edit
+        // form's field, a table inside a record): that switched an edit to split view.
+        if (!isOwnListRow(this, tableElement, event) || isClickInsideRecord(event)) {
+            return;
+        }
+        if ($(event.target).closest(`${TABLE_SELECTOR_CHECKBOX_COLUMN}, input, button, select, textarea, label, .dropdown`).length) {
             return;
         }
         if (event.target.closest('a') && (event.ctrlKey || event.metaKey || event.shiftKey)) {
@@ -489,3 +494,22 @@ function getSelectedRows(tableElement) {
     return Array.from(checkedBoxes).map(cb => cb.dataset.uid);
 }
 
+
+
+/**
+ * A click on a row of this list's own body: not on a row of a table nested inside a
+ * cell or a record (its click bubbles up to the outer row too).
+ */
+function isOwnListRow(row, tableElement, event = null) {
+    if (!row || !tableElement || row.closest('table') !== tableElement) {
+        return false;
+    }
+    const clickedRow = event?.target?.closest?.('tr');
+    return !clickedRow || clickedRow === row;
+}
+
+/** A click inside an open record or a form (fields, sections, panels) is not a row click. */
+function isClickInsideRecord(event) {
+    const target = event?.target;
+    return Boolean(target?.closest?.('form, .inbox-detail-content, .ui-record-section, [contenteditable="true"]'));
+}

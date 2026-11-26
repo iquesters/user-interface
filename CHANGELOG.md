@@ -5,6 +5,58 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Fixed (number fields)
+### Added (tables on any page)
+- **`userinterface::components.table`**: the list page's actions bar and table as a partial, so a module page can show a generic table (e.g. an event's attendees under its totals). `dataUrl` gives that table its own rows: `<table class="lab-table" data-data-url="…">` replaces the schema's `data_url` for the page.
+
+- **`"min": 0` was ignored** (0 was treated as "not set"), so amounts could go negative. `min`, `max` and `step` of 0 now apply, also in repeater rows (which had no number limits at all).
+- **A number field that can't go below 0 blocks the minus sign** (and `e`); a pasted negative becomes positive.
+
+### Fixed (saving in a table's side panel)
+- **Row clicks only open rows of the list itself**: a click inside an open record or form (an edit form's field, a table inside a record or cell) no longer reaches the list's row handler, which opened the record again in view mode (table mode: an edit switched to the split view).
+- **The side panel's title** uses a record's `reference` (or `label`) before its uid: a payment or an order shows *ORD-0001*, not its id.
+- **Editing a record in a list's side panel** (e.g. a product): after *Save*, the panel stayed in edit mode. It now shows the saved record (read-only) and updates its row in the list.
+
+### Added (modern forms)
+- **Repeater rows as cards** (`"rowLabel": "Guest"`): each row is a card titled *Guest 1*, *Guest 2*… (renumbered on remove) with a *Remove* link, its fields in a wrapping grid, and a checkbox as a question with **Yes / No** buttons on its own line (with its `helperText`). Adding or removing a row fires `change` on the form. Without `rowLabel`, rows are compact lines as before.
+- **Repeater sub-field `default`**: a new row starts with it (e.g. *Adult*, *+91*).
+- **Repeater select options with `showWhen`**: an option is offered only while another field in the row has a value (e.g. *Child* only while *Joining as a member?* is No); if the chosen option goes away, the first one still offered is chosen.
+- **Short radio groups on one row** (up to 3 options with short labels, e.g. *Veg / Non-veg*); `"inline": true|false` decides it.
+- **Sections carry `data-section-id`** (their schema id), so a page can fill a section (e.g. a live total).
+- Styles: `.lab-repeater-card`, `.lab-order-summary`.
+
+### Added (repeater rows)
+- **`showWhen` inside a repeater row** (e.g. a guest's school fields only when *Alumnus?* is ticked): hidden fields aren't required or sent, and a field also hides when the one it depends on is hidden.
+
+### Fixed (forms)
+- **Sections in modal forms**: a form opened in a modal (e.g. New event) drew each section heading ("Event", "When and where"…) as a text box. Modals now show sections as on a page: a heading panel with the fields after it inside.
+- **Forms of only a button** (e.g. Cancel my registration, Pay membership): setting them up read `APP_ENV`, which only the form builder page defines, so they broke and their button didn't work. Fixed.
+
+### Added (forms)
+- **`showWhen` follows chains and hidden fields aren't required**: a field also hides when the field it depends on is hidden (e.g. *Valid from* needs *Valid*, hidden for a physical item); a hidden field's `required` waits until it shows, so hidden fields never block saving.
+- **Required radio groups** are checked by the browser (one option must be chosen).
+- **A field's `default`** fills it in create and edit when there's no value yet (e.g. *Where: In person*). Before, only hidden fields used it.
+- **Repeaters**: a `hidden` sub-field is kept in its row and sent, without a column (e.g. a ticket's product id); in view mode a select whose options come from an address shows the option's label, not its value.
+- **Fields that show only when another field has a value**: `"showWhen": {"field": "is_paid", "equals": true}` (a checkbox compares ticked / not ticked; `equals` may be a list). In create and edit they appear (with a short fade) and hide as the user ticks or changes the other field; in view mode they follow the record's value. Used by the event form's paid fields.
+
+### Changed (the form schema line)
+- **"Form Rendered by Form Schema: slug" is a setting**: `form_schema_label` = `debug` (default: only while APP_DEBUG is on), `always` or `never`; `form_schema_label_roles` = the roles that see it, comma separated (default `super-admin`; empty: everyone signed in). Members and org-admins no longer see it. Test: `FormSchemaLabelTest`.
+
+### Changed (submitting a form)
+- **The button shows what is happening at once**, before image crops and reCAPTCHA: *Verifying…* (log in, OTP), *Saving…*, *Recording…*, *Deleting…*, *Cancelling…*, *Uploading…*, *Sending…*, *Registering…*, *Processing…* (pay), else *Submitting…*. The word comes from the button's text, or from the method (PUT: Saving, DELETE: Deleting); a schema (or one of its modes) may set its own with `"submittingLabel"`. It keeps that word, disabled, until the next page opens. Pressing Enter again doesn't send twice.
+- **After a successful submit the form always goes somewhere**: to the server's `redirect_url`, else for a form on its own page (not in a modal, a table record or an inbox detail, which refresh themselves) the page reloads, showing the saved state. A schema may set `"successRedirect"`: `"reload"`, `"none"` (stay), or a URL (`{uid}` is the record's uid).
+- **Edit on a form standing on its own page now keeps the values** (e.g. Payment settings, school records): Edit switches the same form to edit mode in place with the values the page gave it (`formData`); Cancel shows them read-only again. Before, Edit opened the generic `/…/edit/{uid}` page, which loads the record from the entity API and opened empty for forms without an entity.
+- **The success message survives the redirect**: it shows as a snackbar on the next page (unless the schema has `disableSnackbar`).
+
+### Added (repeaters)
+- **A repeater's select can load its options from a module endpoint** (`"optionsFrom": {"url"}`, loaded once per address and shared by every row), e.g. the products of a bundle. Required selects in a repeater are now required in the browser too.
+
+### Fixed
+- **Submit buttons in modals showed no "Submitting…"** and could be pressed twice (the form engine didn't find the modal's button), so forms looked like they did nothing. The button now shows **Submitting…** and stays disabled until the answer (and the redirect) comes. Rebuild the bundle.
+- **A single checkbox lost its value in edit mode**: it was drawn unticked although the record had it on (it is named `{id}[]` with the id `{id}-1`, so filling the form never found it), and saving switched the setting off (e.g. an event's "Registration open"). It is now ticked from its value (true / 1 / "1" / "true"); checkbox and radio groups compare values as text. Rebuild the bundle.
+- **Lists of rows sent with a file were split one field per row** (e.g. the membership application with a proof file: "Choose what you completed…" for every row). Multipart arrays are now indexed (`rows[0][level]`), not `rows[][level]`. Rebuild the bundle.
+- **The form component accepts `formData` / `meta` as arrays** (JSON-encodes them) instead of crashing with "htmlspecialchars(): Argument #1 must be of type string, array given" when an including view passes or leaks an array.
+
 ### Fixed (test round 2)
 - **Create in a modal did nothing when the same form was open in the record panel** (e.g. New organisation while an organisation was open): the footer button found its form by id and got the read-only one. It now submits its own form.
 - **Two Cancel rows** under some forms: an empty `actions` list also built a second footer.

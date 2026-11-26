@@ -421,6 +421,11 @@ async function initLabTable(tableElement) {
     }
 
     const schema = schemaResponse.data;
+    // A page can show a table's rows from its own address (e.g. one event's attendees):
+    // <table class="lab-table" data-data-url="/events/manage/{uid}/attendees/data">.
+    if (tableElement.dataset.dataUrl) {
+        schema.data_url = tableElement.dataset.dataUrl;
+    }
     const entity = schema.entity;
     const dtSchemaConfig = schema["dt-options"] || {};
     const entriesPerPage = schema.entries_per_page || 10;

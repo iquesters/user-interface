@@ -42,6 +42,9 @@
     // Debug logging for the module JS (window.uiDebug?.(...)): only with APP_DEBUG,
     // so production consoles stay clean. console.warn/error are always shown.
     window.USER_INTERFACE_CONFIG.debug = @json((bool) config('app.debug'));
+    // "Form Rendered by Form Schema: slug" under forms: settings form_schema_label
+    // (debug | always | never) and form_schema_label_roles (default super-admin).
+    window.USER_INTERFACE_CONFIG.showFormSchemaLabel = @json(\Iquesters\UserInterface\Support\FormSchemaLabel::visibleTo(auth()->user()));
     window.uiDebug = (...args) => {
         if (window.USER_INTERFACE_CONFIG?.debug) {
             console.log(...args);

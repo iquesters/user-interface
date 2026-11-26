@@ -7,9 +7,12 @@ window.applyFieldValidation = function (field, input) {
   if (field.minLength) input.setAttribute(VALIDATION_KEYS.MIN_LENGTH, field.minLength);
   if (field.maxLength) input.setAttribute(VALIDATION_KEYS.MAX_LENGTH, field.maxLength);
   if (field.pattern) input.setAttribute(VALIDATION_KEYS.PATTERN, field.pattern);
-  if (field.min) input.setAttribute(VALIDATION_KEYS.MIN, field.min);
-  if (field.max) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
-  if (field.step) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
+  // 0 is a real limit (e.g. "min": 0 for amounts): only a missing value is skipped.
+  const given = (v) => v !== undefined && v !== null && v !== '';
+  if (given(field.min)) input.setAttribute(VALIDATION_KEYS.MIN, field.min);
+  if (given(field.max)) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
+  if (given(field.step)) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
+  if (typeof blockNegativeNumberKeys === 'function') blockNegativeNumberKeys(field, input);
 
 
   // input type file
@@ -213,3 +216,22 @@ function applyFieldDependencies(field, input) {
 }
 
 
+
+
+/**
+ * A number field that can't go below 0 (e.g. an amount): the minus sign and
+ * the exponent ("e") can't be typed or pasted in, so a negative number never
+ * shows. The browser still checks "min" on submit.
+ */
+function blockNegativeNumberKeys(field, input) {
+  const min = Number(field?.min);
+  if (input?.type !== 'number' || field?.min === undefined || field?.min === null || field?.min === '' || !(min >= 0)) {
+    return;
+  }
+  input.addEventListener('keydown', (e) => {
+    if (['-', '+', 'e', 'E'].includes(e.key)) e.preventDefault();
+  });
+  input.addEventListener('input', () => {
+    if (input.value !== '' && Number(input.value) < 0) input.value = String(Math.abs(Number(input.value)));
+  });
+}
