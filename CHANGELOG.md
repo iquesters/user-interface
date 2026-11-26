@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+## [2.2.0] – 2026-11-27
+
+_Also covers 2.0.1, 2.1.0 and 2.1.1, which were tagged without their own heading._
+
 ### Fixed (number fields)
 ### Added (tables on any page)
 - **`userinterface::components.table`**: the list page's actions bar and table as a partial, so a module page can show a generic table (e.g. an event's attendees under its totals). `dataUrl` gives that table its own rows: `<table class="lab-table" data-data-url="…">` replaces the schema's `data_url` for the page.
