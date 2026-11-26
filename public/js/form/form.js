@@ -387,6 +387,148 @@ async function returnToPreferredInboxDetail(detailContext, overrides = {}) {
     return true;
 }
 
+/**
+ * Fields shown only while another field has a value:
+ *   {"id": "pass_price", ..., "showWhen": {"field": "is_paid", "equals": true}}
+ * A checkbox compares its ticked state (true / false), other fields their value
+ * ("equals" may be a list: any of them). Edit / create follow the input as it
+ * changes; view mode uses the record's value. Hidden fields keep their value.
+ */
+function applyFieldVisibility(formElement, formMeta) {
+    const rules = (formMeta?.fields || []).filter((field) => field?.showWhen?.field && field._domId);
+    if (!rules.length) {
+        return;
+    }
+    const scope = formElement.__formCard?.isConnected ? formElement.__formCard : formElement;
+    const record = formElement.__entityDataCache || (() => {
+        try {
+            return JSON.parse(formElement.__pageFormData || '{}');
+        } catch (e) {
+            return {};
+        }
+    })();
+
+    const currentValue = (name) => {
+        const inputs = [...scope.querySelectorAll(`[name="${name}"], [name="${name}[]"]`)]
+            .filter((el) => el.type !== 'hidden');
+        if (!inputs.length) {
+            return record?.[name];
+        }
+        if (inputs[0].type === 'checkbox' && inputs.length === 1) {
+            return inputs[0].checked;
+        }
+        if (inputs[0].type === 'radio' || inputs[0].type === 'checkbox') {
+            return inputs.find((el) => el.checked)?.value ?? null;
+        }
+        return inputs[0].value;
+    };
+    const matches = (value, expected) => {
+        const list = Array.isArray(expected) ? expected : [expected];
+        return list.some((want) => (typeof want === 'boolean'
+            ? Boolean(value === true || value === 1 || value === '1' || value === 'true') === want
+            : String(value ?? '') === String(want)));
+    };
+    // A field shows when its condition holds and the field it depends on shows too
+    // (e.g. "Valid from" needs "Valid", which is hidden for a physical item).
+    const ruleById = new Map(rules.map((field) => [field.id, field]));
+    const isShown = (field, seen = new Set()) => {
+        if (seen.has(field.id)) {
+            return true; // a loop in the schema: don't hang
+        }
+        seen.add(field.id);
+        if (!matches(currentValue(field.showWhen.field), field.showWhen.equals ?? true)) {
+            return false;
+        }
+        const parent = ruleById.get(field.showWhen.field);
+
+        return parent ? isShown(parent, seen) : true;
+    };
+    const update = (animate = true) => {
+        rules.forEach((field) => {
+            // Every field has its column "{domId}-field" (checkboxes and selects have no "-container").
+            const find = (id) => scope.querySelector(`[id="${id}"]`) || document.getElementById(id);
+            const container = find(field._domId + SUFFIX.CONTAINER);
+            const show = isShown(field);
+            const target = find(field._domId + SUFFIX.FIELD)
+                || container?.closest('.col, [class*="col-"]')
+                || container;
+            if (!target) {
+                return;
+            }
+            const wasHidden = target.style.display === 'none';
+            target.style.display = show ? '' : 'none';
+            // A hidden field isn't asked for: its "required" waits until it shows again.
+            if (show) {
+                target.querySelectorAll('[data-show-when-required]').forEach((el) => {
+                    el.required = true;
+                    delete el.dataset.showWhenRequired;
+                });
+            } else {
+                target.querySelectorAll('[required]').forEach((el) => {
+                    el.required = false;
+                    el.dataset.showWhenRequired = '1';
+                });
+            }
+            // Appearing fields fade in.
+            if (show && wasHidden && animate) {
+                target.style.transition = 'opacity .2s ease';
+                target.style.opacity = '0';
+                requestAnimationFrame(() => { target.style.opacity = '1'; });
+            }
+        });
+    };
+
+    update(false);
+    const triggers = new Set(rules.map((field) => field.showWhen.field));
+    triggers.forEach((name) => {
+        scope.querySelectorAll(`[name="${name}"], [name="${name}[]"]`).forEach((el) => {
+            el.addEventListener('change', update);
+            el.addEventListener('input', update);
+        });
+    });
+}
+
+/**
+ * Show a page's form again in another mode (view ↔ edit) with the values the
+ * page gave it: a fresh <form> with the same id, record and values replaces
+ * the old one and its card (and the schema label), then it is set up again.
+ */
+async function switchFormModeInPlace(formElement, nextMode) {
+    const fresh = document.createElement('form');
+    ['id', 'method', 'enctype'].forEach((name) => {
+        const value = formElement.getAttribute(name);
+        if (value) {
+            fresh.setAttribute(name, value);
+        }
+    });
+    fresh.className = 'lab-form';
+    fresh.dataset.entityUid = formElement.dataset.entityUid || '';
+    fresh.dataset.formMode = nextMode;
+    fresh.dataset.formData = formElement.__pageFormData;
+    fresh.__pageFormData = formElement.__pageFormData;
+    // Cancel in edit goes back to view (not back in history) once switched here.
+    fresh.__switchedInPlace = nextMode === 'edit';
+    if (formElement.dataset.recaptchaAction) {
+        fresh.dataset.recaptchaAction = formElement.dataset.recaptchaAction;
+    }
+    const token = formElement.querySelector('input[name="_token"]');
+    if (token) {
+        fresh.appendChild(token.cloneNode());
+    }
+
+    // The new form goes where the old card was; the card (with the old form,
+    // its header and buttons) and the schema label go.
+    const card = formElement.__formCard?.isConnected ? formElement.__formCard : null;
+    const label = formElement.nextElementSibling?.classList?.contains('ui-form-schema-label')
+        ? formElement.nextElementSibling
+        : null;
+    (card || formElement).before(fresh);
+    label?.remove();
+    (card || formElement).remove();
+
+    await setupForm(fresh);
+}
+
 async function switchFormMode(formElement, nextMode, formMeta) {
     const entityUid = formElement.dataset.entityUid;
     const route = buildFormRoute(formMeta.id, entityUid, nextMode);
@@ -401,6 +543,13 @@ async function switchFormMode(formElement, nextMode, formMeta) {
     })();
 
     if (!detailContainer || !entityUid) {
+        // A form on its own page with the page's values (e.g. Payment settings):
+        // switch here. The generic /edit page would load the record from the
+        // entity API, which such forms don't have, and open empty.
+        if (formElement.__pageFormData) {
+            await switchFormModeInPlace(formElement, nextMode);
+            return;
+        }
         if (route) {
             window.location.href = route;
         }
@@ -547,6 +696,12 @@ async function handleFormCancelAction(formElement, formMeta) {
         return;
     }
 
+    // Opened with Edit on this page: Cancel shows the values again (read-only).
+    if (formElement.__switchedInPlace && formMeta.formMode === 'edit') {
+        await switchFormModeInPlace(formElement, 'view');
+        return;
+    }
+
     if (window.history.length > 1) {
         window.history.back();
         return;
@@ -642,6 +797,12 @@ async function setupForm(formElement) {
     window.uiDebug?.("setuping lab-form...")
     window.uiDebug?.("formId = " + formElement.id)
 
+    // The values the page gave (data-form-data, used up while rendering): kept so
+    // Edit / Cancel can show the form again in the other mode with the same values.
+    if (formElement.dataset.formData && formElement.__pageFormData === undefined) {
+        formElement.__pageFormData = formElement.dataset.formData;
+    }
+
     // The server renders a generic skeleton when it can't resolve the schema
     // (e.g. reusable form templates in the table split view). If the schema
     // is already cached, swap in the exact shape before the first paint.
@@ -707,6 +868,7 @@ async function setupForm(formElement) {
 
     if (renderMode === 'modal') {
         await renderFormForModal(formElement, formMeta);
+        applyFieldVisibility(formElement, formMeta);
         bindDynamicFormSubmit(formElement, formMeta);
         appendFormSchemaLabel(formElement, formMeta);
         return formMeta;
@@ -714,6 +876,8 @@ async function setupForm(formElement) {
 
     const cardProvider = new CardProvider(formMeta.placeholder);
     formElement.before(cardProvider.getCard());
+    // The form's own card (the form ends up inside it): switchFormModeInPlace replaces it whole.
+    formElement.__formCard = cardProvider.getCard();
 
     const resolvedHeader = resolveFormHeaderConfig(formMeta);
     // A read-only record needs the header row for its Edit / Delete buttons even
@@ -899,6 +1063,7 @@ async function setupForm(formElement) {
     // removing placeholder
     cardProvider.getCard().classList.remove(...['placeholder-glow', 'placeholder-wave']);
 
+    applyFieldVisibility(formElement, formMeta);
     bindDynamicFormSubmit(formElement, formMeta);
     appendFormSchemaLabel(formElement, formMeta);
     return formMeta;
@@ -910,7 +1075,8 @@ async function setupForm(formElement) {
  * is hand-written.
  */
 function appendFormSchemaLabel(formElement, formMeta) {
-    if (!window.USER_INTERFACE_CONFIG?.debug || !formElement?.parentNode) {
+    // Super-admins only (set by the layout: debug and the super-admin role).
+    if (!window.USER_INTERFACE_CONFIG?.showFormSchemaLabel || !formElement?.parentNode) {
         return;
     }
     const next = formElement.nextElementSibling;
@@ -1014,6 +1180,9 @@ async function renderFormForModal(formElement, formMeta) {
     await loadRemoteFieldOptions(formMeta, formElement.dataset.entityUid || null);
 
     if (Array.isArray(formMeta.fields)) {
+        // As on a page (setupFormBlock): a section is a heading panel, and the
+        // fields after it go inside it. Before, a modal drew it as a text box.
+        let target = formElement;
         formMeta.fields.forEach((field, index) => {
             if (!isFieldShownInMode(field, formMeta.formMode)) {
                 return;
@@ -1023,8 +1192,12 @@ async function renderFormForModal(formElement, formMeta) {
             field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
             field._renderIndex = index;
             field._domId = buildFieldDomId(formMeta, field, index);
-            field.value = resolveFieldValue(field.id, formData, entityData);
-            addField(field, formElement, formMeta);
+            field.value = withFieldDefault(field, resolveFieldValue(field.id, formData, entityData), formMeta);
+            if (isSectionField(field)) {
+                target = renderFormSection(field, formElement);
+                return;
+            }
+            addField(field, target, formMeta);
         });
     }
 
@@ -1390,6 +1563,11 @@ async function handleDynamicFormSubmit(event, formMeta) {
     event.preventDefault();
     event.stopPropagation();
 
+    // Already sending (e.g. Enter pressed again): one submit at a time.
+    if (form.__submitting) {
+        return;
+    }
+
     const method = resolveDynamicFormMethod(formMeta, form);
     const endpoint = resolveDynamicFormEndpoint(formMeta, form, method);
 
@@ -1398,22 +1576,24 @@ async function handleDynamicFormSubmit(event, formMeta) {
         return;
     }
 
-    if (typeof waitForImageCrops === 'function') {
-        await waitForImageCrops(form);
-    }
-    const payload = serializeDynamicFormPayload(form, formMeta);
-
-    const recaptchaAction = form.dataset.recaptchaAction;
-    if (recaptchaAction) {
-        const recaptchaToken = await getDynamicFormRecaptchaToken(recaptchaAction);
-        if (recaptchaToken) {
-            payload.recaptcha_token = recaptchaToken;
-        }
-    }
-
-    setDynamicFormSubmitting(form, true);
+    // Busy at once (before image crops and reCAPTCHA), with a word for what is happening.
+    setDynamicFormSubmitting(form, true, resolveSubmittingLabel(formMeta, form, method));
     let isRedirecting = false;
+    let payload = {};
     try {
+        if (typeof waitForImageCrops === 'function') {
+            await waitForImageCrops(form);
+        }
+        payload = serializeDynamicFormPayload(form, formMeta);
+
+        const recaptchaAction = form.dataset.recaptchaAction;
+        if (recaptchaAction) {
+            const recaptchaToken = await getDynamicFormRecaptchaToken(recaptchaAction);
+            if (recaptchaToken) {
+                payload.recaptcha_token = recaptchaToken;
+            }
+        }
+
         const result = await submitDynamicFormRequest(endpoint, method, payload, form);
         const errors = result?.errors || result?.response_schema?.errors || null;
         const detailContext = resolveInboxDetailContext(form);
@@ -1463,18 +1643,25 @@ async function handleDynamicFormSubmit(event, formMeta) {
             response: result,
             message: successMessage,
         });
-        notifyDynamicFormOutcome(formMeta, 'success', successMessage);
-
         // A server that returns a redirect_url (auth forms, or any other
         // fixed-endpoint form) is explicitly telling the client where to go
         // next — honor it before falling back to inbox/detail-view handling,
         // which only applies to entity-backed forms rendered inside a modal.
-        const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url;
+        const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url
+            || resolveSuccessRedirect(formMeta, form, detailContext);
         if (redirectUrl) {
             isRedirecting = true;
-            window.location.href = redirectUrl;
+            // The message shows on the next page (the snackbar would vanish with this one).
+            // The button keeps its busy word (e.g. Saving…) until the next page opens.
+            rememberDynamicFormFlash(formMeta, successMessage);
+            if (redirectUrl === 'reload') {
+                window.location.reload();
+            } else {
+                window.location.href = redirectUrl;
+            }
             return;
         }
+        notifyDynamicFormOutcome(formMeta, 'success', successMessage);
 
         if (detailContext?.componentBackedEdit && method !== 'DELETE') {
             const nextDetailData = mergeSubmittedDetailData(
@@ -1497,6 +1684,17 @@ async function handleDynamicFormSubmit(event, formMeta) {
                 preferredMode: 'component',
                 formMode: 'view',
             });
+        } else if (detailContext && method !== 'DELETE' && form.dataset.entityUid && form.closest('.inbox-detail-content')) {
+            // A record edited in the table's side panel (e.g. a product): show it again, saved and
+            // read-only, and update its row. Before, the panel stayed in edit mode after saving.
+            const nextDetailData = mergeSubmittedDetailData(form.__entityDataCache || detailContext.data || null, payload, result);
+            detailContext.data = nextDetailData;
+            form.__entityDataCache = nextDetailData;
+            form.dataset.formData = JSON.stringify(nextDetailData);
+            if (typeof window.syncInboxSummaryRow === 'function') {
+                window.syncInboxSummaryRow(detailContext, nextDetailData);
+            }
+            await switchFormMode(form, 'view', formMeta);
         }
     } catch (error) {
         console.error('Dynamic form submit error.', error);
@@ -1556,7 +1754,114 @@ function ensureLoadingDotsStyle() {
  * afterward. No-op if the form has no submit button (e.g. read-only view
  * mode).
  */
-function setDynamicFormSubmitting(form, isSubmitting) {
+/**
+ * The word on the busy button: the schema's (or its mode's) "submittingLabel",
+ * else from the button's text (Log in / Verify → Verifying, Save → Saving,
+ * Delete → Deleting, Upload → Uploading, Send → Sending, Register →
+ * Registering, pay → Processing), else from the method (PUT → Saving,
+ * DELETE → Deleting, POST → Submitting).
+ */
+function resolveSubmittingLabel(formMeta, form, method) {
+    const mode = form?.dataset?.formMode;
+    const own = formMeta?.modes?.[mode]?.submittingLabel || formMeta?.submittingLabel;
+    if (own) {
+        return own;
+    }
+    const button = form?.__submitButton
+        || form?.querySelector('button[type="submit"]')
+        || document.querySelector(`button[type="submit"][form="${form?.id}"]`);
+    const text = String(button?.textContent || formMeta?.submitButtonLabel || '').toLowerCase();
+    // First match wins (e.g. "Save payment settings" is Saving, not Processing).
+    const byText = [
+        [/log ?in|sign ?in|verif|otp/, 'Verifying'],
+        [/record/, 'Recording'],
+        [/save|update/, 'Saving'],
+        [/delete/, 'Deleting'],
+        [/cancel/, 'Cancelling'],
+        [/remove/, 'Removing'],
+        [/upload/, 'Uploading'],
+        [/send/, 'Sending'],
+        [/register|sign ?up|join|apply/, 'Registering'],
+        [/pay/, 'Processing'],
+        [/set |create|add|change/, 'Saving'],
+    ].find(([pattern]) => pattern.test(text));
+    if (byText) {
+        return byText[1];
+    }
+
+    return { PUT: 'Saving', PATCH: 'Saving', DELETE: 'Deleting' }[method] || 'Submitting';
+}
+
+/**
+ * Where to go after a successful submit when the server sent no redirect_url:
+ * the schema's "successRedirect" ("reload", "none", or a URL with {uid}), else,
+ * for a form standing on its own page (not in a modal, a table record or an
+ * inbox detail, which refresh themselves), a reload of the page, so it shows
+ * the saved state.
+ */
+function resolveSuccessRedirect(formMeta, form, detailContext) {
+    const mode = form?.dataset?.formMode;
+    const setting = formMeta?.modes?.[mode]?.successRedirect ?? formMeta?.successRedirect;
+    if (setting === 'none' || setting === false) {
+        return null;
+    }
+    if (typeof setting === 'string' && setting !== '') {
+        return setting === 'reload' ? 'reload' : setting.replace('{uid}', encodeURIComponent(form?.dataset?.entityUid || ''));
+    }
+    const standalone = !form?.closest('.modal')
+        && form?.dataset?.recordSource !== 'record-section'
+        && !detailContext;
+
+    return standalone ? 'reload' : null;
+}
+
+const DYNAMIC_FORM_FLASH_KEY = 'lab-form:flash';
+
+/** Keep the success message for the next page (unless the schema has no snackbar). */
+function rememberDynamicFormFlash(formMeta, message) {
+    if (formMeta?.disableSnackbar || !message) {
+        return;
+    }
+    try {
+        sessionStorage.setItem(DYNAMIC_FORM_FLASH_KEY, JSON.stringify({ message, type: 'success', at: Date.now() }));
+    } catch (e) {
+        // Storage blocked: the message is just not shown.
+    }
+}
+
+/** On load: the message a form left before redirecting (at most a minute old). */
+function showDynamicFormFlash() {
+    let flash = null;
+    try {
+        flash = JSON.parse(sessionStorage.getItem(DYNAMIC_FORM_FLASH_KEY) || 'null');
+        sessionStorage.removeItem(DYNAMIC_FORM_FLASH_KEY);
+    } catch (e) {
+        return;
+    }
+    if (!flash?.message || Date.now() - (flash.at || 0) > 60000) {
+        return;
+    }
+    // Shown once: now if the snackbar script is ready, else when the page has loaded.
+    // (showSnackbar returns nothing, so success can't be read from its result.)
+    const show = () => {
+        if (typeof window.showSnackbar !== 'function') {
+            return false;
+        }
+        window.showSnackbar(flash.message, flash.type || 'success');
+        return true;
+    };
+    if (!show()) {
+        window.addEventListener('load', show, { once: true });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', showDynamicFormFlash, { once: true });
+} else {
+    showDynamicFormFlash();
+}
+
+function setDynamicFormSubmitting(form, isSubmitting, label = 'Submitting') {
     // Buttons rendered via the footer's actions array (setupFormFooter)
     // live in the card, a DOM sibling of <form>, not a descendant — they
     // associate back to it via the HTML5 form="..." attribute instead. A
@@ -1564,6 +1869,7 @@ function setDynamicFormSubmitting(form, isSubmitting) {
     // inline submit button (a true descendant), so it silently found
     // nothing once a schema started defining explicit actions.
     // A modal's footer button submits its form through form.__submitButton (modal.js).
+    form.__submitting = isSubmitting;
     const submitBtn = form.__submitButton
         || form.querySelector('button[type="submit"]')
         || document.querySelector(`button[type="submit"][form="${form.id}"]`);
@@ -1572,14 +1878,16 @@ function setDynamicFormSubmitting(form, isSubmitting) {
     }
 
     if (isSubmitting) {
-        if (submitBtn.disabled && submitBtn.dataset.originalHtml !== undefined) {
-            return; // already submitting
-        }
         ensureLoadingDotsStyle();
-        submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        if (submitBtn.dataset.originalHtml === undefined) {
+            submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        }
         submitBtn.disabled = true;
         submitBtn.setAttribute('aria-busy', 'true');
-        submitBtn.innerHTML = 'Submitting<span class="lab-form-loading-dots">'
+        // Keeps the original label to restore (set only once).
+        const word = document.createElement('span');
+        word.textContent = label;
+        submitBtn.innerHTML = word.innerHTML + '<span class="lab-form-loading-dots">'
             + '<span>.</span><span>.</span><span>.</span></span>';
         return;
     }

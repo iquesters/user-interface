@@ -91,7 +91,7 @@ async function setupFormBlock(formCol, formMeta) {
                 field._renderIndex = index;
                 field._domId = buildFieldDomId(formMeta, field, index);
                 field._resolvedSize = resolveFieldSizeConfig(field, formMeta);
-                field.value = resolveFieldValue(field.id, formData, entityData);
+                field.value = withFieldDefault(field, resolveFieldValue(field.id, formData, entityData), formMeta);
                 if (isSectionField(field)) {
                     target = renderFormSection(field, form);
                     return;
@@ -99,11 +99,16 @@ async function setupFormBlock(formCol, formMeta) {
                 addField(field, target, formMeta);
             });
         } else {
-            if (APP_ENV === 'dev') {
+            // A form of only a button (e.g. "Cancel my registration") has no fields: fine.
+            // APP_ENV exists only on the form builder page; elsewhere it isn't defined
+            // and reading it threw, so the button was never set up.
+            if (typeof APP_ENV !== 'undefined' && APP_ENV === 'dev') {
                 const errorMessageContainer = document.getElementById("form-error-message");
                 console.warn("No fields defined in formMeta for form:", formMeta.id);
-                errorMessageContainer.classList.add('alert', 'alert-warning');
-                errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
+                errorMessageContainer?.classList.add('alert', 'alert-warning');
+                if (errorMessageContainer) {
+                    errorMessageContainer.textContent = `⚠️ No fields defined in form: ${formMeta.id}`;
+                }
             }
         }
 
@@ -153,7 +158,13 @@ async function addField(field, addTo,formMeta) {
         }
 
         if (Array.isArray(field.options)) {
-            field.options.forEach(opt => fragment.appendChild(createOptionInput(field, opt, INPUT_TYPE.RADIO)));
+            // Short choices (e.g. Veg / Non-veg) sit on one row; "inline": true/false decides it.
+            const inline = field.inline ?? (field.options.length <= 3 && field.options.every(opt => String(opt?.label ?? opt?.text ?? '').length <= 24));
+            field.options.forEach(opt => {
+                const option = createOptionInput(field, opt, INPUT_TYPE.RADIO);
+                if (inline) option.classList.add('form-check-inline');
+                fragment.appendChild(option);
+            });
         }
         // ✅ Add helper text below radio group
         createHelperText(field, fragment);
@@ -393,6 +404,8 @@ function renderFormSection(field, addTo) {
     section.id = `${getFieldDomId(field)}${SUFFIX.FIELD}`;
     section.className = 'col-12 lab-form-section';
     section.dataset.layoutType = 'section';
+    // Found by its schema id (e.g. a page fills the "summary" section): [data-section-id="summary"].
+    section.dataset.sectionId = field.id;
 
     const header = document.createElement(HTML_TAG.DIV);
     header.className = 'lab-form-section-header';
@@ -892,7 +905,8 @@ function createOptionInput(field, opt, type) {
 
     // A single checkbox (e.g. "I agree to the terms") is the field itself: its label carries the "*".
     const single = type === INPUT_TYPE.CHECKBOX && !Array.isArray(field.options) && !field.optionsFrom;
-    if (single && field.required) {
+    // A required radio group: one of its options must be chosen (the browser checks the group).
+    if ((single || type === INPUT_TYPE.RADIO) && field.required) {
         input.required = true;
     }
     const label = createLabel(opt.label || opt.text, input.id, [STYLE_CLASS.FORM_CHECK_LABEL], single && Boolean(field.required));
@@ -1193,4 +1207,17 @@ function readOnlyDisplayText(form, fieldId, value) {
     const fieldDef = (form.__formMeta?.fields || []).find(f => f?.id === fieldId);
 
     return String(getReadOnlyFieldDisplayValue({ ...(fieldDef || {}), value }));
+}
+
+/**
+ * A field with no value (no record value, nothing from the page) starts at its
+ * schema "default" while filling in (create / edit), e.g. Where: In person.
+ */
+function withFieldDefault(field, value, formMeta) {
+    const empty = value === undefined || value === null || value === '';
+    if (!empty || field?.default === undefined || formMeta?.formMode === 'view') {
+        return value;
+    }
+
+    return field.default;
 }
