@@ -13,6 +13,10 @@ window.applyFieldValidation = function (field, input) {
   if (given(field.max)) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
   if (given(field.step)) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
   if (typeof blockNegativeNumberKeys === 'function') blockNegativeNumberKeys(field, input);
+  // Mobile keyboards and autofill: "inputmode": "numeric", "autocomplete": "one-time-code".
+  if (given(field.inputmode)) input.setAttribute('inputmode', field.inputmode);
+  if (given(field.autocomplete)) input.setAttribute('autocomplete', field.autocomplete);
+  if (field.digitsOnly === true) keepDigitsOnly(field, input);
 
 
   // input type file
@@ -233,5 +237,25 @@ function blockNegativeNumberKeys(field, input) {
   });
   input.addEventListener('input', () => {
     if (input.value !== '' && Number(input.value) < 0) input.value = String(Math.abs(Number(input.value)));
+  });
+}
+
+
+/**
+ * "digitsOnly": true (e.g. a verification code): only digits can be typed or
+ * pasted, and no more than maxLength of them; spaces or dashes in a pasted
+ * code are dropped.
+ */
+function keepDigitsOnly(field, input) {
+  const max = Number(field?.maxLength) || null;
+  input.setAttribute('inputmode', field?.inputmode || 'numeric');
+  input.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return; // shortcuts, arrows, Backspace
+    if (!/[0-9]/.test(e.key)) e.preventDefault();
+  });
+  input.addEventListener('input', () => {
+    let digits = String(input.value || '').replace(/\D+/g, '');
+    if (max) digits = digits.slice(0, max);
+    if (digits !== input.value) input.value = digits;
   });
 }

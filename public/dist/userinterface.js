@@ -5073,8 +5073,15 @@ function bindDynamicFormSubmit(formElement, formMeta) {
     formElement.addEventListener('submit', event => handleDynamicFormSubmit(event, formMeta));
 }
 
+/**
+ * Tells the page what happened. "lab-form:submitted" is cancelable: a page that
+ * shows the result itself (e.g. the next step of sign-in) calls
+ * event.preventDefault(), and the form then doesn't reload the page; a
+ * redirect_url from the server is still followed. Returns false when prevented.
+ */
 function dispatchDynamicFormEvent(eventName, detail = {}) {
-    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    const event = new CustomEvent(eventName, { detail, cancelable: eventName === 'lab-form:submitted' });
+    window.dispatchEvent(event);
 
     if (eventName === 'lab-form:submitted') {
         window.dispatchEvent(new CustomEvent('shoz-form:submitted', { detail }));
@@ -5083,6 +5090,8 @@ function dispatchDynamicFormEvent(eventName, detail = {}) {
     if (eventName === 'lab-form:submit-failed') {
         window.dispatchEvent(new CustomEvent('shoz-form:submit-failed', { detail }));
     }
+
+    return !event.defaultPrevented;
 }
 
 function resolveDynamicFormMessage(result, fallbackMessage) {
@@ -5471,7 +5480,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
         }
 
         const successMessage = resolveDynamicFormMessage(result, 'Form submitted successfully.');
-        dispatchDynamicFormEvent('lab-form:submitted', {
+        const pageLetsFormContinue = dispatchDynamicFormEvent('lab-form:submitted', {
             formId: form.id,
             endpoint,
             method,
@@ -5483,8 +5492,9 @@ async function handleDynamicFormSubmit(event, formMeta) {
         // fixed-endpoint form) is explicitly telling the client where to go
         // next — honor it before falling back to inbox/detail-view handling,
         // which only applies to entity-backed forms rendered inside a modal.
+        // The page showing the result itself (it prevented "lab-form:submitted") keeps it: no reload.
         const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url
-            || resolveSuccessRedirect(formMeta, form, detailContext);
+            || (pageLetsFormContinue ? resolveSuccessRedirect(formMeta, form, detailContext) : null);
         if (redirectUrl) {
             isRedirecting = true;
             // The message shows on the next page (the snackbar would vanish with this one).
@@ -6918,6 +6928,14 @@ function renderRepeaterField(field, addTo, readOnly) {
     rows.forEach(row => list.appendChild(renderRepeaterRow(field, row)));
     numberRepeaterRows(field, list);
 
+    // "fixedRows": true: the rows given, no adding or removing (e.g. editing a registration's guests).
+    if (field.fixedRows === true) {
+        if (typeof createHelperText === 'function' && field.helperText) {
+            createHelperText(field, fragment);
+        }
+        return;
+    }
+
     const add = document.createElement('button');
     add.type = 'button';
     add.classList.add('btn', 'btn-sm', 'btn-outline-secondary', 'mt-2');
@@ -6970,6 +6988,11 @@ function renderRepeaterRow(field, row) {
         }
     });
 
+    if (field.fixedRows === true) {
+        remove.classList.add('d-none');
+        remove.disabled = true;
+    }
+
     if (asCard) {
         const header = document.createElement('div');
         header.classList.add('d-flex', 'align-items-center', 'justify-content-between', 'mb-2');
@@ -7006,6 +7029,10 @@ function renderRepeaterRow(field, row) {
         const col = document.createElement('div');
         const id = `rep-${Math.random().toString(36).slice(2)}`;
         const control = repeaterControl(sub, repeaterCellValue(row, sub));
+        // "readonly": shown, not changeable (still sent), e.g. a guest's ticket type when editing.
+        if (sub.readonly === true) {
+            markRepeaterControlReadonly(control);
+        }
         control.id = id;
         control.dataset.repeaterField = sub.id;
         control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
@@ -7051,6 +7078,10 @@ function renderRepeaterRow(field, row) {
             };
             control.addEventListener('change', paint);
             paint();
+            if (sub.readonly === true) {
+                yesButton.disabled = true;
+                noButton.disabled = true;
+            }
             group.append(yesButton, noButton);
             col.append(question, group, control);
             if (sub.helperText) {
@@ -7325,6 +7356,27 @@ function collectRepeaterValue(form, field) {
 
         return row;
     });
+}
+
+
+/** A repeater control shown but not changeable: inputs are read-only; a select or checkbox ignores changes (its value is still sent). */
+function markRepeaterControlReadonly(control) {
+    control.dataset.readonly = 'true';
+    control.setAttribute('aria-readonly', 'true');
+    control.classList.add('bg-body-secondary');
+    if (control.tagName === 'SELECT' || control.type === 'checkbox') {
+        const keep = () => { control.dataset.keep = control.type === 'checkbox' ? String(control.checked) : control.value; };
+        keep();
+        control.addEventListener('mousedown', (e) => e.preventDefault());
+        control.addEventListener('keydown', (e) => { if (e.key !== 'Tab') e.preventDefault(); });
+        control.addEventListener('change', () => {
+            if (control.type === 'checkbox') control.checked = control.dataset.keep === 'true';
+            else control.value = control.dataset.keep;
+        });
+        control.style.pointerEvents = 'none';
+    } else {
+        control.readOnly = true;
+    }
 }
 
 ;/* ---- js/form/validation/customValidationMessage.js ---- */

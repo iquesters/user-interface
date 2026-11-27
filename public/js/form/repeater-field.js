@@ -87,6 +87,14 @@ function renderRepeaterField(field, addTo, readOnly) {
     rows.forEach(row => list.appendChild(renderRepeaterRow(field, row)));
     numberRepeaterRows(field, list);
 
+    // "fixedRows": true: the rows given, no adding or removing (e.g. editing a registration's guests).
+    if (field.fixedRows === true) {
+        if (typeof createHelperText === 'function' && field.helperText) {
+            createHelperText(field, fragment);
+        }
+        return;
+    }
+
     const add = document.createElement('button');
     add.type = 'button';
     add.classList.add('btn', 'btn-sm', 'btn-outline-secondary', 'mt-2');
@@ -139,6 +147,11 @@ function renderRepeaterRow(field, row) {
         }
     });
 
+    if (field.fixedRows === true) {
+        remove.classList.add('d-none');
+        remove.disabled = true;
+    }
+
     if (asCard) {
         const header = document.createElement('div');
         header.classList.add('d-flex', 'align-items-center', 'justify-content-between', 'mb-2');
@@ -175,6 +188,10 @@ function renderRepeaterRow(field, row) {
         const col = document.createElement('div');
         const id = `rep-${Math.random().toString(36).slice(2)}`;
         const control = repeaterControl(sub, repeaterCellValue(row, sub));
+        // "readonly": shown, not changeable (still sent), e.g. a guest's ticket type when editing.
+        if (sub.readonly === true) {
+            markRepeaterControlReadonly(control);
+        }
         control.id = id;
         control.dataset.repeaterField = sub.id;
         control.dataset.repeaterMeta = sub.meta === true ? 'true' : 'false';
@@ -220,6 +237,10 @@ function renderRepeaterRow(field, row) {
             };
             control.addEventListener('change', paint);
             paint();
+            if (sub.readonly === true) {
+                yesButton.disabled = true;
+                noButton.disabled = true;
+            }
             group.append(yesButton, noButton);
             col.append(question, group, control);
             if (sub.helperText) {
@@ -494,4 +515,25 @@ function collectRepeaterValue(form, field) {
 
         return row;
     });
+}
+
+
+/** A repeater control shown but not changeable: inputs are read-only; a select or checkbox ignores changes (its value is still sent). */
+function markRepeaterControlReadonly(control) {
+    control.dataset.readonly = 'true';
+    control.setAttribute('aria-readonly', 'true');
+    control.classList.add('bg-body-secondary');
+    if (control.tagName === 'SELECT' || control.type === 'checkbox') {
+        const keep = () => { control.dataset.keep = control.type === 'checkbox' ? String(control.checked) : control.value; };
+        keep();
+        control.addEventListener('mousedown', (e) => e.preventDefault());
+        control.addEventListener('keydown', (e) => { if (e.key !== 'Tab') e.preventDefault(); });
+        control.addEventListener('change', () => {
+            if (control.type === 'checkbox') control.checked = control.dataset.keep === 'true';
+            else control.value = control.dataset.keep;
+        });
+        control.style.pointerEvents = 'none';
+    } else {
+        control.readOnly = true;
+    }
 }

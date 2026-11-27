@@ -263,7 +263,8 @@
     @if (count($skeletonActionRows) > 0)
     <!-- Footer Section (row-grouped, matches setupFormFooter()'s multi-row layout) -->
     @foreach ($skeletonActionRows as $rowIndex => $actionRow)
-      <div class="d-flex align-items-center {{ $actionRow['justify'] }} gap-2 placeholder-wave mb-3 {{ $rowIndex === 0 ? 'mt-2' : '' }}">
+      {{-- The first row as the real one: the action bar's gap and line above it (lab-form-actions). --}}
+      <div class="d-flex align-items-center {{ $actionRow['justify'] }} gap-2 placeholder-wave {{ $rowIndex === 0 ? 'lab-form-actions' : 'mb-3' }}">
         @foreach ($actionRow['items'] as $item)
           @if ($item['shape'] === 'link')
             {{-- Plain-text link (addAction() gives it no button chrome) — a short, thin bar, not a box --}}
@@ -277,9 +278,10 @@
     @endforeach
     @elseif ($skeletonButtonCount > 0)
     <!-- Footer Section -->
-    <div class="d-flex justify-content-end gap-2 placeholder-wave">
+    {{-- As the real buttons: the action bar's gap and line above them (lab-form-actions), button-sized placeholders. --}}
+    <div class="d-flex justify-content-end gap-2 placeholder-wave lab-form-actions">
       @for ($i = 0; $i < $skeletonButtonCount; $i++)
-        <div class="bg-info-subtle rounded col-2 p-4"></div>
+        <div class="bg-info-subtle rounded" style="width: 96px; height: 2.5rem;"></div>
       @endfor
     </div>
     @endif
