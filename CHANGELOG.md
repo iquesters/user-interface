@@ -5,6 +5,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Fixed (form skeleton)
+- **The loading skeleton keeps the gap above the buttons**: its button row has the real action bar's spacing and line (`lab-form-actions`) and button-sized placeholders, so it no longer sits on the last field.
+
+### Added (forms)
+- **`lab-form:submitted` can be cancelled**: a page that shows a form's result itself calls `event.preventDefault()`, and the form then doesn't reload the page (a server's `redirect_url` is still followed).
+- **Field options `"digitsOnly": true`** (only digits can be typed or pasted, at most `maxLength`), **`"inputmode"`** and **`"autocomplete"`** (e.g. a verification code: numeric keyboard, filled from the SMS or email).
+
+### Added (repeaters)
+- **`"fixedRows": true`**: the rows given, with no *Add* or *Remove* (e.g. correcting a registration's guests).
+- **A sub-field's `"readonly": true`**: shown, not changeable, still sent (a select or checkbox ignores changes; Yes / No buttons are disabled).
+
 ## [2.2.0] – 2026-11-27
 
 _Also covers 2.0.1, 2.1.0 and 2.1.1, which were tagged without their own heading._

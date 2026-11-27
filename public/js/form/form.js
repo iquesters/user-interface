@@ -320,8 +320,9 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
 
         if (buttonCount > 0) {
             const footer = document.createElement(HTML_TAG.DIV);
-            footer.className = `d-flex align-items-center ${align} gap-2 mt-2`;
-            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 80px; height: 31px;')).join('');
+            // As the real buttons: the action bar's gap and line above them (lab-form-actions), button-sized.
+            footer.className = `d-flex align-items-center ${align} gap-2 lab-form-actions`;
+            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 96px; height: 2.5rem;')).join('');
             skeleton.appendChild(footer);
         }
     }
@@ -1237,8 +1238,15 @@ function bindDynamicFormSubmit(formElement, formMeta) {
     formElement.addEventListener('submit', event => handleDynamicFormSubmit(event, formMeta));
 }
 
+/**
+ * Tells the page what happened. "lab-form:submitted" is cancelable: a page that
+ * shows the result itself (e.g. the next step of sign-in) calls
+ * event.preventDefault(), and the form then doesn't reload the page; a
+ * redirect_url from the server is still followed. Returns false when prevented.
+ */
 function dispatchDynamicFormEvent(eventName, detail = {}) {
-    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    const event = new CustomEvent(eventName, { detail, cancelable: eventName === 'lab-form:submitted' });
+    window.dispatchEvent(event);
 
     if (eventName === 'lab-form:submitted') {
         window.dispatchEvent(new CustomEvent('shoz-form:submitted', { detail }));
@@ -1247,6 +1255,8 @@ function dispatchDynamicFormEvent(eventName, detail = {}) {
     if (eventName === 'lab-form:submit-failed') {
         window.dispatchEvent(new CustomEvent('shoz-form:submit-failed', { detail }));
     }
+
+    return !event.defaultPrevented;
 }
 
 function resolveDynamicFormMessage(result, fallbackMessage) {
@@ -1635,7 +1645,7 @@ async function handleDynamicFormSubmit(event, formMeta) {
         }
 
         const successMessage = resolveDynamicFormMessage(result, 'Form submitted successfully.');
-        dispatchDynamicFormEvent('lab-form:submitted', {
+        const pageLetsFormContinue = dispatchDynamicFormEvent('lab-form:submitted', {
             formId: form.id,
             endpoint,
             method,
@@ -1647,8 +1657,9 @@ async function handleDynamicFormSubmit(event, formMeta) {
         // fixed-endpoint form) is explicitly telling the client where to go
         // next — honor it before falling back to inbox/detail-view handling,
         // which only applies to entity-backed forms rendered inside a modal.
+        // The page showing the result itself (it prevented "lab-form:submitted") keeps it: no reload.
         const redirectUrl = result?.redirect_url || result?.response_schema?.data?.redirect_url
-            || resolveSuccessRedirect(formMeta, form, detailContext);
+            || (pageLetsFormContinue ? resolveSuccessRedirect(formMeta, form, detailContext) : null);
         if (redirectUrl) {
             isRedirecting = true;
             // The message shows on the next page (the snackbar would vanish with this one).
