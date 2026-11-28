@@ -1,6 +1,6 @@
 {
     "file": "dist/userinterface.js",
-    "hash": "d382e12e1eda",
+    "hash": "a74a28e537ad",
     "sources": [
         "js/00-ui-shared-constants.js",
         "js/api-client.js",
