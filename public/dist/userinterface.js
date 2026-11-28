@@ -4156,8 +4156,9 @@ function buildFormSkeletonElement(schema = null, formMode = 'edit') {
 
         if (buttonCount > 0) {
             const footer = document.createElement(HTML_TAG.DIV);
-            footer.className = `d-flex align-items-center ${align} gap-2 mt-2`;
-            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 80px; height: 31px;')).join('');
+            // As the real buttons: the action bar's gap and line above them (lab-form-actions), button-sized.
+            footer.className = `d-flex align-items-center ${align} gap-2 lab-form-actions`;
+            footer.innerHTML = Array.from({ length: buttonCount }, () => bar('', 'width: 96px; height: 2.5rem;')).join('');
             skeleton.appendChild(footer);
         }
     }
@@ -7096,10 +7097,12 @@ function renderRepeaterRow(field, row) {
 
         col.classList.add(...(asCard ? ['col-12', 'col-sm-6', 'col-lg-4'] : ['col-12', 'col-md']));
         label.classList.add('form-label', 'small', 'mb-1');
-        if (sub.required) {
+        if (sub.required || sub.requiredWhen?.field) {
             const star = document.createElement('span');
             star.classList.add('text-danger', 'ms-1');
             star.textContent = '*';
+            // "requiredWhen": the star shows only while the field is required.
+            star.dataset.requiredStar = 'true';
             label.appendChild(star);
         }
         col.append(label, control);
@@ -7134,9 +7137,13 @@ function numberRepeaterRows(field, list) {
  * Within a row, a sub-field with "showWhen": {"field": "alumnus", "equals": true}
  * shows only while that sibling has the value (a checkbox: ticked or not). A
  * hidden one isn't required and its value isn't sent.
+ *
+ * "requiredWhen": {"field": "member", "equals": true} keeps the sub-field shown
+ * but required (with its star) only while that sibling has the value, e.g. a
+ * guest's email: optional, needed for a guest joining as a member.
  */
 function applyRepeaterRowVisibility(field, card) {
-    const rules = repeaterSubFields(field).filter(sub => sub.showWhen?.field);
+    const rules = repeaterSubFields(field).filter(sub => sub.showWhen?.field || sub.requiredWhen?.field);
     // A select's option with "showWhen" (e.g. "Child" only while "Joining as a member?" is No).
     const optionRules = repeaterSubFields(field).filter(sub => Array.isArray(sub.options) && sub.options.some(opt => opt?.showWhen?.field));
     if (!rules.length && !optionRules.length) {
@@ -7144,6 +7151,19 @@ function applyRepeaterRowVisibility(field, card) {
     }
     const control = (id) => card.querySelector(`[data-repeater-field="${id}"]`);
     const valueOf = (el) => (el?.type === 'checkbox' ? el.checked : (el?.value ?? ''));
+    // A field the row doesn't have is looked up in the form around it, e.g. each
+    // guest's meal shows only while the form's "How will you attend?" is In person.
+    const outerIds = [...new Set(rules.map(sub => sub.showWhen?.field).filter(id => id && !control(id)))];
+    const outerValue = (id) => {
+        const form = card.closest('form');
+        const inputs = form ? [...form.querySelectorAll(`[name="${id}"]`)].filter(el => el.type !== 'hidden' && !el.closest('.lab-repeater-row')) : [];
+        if (!inputs.length) {
+            return undefined; // not in the form (yet): no condition
+        }
+        if (inputs[0].type === 'radio') return inputs.find(el => el.checked)?.value ?? '';
+        if (inputs[0].type === 'checkbox') return inputs[0].checked;
+        return inputs[0].value;
+    };
     const matches = (value, expected) => (Array.isArray(expected) ? expected : [expected]).some(want => (typeof want === 'boolean'
         ? Boolean(value === true || value === '1' || value === 'true') === want
         : String(value ?? '') === String(want)));
@@ -7179,13 +7199,29 @@ function applyRepeaterRowVisibility(field, card) {
         if (!el || !col) {
             return;
         }
-        const parent = control(sub.showWhen.field);
-        // Hidden when the field it depends on is hidden too (e.g. "Class left after" needs "Completed at").
-        const show = !parent?.disabled && matches(valueOf(parent), sub.showWhen.equals ?? true);
+        let show = true;
+        if (sub.showWhen?.field && outerIds.includes(sub.showWhen.field)) {
+            const value = outerValue(sub.showWhen.field);
+            show = value === undefined || matches(value, sub.showWhen.equals ?? true);
+        } else if (sub.showWhen?.field) {
+            const parent = control(sub.showWhen.field);
+            // Hidden when the field it depends on is hidden too (e.g. "Class left after" needs "Completed at").
+            show = !parent?.disabled && matches(valueOf(parent), sub.showWhen.equals ?? true);
+        }
         col.style.display = show ? '' : 'none';
         el.disabled = !show; // not sent, not checked
-        if (sub.required) {
-            el.required = show;
+
+        let needed = Boolean(sub.required);
+        if (sub.requiredWhen?.field) {
+            const parent = control(sub.requiredWhen.field);
+            // A hidden field counts as unanswered (empty / No).
+            const value = parent && !parent.disabled ? valueOf(parent) : (parent?.type === 'checkbox' ? false : '');
+            needed = matches(value, sub.requiredWhen.equals ?? true);
+            const star = col.querySelector('[data-required-star]');
+            if (star) star.style.display = needed ? '' : 'none';
+        }
+        if (sub.required || sub.requiredWhen?.field) {
+            el.required = show && needed;
         }
     });
 
@@ -7196,12 +7232,28 @@ function applyRepeaterRowVisibility(field, card) {
 
     update();
     new Set([
-        ...rules.map(sub => sub.showWhen.field),
+        ...rules.flatMap(sub => [sub.showWhen?.field, sub.requiredWhen?.field].filter(Boolean)),
         ...optionRules.flatMap(sub => sub.options.filter(opt => opt?.showWhen?.field).map(opt => opt.showWhen.field)),
     ]).forEach(id => {
         control(id)?.addEventListener('change', update);
         control(id)?.addEventListener('input', update);
     });
+    // Fields of the form around the row: once the row is in the form, follow them.
+    if (outerIds.length) {
+        setTimeout(() => {
+            const form = card.closest('form');
+            if (!form) return;
+            update();
+            const follow = (e) => {
+                if (!card.isConnected) {
+                    form.removeEventListener('change', follow);
+                    return;
+                }
+                if (outerIds.includes(e.target?.name)) update();
+            };
+            form.addEventListener('change', follow);
+        }, 0);
+    }
 }
 
 const repeaterOptionsCache = new Map();
@@ -7573,6 +7625,10 @@ window.applyFieldValidation = function (field, input) {
   if (given(field.max)) input.setAttribute(VALIDATION_KEYS.MAX, field.max);
   if (given(field.step)) input.setAttribute(VALIDATION_KEYS.STEP, field.step);
   if (typeof blockNegativeNumberKeys === 'function') blockNegativeNumberKeys(field, input);
+  // Mobile keyboards and autofill: "inputmode": "numeric", "autocomplete": "one-time-code".
+  if (given(field.inputmode)) input.setAttribute('inputmode', field.inputmode);
+  if (given(field.autocomplete)) input.setAttribute('autocomplete', field.autocomplete);
+  if (field.digitsOnly === true) keepDigitsOnly(field, input);
 
 
   // input type file
@@ -7793,6 +7849,26 @@ function blockNegativeNumberKeys(field, input) {
   });
   input.addEventListener('input', () => {
     if (input.value !== '' && Number(input.value) < 0) input.value = String(Math.abs(Number(input.value)));
+  });
+}
+
+
+/**
+ * "digitsOnly": true (e.g. a verification code): only digits can be typed or
+ * pasted, and no more than maxLength of them; spaces or dashes in a pasted
+ * code are dropped.
+ */
+function keepDigitsOnly(field, input) {
+  const max = Number(field?.maxLength) || null;
+  input.setAttribute('inputmode', field?.inputmode || 'numeric');
+  input.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return; // shortcuts, arrows, Backspace
+    if (!/[0-9]/.test(e.key)) e.preventDefault();
+  });
+  input.addEventListener('input', () => {
+    let digits = String(input.value || '').replace(/\D+/g, '');
+    if (max) digits = digits.slice(0, max);
+    if (digits !== input.value) input.value = digits;
   });
 }
 

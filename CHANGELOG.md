@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follo
 
 ## [Unreleased]
 
+### Added (repeater)
+- **A row's field may follow a field of the form around it**: a sub-field's `showWhen` naming a field the row doesn't have looks it up in the form (e.g. each guest's meal shows only while the form's *How will you attend?* is *In person*). Rows added later follow it too; a hidden field isn't required or sent.
+- **`requiredWhen`** on a repeater sub-field: `{"field": "member", "equals": true}` keeps the field shown but required (with its star) only while that sibling has the value, e.g. a guest's email and mobile, needed only for a guest joining as a member. Works with `showWhen` (a hidden field is never required).
+
+## [2.3.0] - 2026-11-27
+
 ### Fixed (form skeleton)
 - **The loading skeleton keeps the gap above the buttons**: its button row has the real action bar's spacing and line (`lab-form-actions`) and button-sized placeholders, so it no longer sits on the last field.
 
